@@ -25,6 +25,11 @@ try {
     await capture('01 / 世界 · 八十亿种可能，从这里开始', 1800);
     await page.locator('[data-pref="pace"][data-value="slow"]').click();
     await page.locator('[data-action="new"]').click();
+    await capture('命运抽卡 · 起点由命运揭晓', 1600);
+    await page.locator('[data-gacha-card]').click();
+    await page.locator('.avatar-hero').waitFor();
+    await capture('专属主角 · 这一生从这里开始', 2200);
+    await page.locator('[data-action="gacha-accept"]').click();
     await capture('02 / 出生证 · 随机起点，独一无二的名字', 1800);
     await page.locator('[data-action="begin"]').click();
     await page.locator('[data-action="pause"]').click();

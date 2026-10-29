@@ -35,7 +35,7 @@ if manifest_path.exists():
             draw.rectangle((0, 700, 960, 790), fill=INK)
             draw.rectangle((0, 700, round(960*(index+1)/len(manifest['frames'])), 704), fill='#c7a976')
             text(draw, (27, 722), entry['caption'], 23, '#f2f3ed')
-            text(draw, (27, 760), '80亿分之1  /  独立复刻 DEMO · 真实浏览器操作录制', 12, '#c6d1ca')
+            text(draw, (27, 760), '80亿分之1  /  人生模拟 · 真实浏览器操作录制', 12, '#c6d1ca')
             text(draw, (865, 754), f'{index+1:02d} / {len(manifest["frames"]):02d}', 13, '#c6d1ca')
             frames.append(canvas.quantize(colors=112, method=Image.Quantize.MEDIANCUT))
             durations.append(entry['duration'])
@@ -52,7 +52,7 @@ draw = ImageDraw.Draw(canvas)
 text(draw, (70, 43), 'ONE IN EIGHT BILLION  /  INTERFACE FLOW', 18, WINE)
 text(draw, (67, 80), '80亿分之1 · 原型预览', 50)
 text(draw, (71, 156), '从偶然的起点，到完整的一生。十二个界面节点，连接同一段体验。', 22, MUTED)
-text(draw, (1980, 105), '独立复刻 DEMO', 20, WINE)
+text(draw, (1980, 105), '在线人生体验', 20, WINE)
 draw.line((70, 206, 2330, 206), fill=LINE, width=2)
 cards = [
  ('01', '世界 / 首页', '设置时代与节奏，抽选出生的起点。', 'desktop-home.png'),
@@ -62,7 +62,7 @@ cards = [
  ('05', '投资 · 资产', '存款、基金、债券、股票与不动产。', 'feature-invest-overview.png'),
  ('06', '去旅行', '十六个目的地，选择同行的人。', 'feature-travel.png'),
  ('07', '动态家庭 · 育儿', '生育与照护安排，孩子按年成长。', 'dynamic-family.png'),
- ('08', '家庭与宠物', '领养有名字的猫狗，陪伴与老去。', 'dynamic-family.png'),
+ ('08', '命运抽卡 · 像素主角', '翻开出生地，认识这一生的自己。', 'gacha-revealed.png'),
  ('09', '创业经营', '开设小店，记录每年的盈亏。', 'dynamic-business.png'),
  ('10', '就医治疗', '体检之后，选择规范、基础或拖延。', 'dynamic-hospital.png'),
  ('11', '迁居 · 独自出国', '移居另一座城市或国家，重新安家。', 'dynamic-moving.png'),
@@ -95,7 +95,7 @@ for idx, (num, title, desc, image) in enumerate(cards):
         draw.line((48, gy+258, 60, gy+258), fill=TEAL, width=2)
         draw.polygon([(62, gy+258), (53, gy+251), (53, gy+265)], fill=TEAL)
 draw.line((70, 1612, 2330, 1612), fill=LINE, width=2)
-text(draw, (70, 1638), '真实界面截图 · 原型用于展示界面流程，在线试玩请打开游戏 Demo。', 19, MUTED)
+text(draw, (70, 1638), '真实界面截图 · 原型用于展示界面流程，在线试玩请打开游戏。', 19, MUTED)
 text(draw, (1960, 1638), 'github.com/GosuQuan', 18, WINE)
 canvas.save(DOCS/'prototype.png', optimize=True)
 print(f'prototype.png: {(DOCS/"prototype.png").stat().st_size:,} bytes; {canvas.width}×{canvas.height}')

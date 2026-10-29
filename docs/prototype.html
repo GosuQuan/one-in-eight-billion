@@ -12,13 +12,16 @@
 <div class="shell">
 <header><a class="brand" href="../index.html">80亿分之<em>1</em><span class="tag">PROTOTYPE</span></a><a href="https://github.com/GosuQuan/one-in-eight-billion" target="_blank" rel="noopener">查看源码 ↗</a></header>
 <div class="layout">
-<aside><div class="eyebrow">INTERFACE FLOW / 09 STAGES</div><h1>原型预览 / 界面流程</h1><p>用真实界面截图，浏览一段人生的起承转合。</p><nav aria-label="界面阶段" id="nav"></nav><a class="try" href="../index.html">进入游戏 Demo，在线试玩 ↗</a><p class="aside-note">这是截图交互原型。使用左侧导航浏览界面，游戏操作请进入在线试玩。</p></aside>
+<aside><div class="eyebrow">INTERFACE FLOW / 12 STAGES</div><h1>原型预览 / 界面流程</h1><p>用真实界面截图，浏览一段人生的起承转合。</p><nav aria-label="界面阶段" id="nav"></nav><a class="try" href="../index.html">进入游戏，在线试玩 ↗</a><p class="aside-note">这是截图交互原型。使用左侧导航浏览界面，游戏操作请进入在线试玩。</p></aside>
 <main><div class="stage-head"><div><h2 id="title"></h2><p id="description"></p></div><div class="counter" id="counter"></div></div><div class="browser"><div class="chrome"><i></i><i></i><i></i><span>80亿分之1 · 真实界面截图</span></div><div class="viewport" id="viewport"><img id="screen" alt=""></div></div><div class="bar"><button id="prev" type="button">← 上一步</button><div class="dots" id="dots" aria-label="切换阶段"></div><button id="next" type="button">下一步 →</button></div><p class="hint">← → 键切换阶段 · 截图区域可滚动查看完整页面 · 本页可直接从本地打开</p><p role="status" aria-live="polite" id="status" style="position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)"></p></main>
-</div><footer><span>独立复刻 Demo · 截图原型用于展示页面与流程，非原站官方产品。</span><span><a href="prototype.png" target="_blank">原型总览 ↗</a>　·　<a href="demo.gif" target="_blank">查看完整演示 GIF ↗</a></span></footer>
+</div><footer><span>人生模拟 · 截图原型用于展示页面与流程，非原站官方产品。</span><span><a href="prototype.png" target="_blank">原型总览 ↗</a>　·　<a href="demo.gif" target="_blank">查看完整演示 GIF ↗</a></span></footer>
 </div>
 <script>
 const stages=[
 ['世界 / 首页','设置出生时代、抽选方式与节奏，让故事从偶然开始。','desktop-home.png'],
+['命运抽卡','翻开出生国家，认识与你一起长大的像素主角。','gacha-revealed.png'],
+['家庭与宠物','具名家人与宠物在场景中陪伴，育儿安排影响成长。','dynamic-family.png'],
+['创业与医疗','经营事业、安排就医，选择会带来具体后果。','dynamic-hospital.png'],
 ['出生证','查看随机身份、出生城市与家庭起点，准备开始这一生。','desktop-birth.png'],
 ['生活仪表盘','档案与状态、像素场景、年度重心和人生记录，在同一屏展开。','desktop-life.png'],
 ['人生的岔路口','在成长的关键节点作出选择，新的经历会继续写进记录。','desktop-choice.png'],
@@ -30,7 +33,7 @@ const stages=[
 ];
 let current=0;const $=id=>document.getElementById(id);const nav=$('nav'),dots=$('dots');
 stages.forEach((s,i)=>{const b=document.createElement('button');b.type='button';b.innerHTML='<span>'+String(i+1).padStart(2,'0')+'</span>'+s[0];b.onclick=()=>show(i);nav.append(b);const dot=document.createElement('button');dot.type='button';dot.setAttribute('aria-label','查看'+s[0]);dot.onclick=()=>show(i);dots.append(dot)});
-function show(i){current=Math.max(0,Math.min(stages.length-1,i));const [title,description,file]=stages[current];$('title').textContent=title;$('description').textContent=description;$('counter').textContent=String(current+1).padStart(2,'0')+' / '+String(stages.length).padStart(2,'0');$('screen').src='screenshots/'+file;$('screen').alt=title+' — 游戏 Demo 实际界面截图';$('viewport').classList.toggle('mobile',current===stages.length-1);$('viewport').scrollTop=0;[...nav.children].forEach((b,j)=>{b.classList.toggle('active',j===current);b.setAttribute('aria-current',j===current?'step':'false')});[...dots.children].forEach((b,j)=>b.classList.toggle('active',j===current));$('prev').disabled=current===0;$('next').disabled=current===stages.length-1;$('status').textContent='第'+(current+1)+'阶段：'+title;location.hash='stage-'+(current+1)}
+function show(i){current=Math.max(0,Math.min(stages.length-1,i));const [title,description,file]=stages[current];$('title').textContent=title;$('description').textContent=description;$('counter').textContent=String(current+1).padStart(2,'0')+' / '+String(stages.length).padStart(2,'0');$('screen').src='screenshots/'+file;$('screen').alt=title+' — 游戏实际界面截图';$('viewport').classList.toggle('mobile',current===stages.length-1);$('viewport').scrollTop=0;[...nav.children].forEach((b,j)=>{b.classList.toggle('active',j===current);b.setAttribute('aria-current',j===current?'step':'false')});[...dots.children].forEach((b,j)=>b.classList.toggle('active',j===current));$('prev').disabled=current===0;$('next').disabled=current===stages.length-1;$('status').textContent='第'+(current+1)+'阶段：'+title;location.hash='stage-'+(current+1)}
 $('prev').onclick=()=>show(current-1);$('next').onclick=()=>show(current+1);document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){e.preventDefault();show(current+1)}if(e.key==='ArrowLeft'){e.preventDefault();show(current-1)}});window.addEventListener('hashchange',()=>{const n=Number(location.hash.replace('#stage-',''));if(n>=1&&n<=stages.length&&n!==current+1)show(n-1)});show(Number(location.hash.replace('#stage-',''))-1||0);
 </script>
 </body>

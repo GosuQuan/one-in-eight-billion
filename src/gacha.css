@@ -1,0 +1,64 @@
+/* gacha.css —— 国家抽卡 & 专属像素小人（只依赖 style.css 的 --wine/--teal/--ink/--paper 体系） */
+
+/* 舞台：居中大卡 */
+.gacha-stage{min-height:52vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;padding:34px 16px 46px;perspective:1100px}
+.gacha-title{font:24px var(--serif);letter-spacing:1px;text-align:center}
+.gacha-title em{color:var(--wine);font-style:normal}
+.gacha-hint{font-size:10px;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted)}
+
+/* 卡片本体：3D 翻转（--flip 0..1 由 JS 注入，也可纯 .flipped 触发） */
+.gacha-card{position:relative;width:300px;height:434px;border:0;background:none;padding:0;cursor:pointer;transform-style:preserve-3d;transform:rotateY(calc(var(--flip,0)*180deg));transition:transform .9s cubic-bezier(.2,.75,.25,1)}
+.gacha-card.flipped{--flip:1;transform:rotateY(180deg)}
+.gacha-face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border:1px solid var(--line);box-shadow:var(--shadow);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:26px}
+
+/* 卡背：暗色纹理 + ？ + 五角星 / 地球（SVG 内联于 art.js） */
+.gacha-back{background:var(--ink);color:var(--paper)}
+.gacha-back:before{content:'';position:absolute;inset:10px;border:1px solid #ffffff2e;background:repeating-linear-gradient(45deg,#ffffff08 0 5px,#ffffff00 5px 10px),repeating-linear-gradient(-45deg,#ffffff06 0 5px,#ffffff00 5px 10px)}
+.gacha-back .gacha-q{font:84px var(--serif);color:var(--paper);text-shadow:0 0 26px #0000006b;z-index:1}
+.gacha-back .gacha-star{width:30px;height:30px;fill:var(--gold);opacity:.85;position:absolute;top:30px;right:30px}
+.gacha-back .gacha-globe{width:44px;height:44px;stroke:var(--paper);opacity:.55;position:absolute;bottom:30px;left:30px}
+
+/* 卡面：国家信息 */
+.gacha-front{background:var(--paper);transform:rotateY(180deg)}
+.gacha-front:before{content:'';position:absolute;inset:10px;border:1px solid var(--line);pointer-events:none}
+.gacha-flag{font-size:56px;line-height:1}
+.gacha-name{font:30px var(--serif);letter-spacing:2px;color:var(--ink)}
+.gacha-city{font-size:11px;letter-spacing:1.5px;color:var(--muted)}
+.gacha-stats{display:flex;gap:26px;margin-top:8px}
+.gacha-stat{text-align:center}
+.gacha-stat strong{display:block;font:22px var(--serif);color:var(--wine);font-variant-numeric:tabular-nums}
+.gacha-stat span{display:block;margin-top:3px;font-size:9px;letter-spacing:1.5px;color:var(--muted)}
+
+/* 揭晓时的酒红光晕 */
+.gacha-glow{position:relative}
+.gacha-glow:after{content:'';position:absolute;inset:-34px;border-radius:50%;background:radial-gradient(closest-side,#8c294642,#8c294600 72%);z-index:-1;animation:gacha-glow-pulse 2.6s ease-in-out infinite}
+
+@keyframes gacha-glow-pulse{0%,100%{opacity:.45;transform:scale(.96)}50%{opacity:1;transform:scale(1.05)}}
+
+/* 专属像素小人：站在圆形地台上，2.4s 呼吸 */
+.avatar-hero{display:flex;flex-direction:column;align-items:center;gap:10px}
+.avatar-hero .avatar-svg{display:block;animation:avatar-breathe 2.4s ease-in-out infinite}
+.avatar-hero .hero-ground{width:128px;height:30px;border-radius:50%;background:radial-gradient(closest-side,var(--line),#00000000 78%)}
+.avatar-hero .hero-name{font:22px var(--serif);letter-spacing:2px;color:var(--ink)}
+.avatar-hero .hero-name em{color:var(--wine);font-style:normal}
+.hero-caption{font-size:10px;letter-spacing:1.8px;color:var(--muted)}
+
+@keyframes avatar-breathe{0%,100%{transform:translateY(0) scaleY(1)}50%{transform:translateY(-2px) scaleY(1.014)}}
+
+/* 移动端 */
+@media (max-width:640px){
+ .gacha-stage{gap:20px;padding:26px 12px 38px}
+ .gacha-card{width:260px;height:378px}
+ .gacha-flag{font-size:44px}
+ .gacha-name{font-size:24px}
+ .gacha-back .gacha-q{font-size:66px}
+ .avatar-hero .avatar-svg{width:96px;height:96px}
+ .avatar-hero .hero-ground{width:104px;height:26px}
+ .avatar-hero .hero-name{font-size:19px}
+}
+
+/* 减少动态效果 */
+@media (prefers-reduced-motion:reduce){
+ .gacha-card{transition:none}
+ .gacha-glow:after,.avatar-hero .avatar-svg{animation:none}
+}

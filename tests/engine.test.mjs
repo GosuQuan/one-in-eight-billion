@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   COUNTRIES, DESTINATIONS, STOCKS, createLife, upgradeLife, advanceYear, choose,
   setFocus, summarize, rng, netWorth, investedValue, invest, withdraw, buyStock,
-  sellStock, buyHouse, buyCar, buyItem, travel, travelCost
+  sellStock, investStocks, STOCK_RISKS, buyHouse, buyCar, buyItem, travel, travelCost
 } from '../src/engine.js';
 
 const clone = value => JSON.parse(JSON.stringify(value));
@@ -35,7 +35,7 @@ test('birth creates complete serializable life and four same-year companions',()
   assert.ok(life.market && life.investments && life.travels);
   for(const p of life.companions) assert.equal(p.birthYear,life.birthYear);
   assert.deepEqual(clone(life),life);
-  assert.match(life.notes.join(''),/近似/);
+  assert.equal(life.notes.length,0,'notes start empty');
 });
 
 test('era presets, population mode and destination pricing are deterministic',()=>{
@@ -143,6 +143,76 @@ test('investing, withdrawing, stock trading and fees move cash and net worth cor
   const sell=sellStock(life,'NOVA',life.holdings[0].shares);
   assert.equal(sell.ok,true);assert.equal(life.holdings.length,0);
   assert.ok(life.money>15000);
+});
+
+test('stock_tip offers risk tolerance choices, settles distinct gains and losses, and logs outcomes',()=>{
+ let pending;
+ for(let seed=0;seed<10&&!pending;seed++){
+  const life=createLife({seed,country:'US'});life.age=22;life.money=5000;life.debt=0;
+  for(let n=0;n<70&&!life.dead;n++){
+   if(life.pending?.eventId==='stock_tip'){pending=clone(life);break;}
+   if(life.pending)choose(life,0);else advanceYear(life);
+  }
+ }
+ assert.ok(pending,'stock_tip appears in seeded lives');
+ assert.deepEqual(pending.pending.options.map(o=>o.key),['conservative','moderate','high','pass']);
+ assert.deepEqual(pending.pending.options.map(o=>o.label),['保守投入','适度投入','高风险投入','不投']);
+ for(const stock of STOCKS)assert.ok(pending.pending.options.every(o=>!o.label.includes(stock.name)));
+ for(const randomState of [0,1,2,3,4,5,6,7,8,9]){
+  const gains=[];
+  for(const [index,risk] of STOCK_RISKS.entries()){
+   const life=clone(pending);life.money=100000;life.randomState=randomState;
+   choose(life,index);
+   const gain=life.money-100000;gains.push(gain);
+   assert.ok(gain>=25000*risk.minReturn-1&&gain<=25000*risk.maxReturn+1);
+   assert.equal(life.log.at(-1).type,'consequence');
+   assert.match(life.log.at(-1).text,/投入 25000.*系统.*(盈利|亏损).*收回/);
+   assert.ok(life.log.at(-1).text.includes(risk.name));
+   const restored=clone(pending);restored.money=100000;restored.randomState=randomState;choose(restored,index);
+   assert.deepEqual(restored,life,'risk settlement survives JSON round trip');
+  }
+  assert.equal(new Set(gains).size,3,'risk levels produce distinct settlements');
+ }
+ const outcomes=Array.from({length:30},(_,randomState)=>{
+  const life=clone(pending);life.money=100000;life.randomState=randomState;choose(life,2);return life.money-100000;
+ });
+ assert.ok(outcomes.some(g=>g<0)&&outcomes.some(g=>g>0),'risk can genuinely lose and gain money');
+ const skipped=clone(pending),before=skipped.money;choose(skipped,3);
+ assert.equal(skipped.money,before);assert.match(skipped.log.at(-1).title,/不投/);
+});
+
+test('stock risk allocation creates distinct portfolios, preserves legacy holdings and rejects invalid orders',()=>{
+ const original=createLife({seed:'risk-allocation',country:'US'});original.money=10000;
+ buyStock(original,'LOTUS',500);
+ for(const risk of STOCK_RISKS){
+  const life=clone(original),before=life.money;
+  assert.equal(investStocks(life,risk.id,2000).ok,true);
+  assert.equal(life.money,before-2000);
+  for(const [symbol,weight] of Object.entries(risk.allocations)){
+   const prev=original.holdings.find(h=>h.symbol===symbol)?.shares||0;
+   const added=life.holdings.find(h=>h.symbol===symbol).shares-prev;
+   assert.ok(Math.abs(added*life.market.stocks[symbol].price-2000*weight*.995)<1);
+  }
+  assert.match(life.log.at(-1).text,/系统.*配置/);
+  const h=life.holdings.find(h=>h.symbol==='LOTUS');assert.ok(h);
+  assert.equal(sellStock(life,h.symbol,h.shares).ok,true);
+ }
+ for(const [risk,amount] of [['unknown',100],['moderate',0],['moderate',49],['moderate',Infinity],['moderate',10001]]){
+  const life=clone(original),before=clone(life);
+  assert.equal(investStocks(life,risk,amount).ok,false);assert.deepEqual(life,before);
+ }
+ for(const risk of STOCK_RISKS){
+  const life=clone(original);assert.equal(investStocks(life,risk.id,50).ok,true);
+  assert.equal(life.money,original.money-50,'smallest order is fully allocated');
+ }
+ const skipped=clone(original);assert.equal(investStocks(skipped,'pass',0).ok,true);
+ assert.equal(skipped.money,original.money);assert.deepEqual(skipped.holdings,original.holdings);
+ assert.match(skipped.log.at(-1).title,/不投/);
+ const returns=STOCK_RISKS.map(risk=>{
+  const life=clone(original);life.holdings=[];investStocks(life,risk.id,2000);
+  const before=investedValue(life);advanceYear(life,{events:false});return investedValue(life)-before;
+ });
+ assert.equal(new Set(returns).size,3,'actual annual stock returns differ across risk portfolios');
 });
 
 test('market changes investment value and produces annual history',()=>{

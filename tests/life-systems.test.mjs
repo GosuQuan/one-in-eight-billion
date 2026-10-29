@@ -67,11 +67,11 @@ test('medical plans persist, delay harms health and insurance reduces actual exp
  next(d); assert.ok(d.stats.health < health); assert.ok(d.systems.conditions[0].severity > severity);
  assert.equal(getSceneState(a).kind, 'hospital'); a.age++; assert.notEqual(getSceneState(a).kind, 'hospital');
 });
-test('annual world events share calendar headlines, label fiction and include rare war', () => {
+test('annual world events share calendar headlines and include rare war', () => {
  const a = adult('world-a'), b = adult('world-b'); systemsYear(a); systemsYear(b); assert.deepEqual(a.systems.world, b.systems.world);
- assert.equal(a.systems.world.year, a.birthYear + a.age); assert.match(a.systems.world.detail, /模拟|虚构/);
+ assert.equal(a.systems.world.year, a.birthYear + a.age); assert.ok(a.systems.world.detail.length > 0);
  const headlines = [];
- for (let y = 2030; y < 3030; y++) { const l = adult('war'); l.birthYear = y - l.age; systemsYear(l); headlines.push(l.systems.world.kind); if (l.systems.world.kind === 'war') { assert.equal(l.pending.system, 'world-crisis'); assert.match(l.systems.world.detail, /并非事实或预测/); } }
+ for (let y = 2030; y < 3030; y++) { const l = adult('war'); l.birthYear = y - l.age; systemsYear(l); headlines.push(l.systems.world.kind); if (l.systems.world.kind === 'war') { assert.equal(l.pending.system, 'world-crisis'); assert.ok(l.systems.world.detail.length > 0); } }
  assert.ok(headlines.includes('war')); assert.ok(headlines.filter(k => k === 'war').length < 30);
 });
 test('residents respect independent housing, death, absent and adult children', () => {

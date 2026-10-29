@@ -76,6 +76,12 @@ export const STOCKS = [
  {symbol:'LOTUS',name:'莲花医药',sector:'医疗',price:132,mean:.08,vol:.25,beta:.7,blurb:'仿制药与医疗器械，研发消息会带来大波动。'}
 ];
 
+export const STOCK_RISKS = [
+ {id:'conservative',name:'保守',description:'偏向低波动行业，接受较小的涨跌。',allocations:{MOMO:.7,GREEN:.3},minReturn:-.08,maxReturn:.12},
+ {id:'moderate',name:'适度',description:'分散配置多个行业，接受中等幅度亏损。',allocations:{NOVA:.2,GREEN:.2,MOMO:.2,ORBIT:.2,LOTUS:.2},minReturn:-.25,maxReturn:.35},
+ {id:'high',name:'高风险',description:'集中配置高波动行业，可能大赚，也可能大亏。',allocations:{NOVA:.8,ORBIT:.2},minReturn:-.65,maxReturn:.85}
+];
+
 export const PURCHASES = [
  {id:'phone',name:'一部智能手机',desc:'拍照、联系朋友、查资料。',costFactor:.025,happiness:2,knowledge:2,once:true},
  {id:'computer',name:'一台笔记本电脑',desc:'学习、工作、写点自己的东西。',costFactor:.07,happiness:2,knowledge:4,once:true},
@@ -151,7 +157,7 @@ export function createLife({era='now',mode='birth',seed=Date.now(),country,sex,n
    father:{...person(s,c,'男'),age:24+Math.floor(roll(s)*16),job:pick(s,['司机','工人','农民','工程师','小店经营者']),alive:true},
    background:wealth<.25?'生活拮据':wealth>.8?'相对宽裕':'普通家庭',wealth},
   log:[],pending:null,dead:false,deathCause:null,deathAge:null,focus:'joy',companions:[],
-  notes:['本演示使用近似人口、出生、寿命及购买力数据；国家样本有限，概率在样本内归一化。','金钱为购买力折算的演示单位；经历、姓名、公司与未来情境均为虚构。'],
+  notes:[],
   longevity:clamp(c.life+(birthYear===1970?-6:birthYear>=2050?5:0)+(roll(s)-.5)*24,45,106),retired:false,
   investments:initialInvestments(),debt:0,holdings:[],market:initialMarket(),possessions:[],travels:[],house:null,car:false,insurance:false,
   recentEvents:[],lastEventAge:null,lastTravelYear:null,netWorthHistory:[],achievements:[]});
@@ -245,7 +251,12 @@ function marketStep(life){
  life.market.regime=crash?'下跌':boom?'繁荣':Math.abs(idx)>.12?(idx>0?'回暖':'震荡'):'平稳';
  for(const s of STOCKS){
   const st=life.market.stocks[s.symbol];const sector=chance(life,.05)?(roll(life)-.5)*.35:0;
-  const r=clamp(idx*s.beta+(roll(life)-.5)*s.vol*.7+sector,-.7,.8);
+  let r=clamp(idx*s.beta+(roll(life)-.5)*s.vol*.7+sector,-.7,.8);
+  const held=life.holdings.find(h=>h.symbol===s.symbol);
+  if(held){ // 持有越久，这只股的年度涨跌越向它自己的长期平均回报回归
+   held.heldYears=(held.heldYears||0)+1;
+   r=clamp(r+(s.mean-r)*Math.min(.3,(held.heldYears-1)*.1),-.7,.8);
+  }
   st.change=r;st.price=Math.max(1,st.price*(1+r));
   if(st.price>500){st.price/=4;for(const h of life.holdings)if(h.symbol===s.symbol)h.shares*=4;}
   if(st.price<3){st.price*=4;for(const h of life.holdings)if(h.symbol===s.symbol)h.shares/=4;}
@@ -422,9 +433,14 @@ const EVENTS=[
  {id:'side_hustle',age:[22,55],weight:.7,cond:l=>!l.retired&&l.income>0,build:l=>({title:'下班后的副业',text:'朋友拉你一起做一个小项目：周末拍视频，或者接一点设计活。',type:'event',options:[
   {key:'join',label:'试着做起来',description:'少睡一点，多一份可能。',effects:{cash:-800,incomePct:.08,health:-3,knowledge:4}},
   {key:'pass',label:'先顾好主业',description:'把精力留给已经选择的生活。',effects:{happiness:1}}]})},
- {id:'stock_tip',age:[22,65],weight:.7,cond:l=>l.money>800,build:l=>({title:'一个“稳赚”的消息',text:`同事压低声音说，${pick(l,STOCKS).name}下个月一定会涨。他劝你把闲钱都放进去。`,type:'event',options:[
-  {key:'buy',label:'拿一部分钱试试',description:'投入两成现金，看看运气。',resolve:l=>{const amount=l.money*.2;const win=chance(l,.45);const gain=round(amount*(win?.6:-.45));return{text:win?`股票真的涨了。你在饭桌上听同事讲了一晚上“我早就说过”。`:`消息是假的。你卖掉时，少了 ${-gain}。`,effects:{cash:gain,happiness:win?4:-3,knowledge:2}}}},
-  {key:'ignore',label:'只当听了个故事',description:'不把判断交给别人的嘴。',effects:{knowledge:1}}]})},
+ {id:'stock_tip',age:[22,65],weight:.7,cond:l=>l.money>800,build:l=>({title:'行情软件的深夜推送',text:'群里有人晒出收益截图，劝你在市场里下一注。你决定先想清楚自己能承受多大亏损，再由系统配置标的。这次投入四分之一现金，按一段持有期的行情结算。',type:'event',options:[
+   ...STOCK_RISKS.map(risk=>({key:risk.id,label:`${risk.name}投入`,description:`${risk.description} 本次模拟收益范围 ${Math.round(risk.minReturn*100)}% 至 +${Math.round(risk.maxReturn*100)}%。`,resolve:l=>{
+    const amount=round(l.money*.25);
+    const move=risk.minReturn+roll(l)*(risk.maxReturn-risk.minReturn);
+    const gain=round(amount*move);
+    return{text:`你选择${risk.name}风险，投入 ${amount}，系统按风险承受能力分配标的。持有期结束后${gain>=0?'盈利':'亏损'} ${Math.abs(gain)}（${(move*100).toFixed(1)}%），收回 ${amount+gain}。`,effects:{cash:gain,happiness:gain>=0?4:-3,knowledge:2}};
+   }})),
+   {key:'pass',label:'不投',description:'保留现金，不承担这次市场波动。',effects:{knowledge:1}}]})},
  {id:'market_crash',age:[25,75],weight:.6,cond:l=>investedValue(l)>1000,build:l=>({title:'屏幕上的红色',text:'市场连续几天大跌。手机里的数字变小了，群里有人开始骂，有人开始抄底。',type:'market',options:[
   {key:'sell',label:'先卖掉，落袋为安',description:'把能保住的保住。',resolve:l=>({text:'你卖掉了大部分投资。手续费吞掉一点，但今晚终于睡着了。',effects:{sellAll:true,happiness:-2,knowledge:2}})},
   {key:'hold',label:'什么都不做',description:'相信时间，也接受波动。',effects:{happiness:-2,knowledge:3}},
@@ -615,6 +631,29 @@ export function buyStock(life,symbol,amount){
  if(h){h.shares+=shares;}else life.holdings.push({symbol,shares,cost:price});
  log(life,`买入 ${meta.name}`,`以 ${price.toFixed(1)} 的价格买入 ${shares.toFixed(2)} 股，手续费 ${fee}。`,'finance');
  return {ok:true,message:`买入 ${meta.name} ${shares.toFixed(2)} 股`};
+}
+export function investStocks(life,riskId,amount){
+ upgradeLife(life);
+ if(life.dead)return {ok:false,message:'这一生已经结束'};
+ if(riskId==='pass'){
+  log(life,'这次不投股票','你保留了现金，没有新增持仓，也不承担这次投资的波动。','finance');
+  return {ok:true,message:'保留现金，暂不投资'};
+ }
+ const risk=STOCK_RISKS.find(r=>r.id===riskId);
+ if(!risk)return {ok:false,message:'请选择风险承受程度'};
+ amount=Math.round(Number(amount)||0);
+ if(!Number.isFinite(amount)||amount<50)return {ok:false,message:'请输入至少 50 的有效金额'};
+ if(life.money<amount)return {ok:false,message:'现金不足'};
+ const allocations=Object.entries(risk.allocations);
+ // Validate the whole order before buying so an invalid market cannot leave a partial purchase.
+ if(allocations.some(([symbol])=>!Number.isFinite(life.market.stocks[symbol]?.price)||life.market.stocks[symbol].price<=0))return {ok:false,message:'行情暂不可用'};
+ let remaining=amount;
+ for(const [index,[symbol,weight]] of allocations.entries()){
+  const part=index===allocations.length-1?remaining:Math.floor(amount*weight);
+  buyStock(life,symbol,part);remaining-=part;
+ }
+ log(life,`${risk.name}风险投资`,`投入 ${amount}，系统按${risk.name}风险配置：${allocations.map(([symbol,weight])=>`${STOCKS.find(s=>s.symbol===symbol).name} ${Math.round(weight*100)}%`).join('、')}。持仓随每年行情变化，可能盈利或亏损。`,'finance');
+ return {ok:true,message:`已按${risk.name}风险配置 ${amount}`};
 }
 export function sellStock(life,symbol,shares){
  upgradeLife(life);

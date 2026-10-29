@@ -54,11 +54,34 @@ try {
 
   await page.getByRole('button', { name: '股票' }).click();
   await page.locator('#stock-amount').fill('2000');
-  await page.locator('[data-stock-buy="NOVA"]').click();
+  assert.equal(await page.locator('[data-stock-buy]').count(), 0, 'no individual stock buy entry');
+  assert.equal(await page.locator('[data-stock-risk]').count(), 4, 'three risk levels and opt-out');
+  const cashBeforeStocks = saved.money;
+  await page.locator('[data-stock-risk="pass"]').click();
   saved = await page.evaluate(() => JSON.parse(localStorage.getItem('one-in-eight-demo:v1')).current);
-  assert.equal(saved.holdings.length, 1, 'stock holding recorded');
+  assert.equal(saved.money, cashBeforeStocks, 'opt-out preserves cash');
+  assert.equal(saved.holdings.length, 0);
+  await page.locator('#stock-amount').fill('0');
+  await page.locator('[data-stock-risk="moderate"]').click();
+  saved = await page.evaluate(() => JSON.parse(localStorage.getItem('one-in-eight-demo:v1')).current);
+  assert.equal(saved.money, cashBeforeStocks, 'invalid amount never uses fallback cash');
+  await page.locator('#stock-amount').fill('2000');
+  await page.locator('[data-stock-risk="conservative"]').click();
+  saved = await page.evaluate(() => JSON.parse(localStorage.getItem('one-in-eight-demo:v1')).current);
+  assert.equal(saved.holdings.length, 2, 'system allocates conservative portfolio');
+  assert.deepEqual(saved.holdings.map(h => h.symbol).sort(), ['GREEN', 'MOMO']);
+  assert.equal(saved.money, cashBeforeStocks - 2000);
+  assert.match(saved.log.at(-1).text, /保守风险配置/);
   assert.ok(saved.holdings[0].shares > 0);
   await page.screenshot({ path: screenshots + 'feature-invest-stocks.png' });
+  await page.locator('[data-stock-sell="MOMO"]').click();
+  saved = await page.evaluate(() => JSON.parse(localStorage.getItem('one-in-eight-demo:v1')).current);
+  assert.ok(!saved.holdings.some(h => h.symbol === 'MOMO'), 'existing holdings can be sold');
+  assert.ok(saved.money > cashBeforeStocks - 2000);
+  await page.locator('#stock-amount').fill('2000');
+  await page.locator('[data-stock-risk="high"]').click();
+  saved = await page.evaluate(() => JSON.parse(localStorage.getItem('one-in-eight-demo:v1')).current);
+  assert.ok(saved.holdings.some(h => h.symbol === 'NOVA') && saved.holdings.some(h => h.symbol === 'ORBIT'), 'high risk allocates different stocks');
 
   await page.getByRole('button', { name: '消费 · 负债' }).click();
   await page.locator('[data-buy="phone"]').click();
@@ -111,6 +134,10 @@ try {
   await fixture(mobile);
   await mobile.getByRole('button', { name: '投资', exact: true }).click();
   assert.ok(await mobile.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'mobile invest modal fits');
+  await mobile.getByRole('button', { name: '股票', exact: true }).click();
+  assert.equal(await mobile.locator('[data-stock-risk]').count(), 4);
+  assert.equal(await mobile.locator('[data-stock-buy]').count(), 0);
+  assert.ok(await mobile.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'mobile risk choices fit');
   await mobile.screenshot({ path: screenshots + 'mobile-invest.png' });
   await mobile.getByRole('button', { name: '关闭弹窗' }).click();
   await mobile.getByRole('button', { name: '旅行', exact: true }).click();
@@ -120,7 +147,7 @@ try {
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({
     result: 'PASS',
-    checks: ['open invest overview', 'buy index fund', 'buy stock', 'buy phone', 'travel with partner', 'modal pauses time', 'mobile invest/travel fit', 'no page errors'],
+    checks: ['open invest overview', 'buy index fund', 'stock risk allocation, opt-out, validation and sell', 'buy phone', 'travel with partner', 'modal pauses time', 'mobile invest/travel fit', 'no page errors'],
     final: { cash: saved.money, investments: saved.investments, holdings: saved.holdings.length, travels: saved.travels.length, age: saved.age },
     screenshots
   }, null, 2));

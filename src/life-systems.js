@@ -124,7 +124,7 @@ export function systemAction(l, name, payload = {}) {
   log(l, '检查给出明确的诊断', `检查发现${c.name}，需要选择后续治疗。`, 'health'); action(l, 'hospital', '到医院检查'); medicalChoice(l, c); return result(true, '请选择治疗方案。'); }
  case 'move-abroad':
   if (payload.countryId) return migrationParty(l, payload.countryId);
-  pending(l, 'migration-country', '去哪个国家生活', '这是迁居计划，还需要决定家人是否同行。', COUNTRIES.filter(c => c.id !== l.country.id).map(c => option(c.id, `${c.flag} ${c.name} · ${c.city}`, '移民手续与费用为虚构简化模型。'))); return result(true, '请选择迁居国家。');
+  pending(l, 'migration-country', '去哪个国家生活', '这是迁居计划，还需要决定家人是否同行。', COUNTRIES.filter(c => c.id !== l.country.id).map(c => option(c.id, `${c.flag} ${c.name} · ${c.city}`, '新的语言、物价和机会都在等你。'))); return result(true, '请选择迁居国家。');
  case 'return-home': return returnHome(l);
  case 'reunite-family': return reunite(l);
  case 'visit-home':
@@ -214,26 +214,68 @@ export function systemChoice(l, p, index) {
   if (key === 'migrate') { systemAction(l, 'move-abroad'); break; }
   if (key === 'shelter') { spend(l, gdp(l) * .035); stats(l, { health: 2, happiness: -1 }); action(l, 'moving', '暂时前往安全住所'); }
   else { spend(l, gdp(l) * .015); stats(l, { health: -2, happiness: -2 }); }
-  log(l, '危机中的选择', `面对年度情境，你选择${o.label}。个人经历及后果为模拟。`, 'world'); break;
+  log(l, '危机中的选择', `面对年度情境，你选择了${o.label}。`, 'world'); break;
  default: l.pending = p; return false;
  }
  return true;
 }
 
+function tiltByLife(l, pool) { // 年龄/健康/经济/重心决定哪类家里的事更容易找上门
+ const byFocus = l.focus === 'family' ? 1.5 : l.focus === 'work' ? .7 : 1;
+ const byHealth = l.stats.health < 35 ? 1.25 : 1;
+ const byMoney = l.money > gdp(l) * 2 ? .85 : l.money < gdp(l) * .5 ? 1.2 : 1;
+ for (const e of pool) e.w = Math.max(.05, e.w * byFocus * byHealth * byMoney);
+ return pool;
+}
 // Concrete, named incidents: spouse, pets, and the hometown family.
 function intimateEvents(l) {
  const s = l.systems;
  if (l.pending || l.dead) return;
  if (chance(l, .3)) return;
+ const year = yearOf(l);
+ const focusName = ({ study: '学习', work: '工作', health: '健康', family: '家人', joy: '生活体验' })[l.focus] || '生活';
+ const rich = l.age >= 18 && l.money > gdp(l) * 8;
+ const poor = l.age >= 18 && (l.money < gdp(l) * .5 || (l.debt || 0) > gdp(l) * 1.5);
+ const sick = l.age >= 16 && l.stats.health < 40;
+ const band = l.age < 25 ? 'youth' : l.age < 45 ? 'family' : l.age < 65 ? 'mid' : 'late';
  const pool = [];
+ if (sick) pool.push(
+  {w:1.2, run: () => { const paid = Math.round(medicalBill(l, gdp(l) * .05)); stats(l, { health: 4, knowledge: 1 }); log(l, '身体的警讯', `${year}年你${l.age}岁，健康只剩${Math.round(l.stats.health)}。${l.focus === 'work' ? '连轴转的工作把检查一拖再拖，' : ''}体检单上几个向上的箭头让你不能再拖。你花了${paid}${l.insurance ? '（保险承担70%）' : ''}做了全面检查，并把晚饭后的散步捡了起来。`, 'health'); return {effects:{}}; }},
+  {w:.8, run: () => { stats(l, { health: 2, happiness: -1 }); log(l, '不得不慢下来', `${year}年你${l.age}岁，身体状况不允许再硬撑。你推掉了两个饭局，把闹钟拨早半小时睡觉。收入没变，但你也清楚，再透支就要住院了。`, 'health'); return {effects:{}}; }}
+ );
+ if (rich) pool.push(
+  {w:.6, run: () => { const rel = person(l); const loan = Math.round(gdp(l) * .12); const before = Math.round(l.money); spend(l, loan); stats(l, { social: 1 }); log(l, `${rel.name}来借钱`, `${year}年你${l.age}岁，存款约${before}，在亲戚里算过得宽裕。${rel.name}${roll(l) < .5 ? '带着水果上门' : '在电话里吞吞吐吐'}，说孩子上学想借${loan}。你数了数存折把钱转了过去，也提醒自己下次要立个字据。`, 'family'); return {effects:{}}; }},
+  {w:.5, run: () => { const amt = Math.round(gdp(l) * .05); spend(l, amt); stats(l, { knowledge: 3, happiness: -2 }); log(l, '投资找上门', `${year}年你${l.age}岁，手头的闲钱让老同学想起了你。对方拍着胸脯说一个“稳赚”的项目，你投了${amt}试试。三个月后群里安静了，那个头像再也没亮过。`, 'event'); return {effects:{}}; }}
+ );
+ if (poor) pool.push(
+  {w:.7, run: () => { stats(l, { happiness: -1, health: 1 }); log(l, '精打细算的一个月', `${year}年你${l.age}岁，现金只剩${Math.round(l.money)}${l.debt ? `，还背着${Math.round(l.debt)}的债` : ''}。你把外卖换成自己做饭，购物车清了又清，一个月硬省下约${Math.round(gdp(l) * .03)}。日子紧，但账本终于不再往下掉。`, 'event'); return {effects:{}}; }},
+  ...(l.age < 68 && !l.retired ? [{w:.6, run: () => { const earn = Math.round(gdp(l) * .06); l.money += earn; stats(l, { health: -2 }); log(l, '周末的兼职', `${year}年你${l.age}岁，收入${Math.round(l.income)}撑不住开销。你接了两份周末零工，多挣了${earn}。夜里腰有点酸，但卡里的数字让你踏实了一点。`, 'work'); return {effects:{}}; }}] : []),
+  ...(!l.house ? [{w:.6, run: () => { const rent = Math.round(gdp(l) * .06); spend(l, rent); stats(l, { happiness: -2 }); log(l, '房东的消息', `${year}年你${l.age}岁，房租又到日子了。房东说附近都涨了，你央求宽限到月底，最后还是转了${rent}过去。关掉转账页面，你把求职软件的提醒重新打开了。`, 'event'); return {effects:{}}; }}] : [])
+ );
  if (alive(l.partner)) {
+  const p = l.partner;
   pool.push(
-   {w:.8, run: () => { const bill = Math.round(gdp(l) * .04); spend(l, bill); log(l, `${l.partner.name}打碎了你的相机`, `${l.partner.name}大扫除时碰倒了书架，你用了两年的相机摔在地板上，镜头裂了。维修要${bill}，你们在客厅里沉默了很久，最后笑着说：“就当旧的不去，新的不来。”`, 'family'); return {effects:{cash:-bill,happiness:-1}}; }},
-   {w:.6, run: () => { const bill = Math.round(gdp(l) * .05); spend(l, bill); log(l, `${l.partner.name}驾驶的车被追尾`, `雨天的路口，${l.partner.name}的车被人追尾，人没事，但保险之外还要自付${bill}的维修费。${l.partner.name}反复问你是不是很生气，你只说“人平安就好”。`, 'family'); return {effects:{cash:-bill,happiness:1}}; }},
-   {w:.5, run: () => { log(l, `${l.partner.name}的生日`, `你偷偷订了${l.partner.name}念叨很久的那家餐厅。餐后散步回家，${l.partner.name}说这是这几年最放松的一晚。`, 'warm'); return {effects:{cash:-Math.round(gdp(l)*.015),happiness:5,social:2}}; }},
-   {w:.35, run: () => { log(l, `${l.partner.name}升了职`, `${l.partner.name}的晋升通知下来了。晚归的夜里，两个人把冰箱里剩下的菜热了热，聊到很晚。`, 'warm'); return {effects:{happiness:4}}; }},
-   {w:.3, run: () => { const bill = Math.round(gdp(l) * .09); spend(l, bill); log(l, `${l.partner.name}的牙要治`, `${l.partner.name}牙疼了半个月终于去看了牙医，两颗牙的治疗费${bill}。${l.insurance ? '保险报销了一部分。' : '没有保险，只能全额自付。'}`, 'health'); return {effects:{cash:l.insurance?-Math.round(bill*.3):-bill,happiness:-1}}; }}
+   {w:.8, run: () => { const bill = Math.round(gdp(l) * .04); spend(l, bill); stats(l, { happiness: -1 }); log(l, `${p.name}打碎了你的相机`, `${year}年你${l.age}岁。${p.name}大扫除时碰倒了书架，你用了两年的相机摔在地板上，镜头裂了。维修要${bill}，你们在客厅里沉默了很久，最后笑着说：“就当旧的不去，新的不来。”`, 'family'); return {effects:{}}; }},
+   {w:.6, run: () => { const bill = Math.round(gdp(l) * .05); spend(l, bill); stats(l, { happiness: 1 }); log(l, `${p.name}驾驶的车被追尾`, `${year}年，你${l.age}岁，${p.name}照常开车上下班。雨天的路口TA的车被人追尾，人没事，但保险之外还要自付${bill}的维修费。${p.name}反复问你是不是很生气，你只说“人平安就好”。`, 'family'); return {effects:{}}; }},
+   {w:.5, run: () => { const gift = Math.round(gdp(l) * .015); spend(l, gift); stats(l, { happiness: 5, social: 2 }); log(l, `${p.name}的生日`, `${year}年你${l.age}岁。你偷偷订了${p.name}念叨很久的那家餐厅，花了${gift}。餐后散步回家，${p.name}说这是这几年最放松的一晚。`, 'warm'); return {effects:{}}; }},
+   {w:.35, run: () => { stats(l, { happiness: 4 }); log(l, `${p.name}升了职`, `${year}年你${l.age}岁，这一年的重心放在${focusName}上，家里的氛围也跟着起落。${p.name}的晋升通知下来了，晚归的夜里，两个人把冰箱里剩下的菜热了热，聊到很晚。`, 'warm'); return {effects:{}}; }},
+   {w:.3, run: () => { const bill = Math.round(gdp(l) * .09); const paid = Math.round(medicalBill(l, bill)); log(l, `${p.name}的牙要治`, `${year}年你${l.age}岁，${p.name}牙疼了半个月终于去看了牙医，两颗牙的治疗费${bill}。${l.insurance ? `保险承担70%，实付${paid}。` : `没有保险，全额自付${paid}。`}`, 'health'); return {effects:{}}; }}
   );
+  if (band === 'youth') pool.push({w:.6, run: () => { const cost = Math.round(gdp(l) * .02); spend(l, cost); stats(l, { happiness: 4, social: 2 }); log(l, '第一次一起过年', `${year}年你${l.age}岁，还在攒钱（现金约${Math.round(l.money)}）。你们挤着火车回${p.name}老家过年，年货和红包花了${cost}。围炉夜话时TA说：“明年把房子的事定下来。”`, 'family'); return {effects:{}}; }});
+  if (band === 'family') pool.push(
+   ...(l.children.some(c => alive(c) && c.age < 18) ? [{w:.55, run: () => { const c = l.children.find(c => alive(c) && c.age < 18); c.bond = clamp(c.bond + 3); stats(l, { happiness: 2 }); log(l, '谁去开家长会', `${year}年你${l.age}岁，${c.name}的学校通知开家长会，你的工作正处在要劲的时候。你们商量后由${p.name}去，回来的路上TA把老师的话一条条讲给你听。`, 'family'); return {effects:{}}; }}] : [{w:.55, run: () => { stats(l, { happiness: 3, social: 2 }); log(l, '两个人的分工表', `${year}年你${l.age}岁，家里的事越排越满。你和${p.name}在冰箱上贴了一张分工表：TA管账单和菜，你管修理和接送。贴上去那晚，两个人都笑了。`, 'family'); return {effects:{}}; }}]),
+   {w:.4, run: () => { const cost = Math.round(gdp(l) * .04); spend(l, cost); stats(l, { happiness: 3 }); log(l, '请人搭把手', `${year}年你${l.age}岁，收入约${Math.round(l.income)}，家里两头顾不过来。你们请了钟点工每周来两次，一个月${cost}。争吵少了一些，晚饭后也能一起散步了。`, 'family'); return {effects:{}}; }}
+  );
+  if (band === 'mid') pool.push(
+   {w:.5, run: () => { stats(l, { knowledge: 2, happiness: 2 }); log(l, '你们聊起以后', `${year}年你${l.age}岁，年收入约${Math.round(l.income)}。晚饭后你和${p.name}算了算：父母的身体、孩子的学费、自己的养老。最后决定把每年结余的一部分先存起来。账算得有点冷，牵手却更紧了。`, 'family'); return {effects:{}}; }},
+   {w:.4, run: () => { const cost = Math.round(gdp(l) * .05); spend(l, cost); stats(l, { happiness: 5 }); log(l, '补上的蜜月', `${year}年你${l.age}岁，你们终于把年轻时没舍得的那趟旅行补上了，花了${cost}。照片里两个人的白发都比记忆里多，笑得却和当年一样。`, 'warm'); return {effects:{}}; }}
+  );
+  if (band === 'late') pool.push(
+   {w:.55, run: () => { stats(l, { happiness: 4, health: 1 }); log(l, '相扶着散步', `${year}年你${l.age}岁，${p.name}也${p.age ?? l.age}岁了。你们把晚饭后的散步改成两圈，走慢一点，把年轻时没说完的话接着说。`, 'warm'); return {effects:{}}; }},
+   {w:.4, run: () => { const paid = Math.round(medicalBill(l, gdp(l) * .04)); stats(l, { happiness: -1 }); log(l, `${p.name}的老花镜和药盒`, `${year}年，${p.name}配了新眼镜，又开了两个月的慢性病药，实付${paid}${l.insurance ? '（保险承担70%）' : ''}。你们把药盒摆在餐桌最显眼的地方，像给日子上了个闹钟。`, 'health'); return {effects:{}}; }}
+  );
+  if (l.focus === 'work') pool.push({w:.5, run: () => { p.bond = clamp(p.bond - 3); stats(l, { happiness: -1 }); log(l, '加班的夜晚', `${year}年你${l.age}岁，重心压在工作上，连续几周晚归。${p.name}给你留了一盏灯和一张字条：“汤在锅里。”你看着字条坐了一会儿，决定周末把时间还给这个家。`, 'family'); return {effects:{}}; }});
+  if (l.focus === 'family') pool.push({w:.5, run: () => { p.bond = clamp(p.bond + 4); stats(l, { happiness: 3 }); log(l, '一起做饭的周末', `${year}年你${l.age}岁，你把重心拨回家人这边。周末你和${p.name}试着做了TA家乡的那道菜，咸了，两个人还是吃了个精光。`, 'warm'); return {effects:{}}; }});
  }
  if (s.pet?.alive) {
   const p = s.pet;
@@ -244,33 +286,52 @@ function intimateEvents(l) {
   if (p.age >= 9 || p.health < 45) pool.push({w:.9, run: () => { pending(l, 'pet-crisis', `${p.name}病得很重`, `${p.age}岁的${p.name}查出了严重的病。医生说手术有风险，费用约${Math.round(gdp(l)*.12)}，且不能保证治好。`, [option('surgery', '全力治疗', '花这笔钱，陪它最后一程或重新开始。'), option('comfort', '保守治疗陪伴', '用止痛和护理让它舒服一些。'), option('farewell', '告别', '不让它再受苦，陪它到最后。')], {petKind:p.kind}); return null; }});
  }
  if (alive(l.partner) && l.age >= 55 && (l.partner.age ?? l.age) >= 55 && !l.formerPartners?.length) pool.push({w:.12, run: () => { l.partner.alive = false; l.partner.deathAge = l.partner.age ?? l.age; const name = l.partner.name; l.systems.residence.with = l.children.some(c => alive(c) && c.age < 18) ? 'family' : 'alone'; stats(l, { happiness: -12, health: -3 }); log(l, `${name}离开了`, `${name}在${l.partner.deathAge}岁时因病离世。你整理TA的抽屉时，发现一沓两人年轻时互相写的信。很长一段时间，你习惯性地给TA留一盏灯。`, 'family'); return null; }});
- if (pool.length) pickWeighted(l, pool).run();
+ if (pool.length) pickWeighted(l, tiltByLife(l, pool)).run();
 }
 function hometownEvents(l) {
  const s = l.systems, r = s.residence; if (l.pending || l.dead || l.age < 6) return;
  const parents = [l.family.mother, l.family.father].filter(alive);
  if (!parents.length) return;
  if (chance(l, .35)) return;
- const ruralHome = r.familyCountryId === r.homeCountry && ['parents','alone'].includes(r.familyWith || r.with);
- const farAway = r.countryId !== r.homeCountry || r.with !== 'parents';
+ const year = yearOf(l);
  const parent = pick(l, parents);
- const pool = [
-  {w:.7, run: () => { log(l, `${parent.name}打来的电话`, `周末${parent.name}打来视频，镜头先对着院子里的菜地，再转到屋里：“鸡下蛋了，你小时候那间屋还空着。”${farAway ? '挂了电话，你想家乡的空气和这条城市的马路完全是两个世界。' : '你答应这周末回去吃晚饭。'}`, 'family'); return farAway ? {effects:{happiness:2,social:1}} : {effects:{happiness:2}}; }},
-  {w:.4, run: () => { log(l, `老家的屋顶要翻修`, `${parent.name}说村里的房子漏雨了，找熟人问了价，翻修要${Math.round(gdp(l)*.08)}。电话那头的声音很轻松，你却听出了心疼钱的意思。`, 'family'); return {effects:{}}; }},
-  {w:.35, run: () => { const bill = Math.round(gdp(l) * .06); spend(l, bill); log(l, `${parent.name}住院了`, `${parent.name}在地里闪了腰，住院观察了几天。你赶回去陪了两晚，出院时TA坚持不让你多花钱。医疗和往返花了${bill}。`, 'family'); return {effects:{cash:-bill,happiness:-2,social:2}}; }},
-  {w:.3, run: () => { const gift = Math.round(gdp(l) * .03); spend(l, gift); log(l, '从老家寄来的包裹', `${parent.name}寄来一箱自家晒的干货和一罐腌菜，快递单上的字写得很大。包裹的运费和回寄的保健月饼，一共${gift}。`, 'warm'); return {effects:{cash:-gift,happiness:4}}; }}
- ];
- if (farAway && parents.length) pool.push({w:.5, run: () => { pending(l, 'hometown-plan', '老家的安排', `${parents.map(p=>p.name).join('、')}年纪渐渐大了，一个人在${country(r.homeCountry)?.name || '老家'}的院子里生活。你可以把TA们接过来同住，或者多回去看看。`, [option('invite', '接来身边养老', '安排住房和适应，开销会增加。'), option('visit', '今年多回去看看', '多几次探望和电话，各自安好。'), option('later', '以后再说')]); return null; }});
- if (ruralHome && l.age >= 18) pool.push({w:.4, run: () => { log(l, '回村的那几天', `你回到${country(r.homeCountry)?.name || '老家'}住了几天。${parent.name}天不亮就去集上买了你爱吃的东西，走的时候后备箱被塞得满满的。`, 'warm'); return {effects:{happiness:4,social:2,cash:-Math.round(gdp(l)*.02)}}; }});
- if (pool.length) pickWeighted(l, pool).run();
+ const oldest = Math.max(...parents.map(p => p.age ?? 60));
+ const withYou = r.with === 'parents' && r.familyCountryId === r.countryId;
+ const farAway = r.countryId !== r.homeCountry || r.with !== 'parents';
+ const homeName = country(r.homeCountry)?.name || '老家';
+ const focusName = ({ study: '学习', work: '工作', health: '养身体', family: '家人', joy: '生活体验' })[l.focus] || '生活';
+ const pool = [];
+ if (!withYou) {
+  pool.push(
+   {w:.7, run: () => { log(l, `${parent.name}打来的电话`, `${year}年你${l.age}岁，这一年的重心放在${focusName}上。周末${parent.name}打来视频，镜头先对着院子里的菜地，再转到屋里：“鸡下蛋了，你小时候那间屋还空着。”${farAway ? '挂了电话，你想家乡的空气和这条城市的马路完全是两个世界。' : '你答应这周末回去吃晚饭。'}`, 'family'); return {effects:{happiness:2,social:1}}; }},
+   {w:.4, run: () => { const cost = Math.round(gdp(l) * .08); spend(l, cost); log(l, '老家的屋顶要翻修', `${year}年你${l.age}岁，${parent.name}来电话说村里的房子漏雨了，找熟人问了价，翻修要${cost}。TA嘴上说“不急”，你却听出了心疼钱的意思，当天就把钱转了过去，也提醒自己回村的次数太少了。`, 'family'); return {effects:{happiness:-1,social:1}}; }},
+   {w:.35, run: () => { const bill = Math.round(gdp(l) * .06); const paid = Math.round(medicalBill(l, bill)); log(l, `${parent.name}住院了`, `${year}年你${l.age}岁，${parent.name}${parent.age ?? 60}岁，在地里闪了腰，住院观察了几天。你赶回去陪了两晚，医疗和往返花了${paid}${l.insurance ? '（保险承担70%）' : ''}。出院时TA坚持不让你多花钱，你只把回程票订得更早了些。`, 'family'); return {effects:{happiness:-2,social:2}}; }},
+   {w:.3, run: () => { const gift = Math.round(gdp(l) * .03); spend(l, gift); log(l, '从老家寄来的包裹', `${year}年你${l.age}岁。${parent.name}寄来一箱自家晒的干货和一罐腌菜，快递单上的字写得很大。你回寄了一盒点心和一件冬衣，一共${gift}。`, 'warm'); return {effects:{happiness:4}}; }}
+  );
+  if (farAway) pool.push({w:.5, run: () => { pending(l, 'hometown-plan', '老家的安排', `${parents.map(p=>p.name).join('、')}年纪渐渐大了，一个人在${homeName}的院子里生活。你可以把TA们接过来同住，或者多回去看看。`, [option('invite', '接来身边养老', '安排住房和适应，开销会增加。'), option('visit', '今年多回去看看', '多几次探望和电话，各自安好。'), option('later', '以后再说')]); return null; }});
+  if (l.age >= 18) pool.push({w:.4, run: () => { const cost = Math.round(gdp(l) * .02); spend(l, cost); log(l, '回村的那几天', `${year}年你${l.age}岁，你回到${homeName}住了几天，来回路费${cost}。${parent.name}天不亮就去集上买了你爱吃的东西，走的时候后备箱被塞得满满的。`, 'warm'); return {effects:{happiness:4,social:2}}; }});
+ } else {
+  pool.push(
+   {w:.55, run: () => { const cost = Math.round(gdp(l) * .02); spend(l, cost); log(l, '同住的一个家', `${year}年你${l.age}岁，${parents.map(p=>p.name).join('、')}搬来和你同住。晚饭桌上多了两双筷子，你带TA们熟悉了附近的菜市场和公园，这个月开销多出约${cost}。屋子挤了些，心却踏实了。`, 'warm'); return {effects:{happiness:4}}; }},
+   {w:.4, run: () => { log(l, `${parent.name}搭把手`, `${year}年你${l.age}岁，重心放在${focusName}上，常常顾不上家。${parent.name}把饭做好、衣服晾好，还念叨你“别老点外卖”。你下班回家看见亮着的厨房灯，一天的疲惫散了一半。`, 'warm'); return {effects:{happiness:3,social:1}}; }},
+   {w:.35, run: () => { const cost = Math.round(gdp(l) * .05); spend(l, cost); log(l, '想回老家看看', `${year}年，${parent.name}翻出老照片，想回${homeName}的老院子住几天。你订了车票，陪TA们回去待了一个周末，花了约${cost}。临走时TA把院子里的果子摘满了袋子。`, 'family'); return {effects:{happiness:3,social:1}}; }}
+  );
+  if (l.children.some(c => alive(c) && c.age < 12)) pool.push({w:.5, run: () => { const c = l.children.find(c => alive(c) && c.age < 12); c.bond = clamp(c.bond + 3); log(l, '隔代的疼爱', `${year}年你${l.age}岁，${c.name}放学回家，${parent.name}已经备好了点心。孩子缠着老人讲过去的故事，你在一旁听得出神。家里有老人，孩子的话都变多了。`, 'warm'); return {effects:{happiness:3}}; }});
+ }
+ if (oldest > 75) pool.push(
+  {w:.8, run: () => { const bill = Math.round(gdp(l) * .04); const paid = Math.round(medicalBill(l, bill)); log(l, `带${parent.name}做体检`, `${year}年，${parent.name}已经${parent.age ?? 75}岁。你陪TA做了全面体检，配了半年的慢性病药，实付${paid}${l.insurance ? '（保险承担70%）' : ''}。医生说指标大体平稳，你这些年第一次松了口气。`, 'health'); return {effects:{happiness:2}}; }},
+  {w:.45, run: () => { const bill = Math.round(gdp(l) * .07); spend(l, bill); log(l, '半夜的动静', `${year}年，${parent.age ?? 75}岁的${parent.name}夜里起床上洗手间时摔了一跤。所幸不重，检查和护理花了${bill}。你从此在走廊装了小夜灯，把TA的床换到靠门的位置。`, 'family'); return {effects:{happiness:-2,social:1}}; }},
+  {w:.3, run: () => { log(l, `${parent.name}的话少了`, `${year}年，${parent.name}的耳朵越来越背，电视声音开得很大，人却越来越安静。你配了助听器，晚饭后陪TA慢慢散步，把当年没来得及听的故事一点点补上。`, 'warm'); return {effects:{happiness:2,social:1}}; }}
+ );
+ if (pool.length) pickWeighted(l, tiltByLife(l, pool)).run();
 }
 // Calendar arithmetic makes the year's headline identical across independently seeded lives.
 function worldFor(year) {
  const historical={1973:['crisis','石油危机','1973年石油危机冲击能源供应和全球经济。'],1989:['culture','柏林墙开放','1989年柏林墙开放，欧洲政治格局发生重大变化。'],2001:['crisis','九一一事件','2001年九一一袭击发生，国际旅行和安全环境随之变化。'],2008:['crisis','全球金融危机','2008年金融危机引发就业与资产市场动荡。'],2020:['crisis','新冠疫情','2020年新冠疫情蔓延，出行、学习和工作受到广泛影响。'],2022:['war','俄乌战争全面升级','2022年俄罗斯全面入侵乌克兰，战争造成大量人员流离失所，并冲击粮食和能源市场。']};
- if(historical[year]){const [kind,title,detail]=historical[year];return {year,kind,title,detail:detail+' 历史事实摘要；本游戏对个人处境的影响为简化模拟。',fictional:false};}
+ if(historical[year]){const [kind,title,detail]=historical[year];return {year,kind,title,detail:detail+'',fictional:false};}
  const n = ((Math.imul(year, 1664525) + 1013904223) >>> 0) % 1000;
- const entries = n < 18 ? ['war', '虚构情境：地区武装冲突', '虚构地区的冲突扰乱运输，生活物资涨价。'] : n < 55 ? ['crisis', '虚构情境：全球供应危机', '物流受阻，食品与能源开支上涨。'] : n < 250 ? ['climate', '城市应对极端天气', '虚构年度情境中，多地加强防暑与防洪设施。'] : n < 500 ? ['science', '公共医疗出现新进展', '虚构年度情境中，基层筛查和医疗技术逐步改善。'] : n < 750 ? ['economy', '工作方式继续变化', '虚构年度情境中，新职业出现，人们重新学习技能。'] : ['culture', '跨国文化交流季', '虚构年度情境中，社区展览与交流让陌生人相遇。'];
- return { year, kind: entries[0], title: entries[1], detail: entries[2] + ' 本条为游戏模拟，尤其未来战争并非事实或预测。', fictional: true };
+ const entries = n < 18 ? ['war', '地区武装冲突', '地区冲突扰乱运输，生活物资涨价。'] : n < 55 ? ['crisis', '全球供应危机', '物流受阻，食品与能源开支上涨。'] : n < 250 ? ['climate', '城市应对极端天气', '多地加强防暑与防洪设施。'] : n < 500 ? ['science', '公共医疗出现新进展', '基层筛查和医疗技术逐步改善。'] : n < 750 ? ['economy', '工作方式继续变化', '新职业出现，人们重新学习技能。'] : ['culture', '跨国文化交流季', '社区展览与交流让陌生人相遇。'];
+ return { year, kind: entries[0], title: entries[1], detail: entries[2] + '', fictional: true };
 }
 export function systemsYear(l, options = {}) {
  initSystems(l); const s = l.systems, r = s.residence;
@@ -311,8 +372,6 @@ export function systemsYear(l, options = {}) {
   else if ((c.severity >= 50 || l.age - (c.lastReviewAge ?? c.diagnosedAge) >= 3) && !l.pending) medicalChoice(l, c);
  }
  if (r.abroadSince != null && l.age - (s.lastMigrationReview ?? r.abroadSince) >= 3 && !l.pending) offer(l, 'migration-review', '海外的第三年', `你住在${l.country.name}，家人在${country(r.familyCountryId)?.name || '原居国'}。下一步如何安排？`, [option('stay', '继续留居'), ...(r.familyCountryId !== r.countryId && (alive(l.partner) || l.children.some(c => alive(c) && c.age < 18)) ? [option('reunite', '接家人团聚')] : []), option('home', '回原居国生活')]);
- hometownEvents(l); intimateEvents(l);
- s.world = worldFor(yearOf(l)); log(l, s.world.title, s.world.detail, 'world');
  if (options.events !== false) { hometownEvents(l); intimateEvents(l); }
  s.world = worldFor(yearOf(l)); log(l, s.world.title, s.world.detail, 'world');
  if (['war', 'crisis'].includes(s.world.kind)) { if (l.age >= 18) spend(l, gdp(l) * .025); stats(l, { happiness: -2, health: -1 }); if (options.events !== false && l.age >= 18) offer(l, 'world-crisis', s.world.title, s.world.detail, s.world.kind==='war' ? [option('stay', '留守并准备物资'), option('shelter', '暂时避难'), option('migrate', '考虑移民')] : [option('stay', '缩减开支，准备应急物资'), option('shelter', '动用应急预算渡过危机'), option('migrate', '寻找其他地方的机会')]); }
@@ -322,8 +381,8 @@ export function systemsYear(l, options = {}) {
 
 export function getHousehold(l) {
  initSystems(l); const r = l.systems.residence;
- const residents = [{ id: 'self', name: l.name, role: '自己', age: l.age, sex: l.sex }];
- const add = (p, id, role, fallbackAge) => { if (alive(p)) residents.push({ id, name: p.name, role, age: p.age ?? fallbackAge, sex: p.sex || (role === '母亲' ? '女' : role === '父亲' ? '男' : '未知') }); };
+ const residents = [{ id: 'self', name: l.name, role: '自己', age: l.age, sex: l.sex, countryId: r.countryId }];
+ const add = (p, id, role, fallbackAge) => { if (alive(p)) residents.push({ id, name: p.name, role, age: p.age ?? fallbackAge, sex: p.sex || (role === '母亲' ? '女' : role === '父亲' ? '男' : '未知'), countryId: r.countryId }); };
  if (r.with === 'parents') { add(l.family.mother, 'mother', '母亲', 55); add(l.family.father, 'father', '父亲', 57); }
  if (['partner', 'family'].includes(r.with) && r.countryId === r.familyCountryId) add(l.partner, 'partner', '伴侣', l.age);
  if (r.with === 'family') for (const c of l.children) if ((c.age < 18 || c.livesWithPlayer === true) && (c.countryId || r.familyCountryId) === r.countryId) add(c, c.id, '孩子', 0);
