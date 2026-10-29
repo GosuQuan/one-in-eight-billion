@@ -105,6 +105,7 @@ test('JSON round-trip at a pending choice resumes exactly through death',()=>{
 test('focus influences income and health without forcing a random event',()=>{
   const work=createLife({seed:'focus',country:'US'});
   while(work.age<23) step(work);
+  while(work.pending) choose(work,0);
   const health=clone(work);
   work.income=health.income=1000;work.job=health.job='职员';
   setFocus(work,'work');setFocus(health,'health');
@@ -148,8 +149,8 @@ test('investing, withdrawing, stock trading and fees move cash and net worth cor
 test('stock_tip offers risk tolerance choices, settles distinct gains and losses, and logs outcomes',()=>{
  let pending;
  for(let seed=0;seed<10&&!pending;seed++){
-  const life=createLife({seed,country:'US'});life.age=22;life.money=5000;life.debt=0;
-  for(let n=0;n<70&&!life.dead;n++){
+  const life=createLife({seed,country:'US'});life.age=22;life.money=120000;life.debt=0;life.income=60000;life.job='职员';
+  for(let n=0;n<180&&!life.dead;n++){
    if(life.pending?.eventId==='stock_tip'){pending=clone(life);break;}
    if(life.pending)choose(life,0);else advanceYear(life);
   }

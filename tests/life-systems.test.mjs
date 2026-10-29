@@ -84,7 +84,7 @@ test('residents respect independent housing, death, absent and adult children', 
 });
 test('low relationship bond offers communication, counseling and separation', () => {
  const l = adult('relationship'); addPartner(l); l.systems.residence.with = 'family'; l.partner.bond = 20; systemsYear(l);
- assert.equal(l.pending.system, 'relationship'); select(l, 'separate'); assert.equal(l.partner, null); assert.equal(getHousehold(l).length, 1);
+ assert.equal(l.pending.system, 'relationship'); select(l, 'separate'); assert.equal(l.pending.system, 'divorce'); select(l, 'self'); assert.equal(l.partner, null); assert.equal(getHousehold(l).length, 1);
 });
 test('named spouse and pet incidents actually cost money and mention real names', () => {
  const l = adult('intimate'); addPartner(l); systemAction(l, 'adopt-dog');
@@ -105,18 +105,62 @@ test('named spouse and pet incidents actually cost money and mention real names'
 });
 test('hometown plan can move rural parents in and is offered while abroad', () => {
  const l = adult('hometown'); addPartner(l);
- l.systems.residence.familyWith = 'alone';
+ l.systems.residence.familyWith = 'alone'; l.family.mother.age = l.family.father.age = 65;
  systemAction(l, 'move-abroad', { countryId: 'US' }); select(l, 'solo');
  assert.equal(l.systems.residence.abroadSince, l.age);
  let offered = false;
- for (let year = 0; year < 12 && !l.dead; year++) {
+ for (let year = 0; year < 80 && !l.dead; year++) {
   next(l);
   if (l.pending?.system === 'hometown-plan') { offered = true; select(l, 'invite'); break; }
   if (l.pending?.kind === 'system') systemChoice(l, l.pending, 0);
  }
- assert.ok(offered, 'hometown plan appears within 12 years abroad');
+ assert.ok(offered, 'hometown plan appears during an extended overseas life');
  const res = l.systems.residence;
- assert.equal(res.with, 'parents'); assert.equal(res.familyCountryId, res.countryId);
+ assert.equal(res.with, 'parents'); assert.equal(res.parentsCountryId, res.countryId); assert.notEqual(res.familyCountryId, res.countryId);
  const names = getHousehold(l).map(p => p.name);
  assert.ok(names.includes(l.family.mother.name) || names.includes(l.family.father.name));
+});
+
+test('children never receive adult hometown costs or elder relocation choices', () => {
+ for (let seed = 0; seed < 100; seed++) { const l = adult(`young-${seed}`); l.age = 6; l.money = 0; l.systems.residence.with = 'parents'; systemsYear(l); assert.notEqual(l.pending?.system, 'hometown-plan'); assert.equal(l.money, 0); assert.equal(l.debt, 0); assert.ok(!l.log.some(e => /养老|下班|搬来和你同住|屋顶要翻修/.test(e.text + e.title))); assert.equal(systemAction(l, 'divorce').ok, false); }
+});
+test('distance weakens bonds, contact helps but reunion needs cash reserves', () => {
+ const a = adult('distance'); addPartner(a); systemAction(a, 'move-abroad', { countryId: 'CA' }); select(a, 'solo');
+ const b = clone(a); b.partner.lastContactAge = b.age;
+ a.age++; b.age++; systemsYear(a, { events: false }); systemsYear(b, { events: false });
+ assert.equal(a.partner.distanceYears, 1); assert.ok(a.partner.bond < b.partner.bond); assert.ok(b.partner.bond < 75);
+ a.pending = null; a.money = 0; const debt = a.debt; assert.equal(systemAction(a, 'reunite-family').ok, false); assert.equal(a.debt, debt); assert.equal(a.partner.countryId, 'CN');
+ a.money = 500000; assert.equal(systemAction(a, 'reunite-family').ok, true); assert.equal(a.partner.distanceYears, 0); const cash = a.money; assert.equal(systemAction(a, 'reunite-family').ok, false); assert.equal(a.money, cash);
+});
+test('divorce settles cash and house once, supports children annually without duplicate care', () => {
+ const l = adult('split'); addPartner(l); l.house = { value: 200000, loan: 100000 }; l.money = 100000;
+ l.children.push({ name: '小雨', age: 3, birthYear: l.birthYear + l.age - 3, alive: true }); initSystems(l);
+ systemAction(l, 'divorce'); const p = l.pending; select(l, 'other');
+ assert.equal(l.money, 100000); assert.equal(l.house, null); assert.equal(l.partner, null); assert.equal(l.formerPartners[0].settlement.cashPaid, 50000);
+ const cash = l.money; assert.equal(systemChoice(l, p, 1), false); assert.equal(l.money, cash); assert.equal(getHousehold(l).length, 1);
+ l.birthYear = 2030 - l.age; l.children[0].birthYear = 2027; l.age++; systemsYear(l, { events: false });
+ assert.equal(l.children[0].lastSupportAge, l.age); assert.equal(l.pending?.system === 'child-care', false); assert.equal(l.systems.care[l.children[0].id], undefined);
+ const once = l.money; systemsYear(l, { events: false }); assert.equal(l.money, once);
+ l.age += 14; l.pending = null; systemsYear(l, { events: false }); assert.equal(l.children[0].age, 18); assert.notEqual(l.children[0].lastSupportAge, l.age);
+});
+test('keeping custody retains ordinary care and underwater house shares its loss', () => {
+ const l = adult('custody'); addPartner(l); l.money = 1000; l.house = { value: 10000, loan: 14000 };
+ l.children.push({ name: '小雨', age: 2, birthYear: l.birthYear + l.age - 2 }); initSystems(l);
+ systemAction(l, 'divorce'); select(l, 'self'); assert.equal(l.money, 0); assert.equal(l.debt, 1500); assert.equal(l.children[0].supportPayer, null); assert.equal(getHousehold(l).length, 2);
+ l.age++; systemsYear(l, { events: false }); assert.equal(l.pending.system, 'child-care');
+});
+test('communication can fail and counseling differs from a simple talk', () => {
+ let success = false, failure = false, difference = false;
+ for (let seed = 0; seed < 80; seed++) { const a = adult(`talk-${seed}`); addPartner(a); a.partner.bond = 30; const b = clone(a); systemAction(a, 'relationship-talk'); systemAction(b, 'relationship-counsel'); success ||= a.partner.bond > 30; failure ||= a.partner.bond < 30; difference ||= a.partner.bond !== b.partner.bond; assert.ok(b.money < a.money); assert.equal(systemAction(a, 'date').ok, false); }
+ assert.ok(success && failure && difference);
+});
+test('named friends persist, share memories and can decline romance', () => {
+ let accepted = false, declined = false;
+ for (let seed = 0; seed < 60; seed++) { const l = adult(`friend-${seed}`); systemAction(l, 'make-friend', { name: '陈小青', metThrough: '读书会' }); const f = l.friends[0]; assert.equal(clone(l).friends[0].name, '陈小青');
+ systemAction(l, 'friend-time', { friendId: f.id }); select(l, 'help'); assert.ok(l.log.some(e => e.text.includes('陈小青'))); systemAction(l, 'seek-partner'); select(l, f.id); accepted ||= !!l.partner; declined ||= !l.partner; }
+ assert.ok(accepted && declined);
+});
+test('world updates its panel without filling the personal timeline', () => {
+ const l = adult('headlines'); l.log = []; for (let i = 0; i < 8; i++) { l.age++; l.pending = null; systemsYear(l, { events: false }); }
+ assert.equal(l.log.filter(e => e.type === 'world').length, 0); assert.equal(l.systems.world.year, l.birthYear + l.age);
 });
