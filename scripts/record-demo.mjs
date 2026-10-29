@@ -60,14 +60,24 @@ try {
           await capture('09 / 出发 · 钱会花掉，记忆会留下', 1800);
           await page.locator('[data-action="close"]').click();
         }
-        if (age === 30) { sawAdult = true; await page.locator('[data-focus="family"]').click(); await capture('10 / 家人与生活 · 也成为别人生命里的重要角色', 2200); }
+        if (age === 30) {
+          sawAdult = true; await page.locator('[data-focus="family"]').click();
+          await page.locator('.controls [data-action="systems"]').click();
+          await page.locator('[data-system="plan-child"]').click();
+          await page.locator('[data-choice="0"]').click();
+          await capture('10 / 生育 · 孩子出生后，由谁来照顾？', 2400);
+          await page.locator('[data-choice="0"]').click();
+          await page.locator('.controls [data-action="systems"]').click();
+          await page.locator('[data-system="adopt-dog"]').click();
+          await capture('11 / 伙伴 · 领养一只小狗，家人与宠物同住', 2200);
+        }
         if (age === 50) await capture('中年 · 一年的重量，汇入人生的记录', 1400);
         if (age === 65) await capture('晚年 · 看岁月流过，也看世界继续', 1400);
         await page.locator('[data-action="next"]').click();
       }
     }
     if (sawFive && sawEighteen && sawAdult && await page.locator('.ending').count()) {
-      await capture('11 / 终章 · 这一生，曾经属于你', 2400);
+      await capture('12 / 终章 · 这一生，曾经属于你', 2400);
       await page.locator('.ending-body').scrollIntoViewIfNeeded();
       await capture('人生回顾 · 记住那些值得珍藏的片刻', 1800);
       await writeFile(path.join(out, 'manifest.json'), JSON.stringify({ source: base, method: 'Real browser UI clicks; no game state injection', viewport: { width: 1440, height: 1050 }, frames }, null, 2));
