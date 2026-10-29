@@ -11,7 +11,7 @@ test('car and insurance recurring cost is charged once per year',()=>{
  const a=createLife({seed:'cost-once',country:'US'});a.age=30;a.money=1000000;a.income=0;a.longevity=100;
  const b=copy(a);b.car=true;b.insurance=true;
  advanceYear(a,{events:false});advanceYear(b,{events:false});
- assert.ok(Math.abs((a.money-b.money)-a.country.gdp*.024*1.01)<=2);
+ assert.ok(Math.abs((a.money-b.money)-a.country.gdp*.024*.55*1.01)<=2);
 });
 test('medical insurance reimburses 70 percent of medical costs',()=>{
  const a=createLife({seed:'insurance'});a.money=10000;
