@@ -92,7 +92,7 @@ try {
     s.recentEvents = [];
     for (let i = 0; i < 30 && !s.dead; i++) {
       if (s.pending) {
-        if (s.pending.kind === 'event') break;
+        if (s.pending.kind === 'event' || s.pending.kind === 'system') break;
         e.choose(s, 0);
       } else e.advanceYear(s);
     }
@@ -102,7 +102,7 @@ try {
   await page.reload({ waitUntil: 'networkidle' });
   await page.getByRole('button', { name: /继续这一生/ }).click();
   await page.locator('[data-choice]').first().waitFor();
-  assert.match(await page.locator('.dialog-kicker').innerText(), /没有预料到/);
+  assert.match(await page.locator('.dialog-kicker').innerText(), /没有预料到|人生还在继续/);
   await page.screenshot({ path: screenshots + 'feature-event.png' });
   await page.locator('[data-choice="0"]').click();
 

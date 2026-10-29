@@ -1,3 +1,5 @@
+import { initSystems, systemsYear, systemChoice, systemAction } from './life-systems.js';
+export { systemAction };
 // A self-contained, deterministic life simulation for the demo.
 // All country/price figures are approximate teaching data, not official statistics.
 const rows = [
@@ -132,6 +134,7 @@ export function upgradeLife(life){
  if(life.stats)for(const k of Object.keys(life.stats))life.stats[k]=clamp(life.stats[k]);
  if(!Array.isArray(life.log))life.log=[];
  if(!life.notes)life.notes=[];
+ initSystems(life);
  return life;
 }
 
@@ -158,6 +161,7 @@ export function createLife({era='now',mode='birth',seed=Date.now(),country,sex,n
  }
  log(s,'世界多了一个你',`${birthYear}年，你出生在${c.name}${c.city}的一个${s.family.background}。父母给你取名${s.name}。`,'birth');
  log(s,'同一秒的远方','另外四个孩子也在这个世界睁开眼睛。你们彼此陌生，却一起走进时间。','world');
+ initSystems(s);
  return s;
 }
 
@@ -209,9 +213,9 @@ export function applyEffects(life,effects={}){
  if(effects.job)life.job=effects.job;
  if(effects.education)life.education=effects.education;
  if(effects.retired){life.retired=true;life.job='退休';}
- if(effects.partner){const p=ensurePartner(life);details.push(`与${p.name}成为伴侣`);}
- if(effects.child){const c=ensureChild(life);details.push(`孩子${c.name}来到家中`);}
- if(effects.relocate){const c=COUNTRIES.find(x=>x.id===effects.relocate);if(c){life.country=JSON.parse(JSON.stringify(c));details.push(`迁居${c.name}${c.city}`);}}
+ if(effects.partner){const p=ensurePartner(life);systemAction(life,'housing',{with:'family'});details.push(`与${p.name}成为伴侣`);}
+ if(effects.child){const c=ensureChild(life);systemAction(life,'child-care');details.push(`孩子${c.name}来到家中`);}
+ if(effects.relocate){systemAction(life,'move-abroad',{countryId:effects.relocate});details.push('开始讨论迁居与同行安排');}
  if(effects.insurance){life.insurance=true;details.push('有了医疗保险');}
  if(effects.car){life.car=true;if(!life.possessions.includes('car'))life.possessions.push('car');details.push('有了自己的车');}
  if(effects.item){const r=buyItem(life,effects.item,true);if(r.ok)details.push(r.message);}
@@ -269,9 +273,15 @@ function familyStep(life){
   }
  }
  if(life.age>=18){
+  if(!life.retired&&life.income===0&&!['学生','尚未工作','退休'].includes(life.job)&&chance(life,.42)){
+   life.income=Math.round(life.country.gdp*({大学:.7,高中:.5,初中:.32}[life.education]||.5));
+   life.job=life.job==='求职中'?'重新入职的职员':'零工';
+   log(life,'重新找到工作','投出的简历终于有了回音。新的岗位不算完美，但生活重新有了节奏。','work');
+  }
   const minor=life.children.filter(c=>c.age<18).length;
   let cost=life.country.gdp*(.2+(life.house?0:.06)+minor*.05+(life.car?.012:0)+(life.insurance?.012:0));
   if(life.income===0&&life.age<22)cost=life.country.gdp*.045;
+  else if(life.income===0)cost*=.55;
   if(life.income>0&&life.money+life.income>=cost)life.money+=life.income-cost;
   else if(life.income>0){life.money+=life.income;spend(life,cost);}
   else spend(life,cost);
@@ -280,7 +290,8 @@ function familyStep(life){
    const pay=Math.min(life.debt,Math.round(life.money*.3));
    life.debt-=pay;life.money-=pay;
   }
-  life.money=Math.max(0,life.money*1.01);
+  if(life.debt>life.country.gdp*2.4){life.stats.happiness=clamp(life.stats.happiness-2);if(chance(life,.3))log(life,'入不敷出','借不到更多的钱，只能进一步缩减生活的开销。','finance');}
+  life.money=Math.max(0,round(life.money*1.01))||0;
  }
 }
 function deathCheck(life){
@@ -518,7 +529,10 @@ export function choose(life,index){
  upgradeLife(life);
  if(life.dead||!life.pending)return life;
  if(!Number.isInteger(index)||!life.pending.options[index])throw new RangeError('选择不存在');
- const pending=life.pending,option=pending.options[index];let outcome={effects:option.effects||{},text:option.description||''};
+ const pending=life.pending;
+ if(pending.kind==='system'){systemChoice(life,pending,index);return life;}
+ life.pending=null;
+ const option=pending.options[index];let outcome={effects:option.effects||{},text:option.description||''};
  if(pending.kind==='event'){
   const event=EVENT_BY_ID[pending.eventId];
   const context=JSON.parse(JSON.stringify(life));
@@ -530,7 +544,6 @@ export function choose(life,index){
  const effects=prepareEffects(outcome.effects||{},life);
  const details=applyEffects(life,effects);
  log(life,option.label,`${outcome.text||option.description||''}${details.length?` ${details.join('，')}。`:''}`,'consequence');
- life.pending=null;
  for(const k of Object.keys(life.stats))life.stats[k]=clamp(life.stats[k]);
  life.money=Math.max(0,round(life.money));life.income=Math.max(0,round(life.income));life.debt=Math.max(0,round(life.debt));
  return life;
@@ -549,11 +562,12 @@ export function advanceYear(life,options={}){
  marketStep(life);
  appreciationStep(life);
  familyStep(life);
+ if(options.events!==false&&MILESTONES[age])setMilestone(life,age);
+ systemsYear(life, options);
  for(const p of life.companions){p.age=Math.min(age,p.life);p.dead=age>=p.life;p.job=p.dead?'人生已结束':age<18?'学生':age>=65?'退休':age>=22?'在自己的城市工作':'初入社会';}
  life.netWorthHistory.push({age,value:netWorth(life)});
  if(deathCheck(life))return life;
  if(options.events!==false){
-  if(MILESTONES[age])setMilestone(life,age);
   if(!life.pending)maybeEvent(life);
  }
  if(!life.dead&&life.stats.health<=0){
@@ -705,6 +719,7 @@ export function travel(life,destinationId,companion='solo',options={}){
  const companionName=companion==='partner'?life.partner?.name:companion==='family'?'家人':companion==='friends'?'朋友':'自己';
  const memory=`${d.flag} ${d.place} · 和${companionName}${risk?'（旅途中生了一场小病）':''}`;
  life.travels.push({id:d.id,name:d.name,place:d.place,flag:d.flag,year:life.birthYear+life.age,age:life.age,companion,cost,memory});
+ life.sceneAction={id:`trip-${life.age}-${life.travels.length}`,type:'travel',age:life.age,text:`${companionName} · ${d.name}旅行`,from:life.country.name,to:d.name};
  if(!options.silent)log(life,`去了${d.name}`,risk?`${d.blurb} 只是回程时身体不太舒服，躺了两天才缓过来。`:`${d.blurb} 这趟旅行花了 ${cost}，但你记住了其中一些不需要花钱的瞬间。`,'travel');
  return {ok:true,cost,message:`${d.flag} ${d.place}`};
 }
