@@ -1,12 +1,28 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createLife, COUNTRIES } from '../src/engine.js';
+import { createLife, COUNTRIES, advanceYear, choose } from '../src/engine.js';
+import { financeYear } from '../src/finance.js';
 import { initSystems, systemsYear, systemAction, systemChoice, getHousehold, getSceneState } from '../src/life-systems.js';
 const clone = x => JSON.parse(JSON.stringify(x));
 function adult(seed = 'systems') { const l = createLife({ seed, country: 'CN' }); l.age = 28; l.income = 20000; l.money = 500000; initSystems(l); l.systems.residence.with = 'alone'; return l; }
 function select(l, key) { const p = l.pending; assert.equal(p?.kind, 'system'); const i = p.options.findIndex(o => o.key === key); assert.ok(i >= 0, key); assert.equal(systemChoice(l, p, i), true); }
 function next(l) { l.pending = null; l.age++; systemsYear(l); }
 function addPartner(l) { l.partner = { name: '林小舟', sex: '女', age: 28, income: 14000, bond: 75, alive: true }; }
+function conceive(l) {
+ if (!l.partner) addPartner(l);
+ for (let i = 0; i < 16 && !l.children.length; i++) {
+  l.pending = null; l.systems.lastConceptionAge = null; if (i) l.age++;
+  assert.equal(systemAction(l, 'plan-child').ok, true); select(l, 'birth');
+ }
+ assert.equal(l.children.length, 1);
+}
+function emigrate(l, id) {
+ for (let i = 0; i < 24 && l.country.id !== id; i++) {
+  l.pending = null; l.systems.visaUntil = 0; l.money = Math.max(l.money, 800000);
+  systemAction(l, 'move-abroad', { countryId: id }); select(l, 'solo');
+ }
+ assert.equal(l.country.id, id, id);
+}
 
 test('initialization is idempotent, consumes no randomness and preserves JSON', () => {
  const l = createLife({ seed: 'init', country: 'CN' }); const state = l.randomState; initSystems(l); const saved = clone(l); initSystems(l);
@@ -15,7 +31,7 @@ test('initialization is idempotent, consumes no randomness and preserves JSON', 
  assert.equal(getHousehold(l)[1].name, l.family.mother.name);
 });
 test('birth immediately chains care, with continuing costs and child growth', () => {
- const l = adult(); addPartner(l); systemAction(l, 'plan-child'); select(l, 'birth');
+ const l = adult(); addPartner(l); conceive(l);
  assert.equal(l.children.length, 1); assert.equal(l.pending.system, 'child-care'); const c = l.children[0];
  assert.equal(getHousehold(l).find(p => p.id === c.id).name, c.name);
  select(l, 'partner'); const cash = l.money; next(l);
@@ -25,13 +41,13 @@ test('birth immediately chains care, with continuing costs and child growth', ()
 });
 test('grandparent care is only offered while grandparents are alive and local', () => {
  const l = adult(); l.family.mother.alive = l.family.father.alive = false;
- systemAction(l, 'plan-child'); select(l, 'birth'); assert.ok(!l.pending.options.some(o => o.key === 'grandparents'));
+ conceive(l); assert.ok(!l.pending.options.some(o => o.key === 'grandparents'));
  select(l, 'nursery'); next(l); assert.ok(l.systems.care[l.children[0].id].annualCost > 0);
 });
 test('solo migration leaves named family home, reunion moves them, return restores country', () => {
  const l = adult('migration'); addPartner(l); l.children.push({ name: '林小雨', sex: '男', age: 2, birthYear: l.birthYear + l.age - 2 }); initSystems(l);
  l.systems.residence.with = 'family';
- systemAction(l, 'move-abroad', { countryId: 'CA' }); select(l, 'solo');
+ emigrate(l, 'CA');
  assert.equal(l.country.id, 'CA'); assert.equal(l.country.gdp, COUNTRIES.find(c => c.id === 'CA').gdp);
  assert.deepEqual(getHousehold(l).map(p => p.id), ['self']); assert.equal(l.systems.residence.familyCountryId, 'CN');
  assert.equal(systemAction(l, 'reunite-family').ok, true);
@@ -40,7 +56,7 @@ test('solo migration leaves named family home, reunion moves them, return restor
  assert.equal(getHousehold(l).length, 3); assert.ok(l.log.every(e => Number.isFinite(e.age) && Number.isFinite(e.year)));
 });
 test('migration review follows three years and preserves choice chains through JSON', () => {
- const l = adult('review'); addPartner(l); systemAction(l, 'move-abroad', { countryId: 'JP' }); select(l, 'solo');
+ const l = adult('review'); addPartner(l); emigrate(l, 'JP');
  l.age += 3; systemsYear(l); assert.equal(l.pending.system, 'migration-review');
  const saved = clone(l); select(l, 'reunite'); select(saved, 'reunite'); assert.deepEqual(l, saved);
  assert.equal(getHousehold(l).length, 2);
@@ -106,7 +122,7 @@ test('named spouse and pet incidents actually cost money and mention real names'
 test('hometown plan can move rural parents in and is offered while abroad', () => {
  const l = adult('hometown'); addPartner(l);
  l.systems.residence.familyWith = 'alone'; l.family.mother.age = l.family.father.age = 65;
- systemAction(l, 'move-abroad', { countryId: 'US' }); select(l, 'solo');
+ emigrate(l, 'US');
  assert.equal(l.systems.residence.abroadSince, l.age);
  let offered = false;
  for (let year = 0; year < 80 && !l.dead; year++) {
@@ -125,7 +141,7 @@ test('children never receive adult hometown costs or elder relocation choices', 
  for (let seed = 0; seed < 100; seed++) { const l = adult(`young-${seed}`); l.age = 6; l.money = 0; l.systems.residence.with = 'parents'; systemsYear(l); assert.notEqual(l.pending?.system, 'hometown-plan'); assert.equal(l.money, 0); assert.equal(l.debt, 0); assert.ok(!l.log.some(e => /养老|下班|搬来和你同住|屋顶要翻修/.test(e.text + e.title))); assert.equal(systemAction(l, 'divorce').ok, false); }
 });
 test('distance weakens bonds, contact helps but reunion needs cash reserves', () => {
- const a = adult('distance'); addPartner(a); systemAction(a, 'move-abroad', { countryId: 'CA' }); select(a, 'solo');
+ const a = adult('distance'); addPartner(a); emigrate(a, 'CA');
  const b = clone(a); b.partner.lastContactAge = b.age;
  a.age++; b.age++; systemsYear(a, { events: false }); systemsYear(b, { events: false });
  assert.equal(a.partner.distanceYears, 1); assert.ok(a.partner.bond < b.partner.bond); assert.ok(b.partner.bond < 75);
@@ -163,4 +179,35 @@ test('named friends persist, share memories and can decline romance', () => {
 test('world updates its panel without filling the personal timeline', () => {
  const l = adult('headlines'); l.log = []; for (let i = 0; i < 8; i++) { l.age++; l.pending = null; systemsYear(l, { events: false }); }
  assert.equal(l.log.filter(e => e.type === 'world').length, 0); assert.equal(l.systems.world.year, l.birthYear + l.age);
+});
+test('birth needs a living partner and can fail', () => {
+ const solo = adult('no-partner'); assert.equal(systemAction(solo, 'plan-child').ok, false); assert.equal(solo.children.length, 0);
+ let failed = false;
+ for (let seed = 0; seed < 40 && !failed; seed++) { const l = adult('miss-' + seed); addPartner(l); systemAction(l, 'plan-child'); select(l, 'birth'); failed = l.children.length === 0 && l.log.some(e => e.title === '这一年没有迎来孩子'); }
+ assert.ok(failed, 'conception can fail');
+});
+test('returning home ends a local job and keeps a remote one', () => {
+ const l = adult('return-job'); emigrate(l, 'US'); assert.equal(l.job, '待业'); assert.equal(l.income, 0);
+ l.remote = true; l.job = '远程职员'; l.income = 90000; l.employerGdp = 80000; l.pending = null;
+ assert.equal(systemAction(l, 'return-home').ok, true); assert.equal(l.country.id, 'CN'); assert.equal(l.income, 90000); assert.equal(l.remote, true);
+});
+test('a heard offer home from a richer country reprices pay downward', () => {
+ const l = adult('cheaper'); emigrate(l, 'US');
+ l.pending = null; l.income = 60000; l.job = '行政职员'; l.jobKind = 'office'; l.careerYears = 3;
+ l.pending = { kind: 'system', system: 'opportunity', offerKind: 'home-offer', title: '老家有人叫你回去', text: '收入按老家重算。', options: [{ key: 'try', label: '回去看看那份工作', description: '人会回去，收入按老家重算。' }] };
+ select(l, 'try'); assert.equal(l.country.id, 'CN'); assert.ok(l.income > 0 && l.income < 60000); assert.ok(l.log.some(e => /开销/.test(e.text)));
+});
+test('heavy debt with no income is not a calm life', () => {
+ const l = adult('debt-crisis'); l.money = 100; l.income = 0; l.debt = l.country.gdp * 4; l.stats.happiness = 100; l.stats.health = 80; l.finance.arrears = 3; l.finance.lastYear = null;
+ financeYear(l); assert.ok(l.stats.happiness < 80); assert.ok(l.log.some(e => /拦住|房子保不住|夜里没有|居留没有|债压着/.test(e.title)));
+});
+test('siblings are named people or the birth does not happen', () => {
+ let named = false, missed = false;
+ for (let seed = 0; seed < 40 && !(named && missed); seed++) {
+  const l = createLife({ seed: 'sib-' + seed, country: 'CN' });
+  for (let y = 0; y < 18 && !l.dead && !(named && missed); y++) { if (l.pending) choose(l, 0); else advanceYear(l); }
+  named ||= (l.family.siblings || []).some(s => s.name && s.alive !== false);
+  missed ||= l.log.some(e => e.title === '家里没有添人');
+ }
+ assert.ok(named, 'a named sibling appears'); assert.ok(missed, 'a parental birth can fail');
 });

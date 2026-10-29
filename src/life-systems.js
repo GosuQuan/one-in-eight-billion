@@ -1,5 +1,6 @@
 // Original, serializable life systems. Monetary figures are illustrative PPP units.
 import { COUNTRIES } from './engine.js';
+import { inferKind, localIncome } from './career.js';
 
 const clamp = n => Math.max(0, Math.min(100, Number(n) || 0));
 const copy = x => JSON.parse(JSON.stringify(x));
@@ -33,7 +34,8 @@ export function initSystems(l) {
  r.abroadSince ??= r.countryId !== (l.birthCountry || l.country).id ? l.age : null;
  r.homeCountry ??= (l.birthCountry || l.country).id;
  r.familyCountryId ??= r.countryId; r.familyWith ??= r.with;
- s.pet ??= null; s.business ??= null; s.conditions ||= []; s.care ||= {};
+ l.family.siblings ||= []; s.migration ||= []; s.residency ??= r.abroadSince != null ? 'temporary' : 'citizen'; s.visaUntil ??= 0;
+  s.pet ??= null; s.business ??= null; s.conditions ||= []; s.care ||= {};
  s.world ??= { year: null, title: '等待年度新闻', kind: 'quiet', detail: '世界新闻将随年份更新。' };
  s.actionSequence ??= 0; s.lastYear ??= null; s.lastRelationshipAge ??= null; s.lastMigrationReview ??= r.abroadSince;
  s.eventCooldowns ||= {}; s.relationshipActions ||= {}; l.friends ||= [];
@@ -61,27 +63,81 @@ function migrationParty(l, id) {
  pending(l, 'migration-party', `迁居${c.name}`, '这次谁和你一起走？独自迁居后，家人会留在原居国。', [option('solo', '独自出国', '家人留在原居国，之后可以团聚或回国。'), option('family', '携家人同行', '伴侣与未成年孩子一起迁居，搬迁费用更高。'), option('cancel', '暂时不搬')], { countryId: id });
  return result(true, '请选择移民同行安排。');
 }
-function move(l, id, withFamily) {
- const r = l.systems.residence, from = l.country.name, destination = country(id), wasWith = r.with;
- if (r.abroadSince == null) { r.homeCountry = l.country.id; r.familyCountryId = l.country.id; r.familyWith = wasWith; r.abroadSince = l.age; }
+function visaOdds(l) {
+ const edu = { none: 0, primary: 1, basic: 2, high: 3, vocational: 3, university: 4, masters: 5 }[l.school?.credential] || 0;
+ const cash = Math.max(0, l.money) / Math.max(1, gdp(l));
+ return Math.max(.08, Math.min(.78, .18 + edu * .07 + Math.min(.18, cash * .008) + (l.stats.knowledge || 0) * .0012));
+}
+function fertilityBlock(l) {
+ if (!alive(l.partner)) return '没有在世的伴侣，不能开始生育。';
+ const page = l.partner.age ?? l.age;
+ if (l.age < 18 || page < 18) return '还没到可以共同生育的年龄。';
+ if (l.age > 45 || page > 45) return '你或伴侣已经超出这次生育安排的年龄。';
+ return '';
+}
+function arriveWork(l, destination, originGdp, mode) {
+ if (mode === 'transfer') {
+  const kind = l.jobKind || inferKind(l.job);
+  l.remote = false; l.employerGdp = null; l.employerCountryId = destination.id; l.jobKind = kind;
+  if (!l.job || ['待业', '尚未工作', '学生'].includes(l.job)) l.job = '本地职员';
+  l.income = localIncome(l, kind, destination);
+  const cheaper = destination.gdp < originGdp * .75, richer = destination.gdp > originGdp * 1.25;
+  stats(l, cheaper ? { happiness: 6, knowledge: 2 } : richer ? { happiness: -3, knowledge: 3 } : { knowledge: 1 });
+  log(l, cheaper ? '到了消费更低的地方' : '收入和开销改按这里计算', `年收入现在是${l.income}，按${destination.name}的物价重算。日常开销也改按这里，不再沿用原来的账单。${cheaper ? '消费没那么高，收入通常会降下来，日子却松一点。' : richer ? '收入有机会更高，房租和日常也跟着涨。' : ''}`, 'work');
+ } else if (l.remote) {
+  if (destination.gdp < originGdp * .75) stats(l, { happiness: 5 });
+  log(l, '远程收入还在', `工作仍按原雇主那边计算，年收入${l.income}。你住在${destination.name}，吃饭、房租和账单改按这里。`, 'work');
+ } else if ((l.income || 0) > 0 || (l.job && !['待业', '尚未工作', '学生', '退休'].includes(l.job))) {
+  l.income = 0; l.job = '待业'; l.jobKind = null; l.remote = false;
+  log(l, '工作没有一起过来', `你到了${destination.name}。开销按这里计算，但这份工作不能远程，收入先归零。${l.careerYears || 0}年经验还在，要等当地的机会。`, 'work');
+ }
+}
+function move(l, id, withFamily, mode = 'none') {
+ const destination = country(id);
+ if (!destination || id === l.country.id) return result(false, '请选择不同的有效国家。');
+ const s = l.systems, r = s.residence;
+ if ((s.visaUntil || 0) > l.age) { log(l, '还不能再递交', `上次没有通过。要到${s.visaUntil}岁才能再申请前往${destination.name}。你仍在${l.country.name}。`, 'migration'); return result(false, `要到${s.visaUntil}岁才能再申请。`); }
+ const fromName = l.country.name, fromId = l.country.id, originGdp = l.country.gdp;
+ const fee = Math.round(gdp(l) * (mode === 'refuge' ? .03 : .02));
+ spend(l, fee);
+ s.migration ||= [];
+ const odds = Math.min(.85, visaOdds(l) + (mode === 'refuge' ? .08 : 0) + (mode === 'transfer' ? .1 : 0));
+ if (!chance(l, odds)) {
+  s.visaUntil = l.age + 4;
+  if (mode === 'refuge') { spend(l, gdp(l) * .05); stats(l, { health: -6, happiness: -6 }); }
+  else stats(l, { happiness: -3 });
+  s.migration.push({ from: fromId, to: id, age: l.age, status: 'refused', fee });
+  log(l, mode === 'refuge' ? '避难没有走通' : '签证没有通过', `${destination.name}没有批准这次申请。申请费已经花掉。${mode === 'refuge' ? '路上还损失了一笔钱和精力。' : ''}最早${s.visaUntil}岁可以再试。你仍在${fromName}。`, 'migration');
+  return result(false, '申请没有通过。');
+ }
+ if (r.abroadSince == null) { r.homeCountry = l.country.id; r.familyCountryId = l.country.id; r.familyWith = r.with; r.abroadSince = l.age; }
  const count = withFamily ? 1 + (alive(l.partner) ? 1 : 0) + l.children.filter(c => alive(c) && c.age < 18 && c.supportPayer !== 'player').length : 1;
  spend(l, gdp(l) * .16 * count); l.country = copy(destination);
  r.countryId = destination.id; r.city = destination.city;
  r.with = withFamily && (alive(l.partner) || l.children.some(c => alive(c) && c.age < 18 && c.supportPayer !== 'player')) ? 'family' : 'alone';
  if (withFamily) { r.familyCountryId = destination.id; if (alive(l.partner)) { l.partner.countryId = destination.id; l.partner.distanceYears = 0; } for (const c of l.children) if (alive(c) && c.age < 18 && c.supportPayer !== 'player') c.countryId = destination.id; }
- l.systems.lastMigrationReview = l.age; stats(l, { social: -5, knowledge: 4 });
- log(l, '在另一国安家', `${l.name}从${from}迁居${destination.name}${destination.city}，${withFamily ? '家人同行' : '独自出国，家人仍在' + (country(r.familyCountryId)?.name || '原居国')}。`, 'migration');
- action(l, 'moving', '搬进新的住所', from, destination.name);
+ s.lastMigrationReview = l.age; s.residency = 'temporary';
+ s.migration.push({ from: fromId, to: destination.id, age: l.age, status: 'temporary', fee });
+ stats(l, { social: -5, knowledge: 4 });
+ log(l, '在另一国安家', `${l.name}从${fromName}迁居${destination.name}${destination.city}，${withFamily ? '家人同行' : '独自出国，家人仍在' + (country(r.familyCountryId)?.name || '原居国')}。居留是临时的，不会自动变成永居。`, 'migration');
+ action(l, 'moving', '搬进新的住所', fromName, destination.name);
+ arriveWork(l, destination, originGdp, l.remote ? 'remote' : mode);
+ return result(true, `已迁居${destination.name}。`);
 }
-function returnHome(l) {
+function returnHome(l, mode = 'none') {
  const r = l.systems.residence, home = country(r.homeCountry); if (!home) return result(false, '找不到原居国。');
  if (r.countryId === home.id && r.abroadSince == null) return result(false, '你已经在原居国。');
- const from = l.country.name; spend(l, gdp(l) * .1); l.country = copy(home);
+ const from = l.country.name, originGdp = l.country.gdp; spend(l, gdp(l) * .1); l.country = copy(home);
  r.countryId = home.id; r.city = home.city; r.abroadSince = null; r.familyCountryId = home.id;
  for (const c of l.children) if (alive(c) && c.age < 18 && c.supportPayer !== 'player') c.countryId = home.id;
  if (alive(l.partner)) { l.partner.countryId = home.id; l.partner.distanceYears = 0; }
-  r.with = alive(l.partner) || l.children.some(c => alive(c) && c.age < 18 && c.supportPayer !== 'player') ? 'family' : r.familyWith === 'parents' && grandparents(l).length ? 'parents' : 'alone';
- l.systems.lastMigrationReview = null; stats(l, { social: 7, happiness: 5 }); log(l, '回到原居国', `${l.name}从${from}回到${home.name}，重新安排与亲人的生活。`, 'migration'); action(l, 'moving', '回国安家', from, home.name); return result(true, '已经回到原居国。');
+ r.with = alive(l.partner) || l.children.some(c => alive(c) && c.age < 18 && c.supportPayer !== 'player') ? 'family' : r.familyWith === 'parents' && grandparents(l).length ? 'parents' : 'alone';
+ l.systems.lastMigrationReview = null; l.systems.residency = 'citizen';
+ l.systems.migration ||= []; l.systems.migration.push({ from, to: home.id, age: l.age, status: 'returned' });
+ stats(l, { social: 4 });
+ arriveWork(l, home, originGdp, mode === 'transfer' ? 'transfer' : 'none');
+ log(l, '回到原居国', `${l.name}从${from}回到${home.name}。开销改按这里计算。${l.remote ? '远程工作还在。' : '原来的本地工作没有跟回来。'}`, 'migration');
+ action(l, 'moving', '回国安家', from, home.name); return result(true, '已经回到原居国。');
 }
 function reunite(l) {
  const r = l.systems.residence;
@@ -130,10 +186,12 @@ export function systemAction(l, name, payload = {}) {
  const s = l.systems, r = s.residence;
  if (['plan-child', 'start-business', 'move-abroad', 'housing', 'seek-partner', 'relationship-talk', 'relationship-counsel', 'relationship-decide', 'divorce'].includes(name) && l.age < 18) return result(false, '成年后才能安排这件事。');
  switch (name) {
- case 'plan-child':
-  if (l.age > 50) return result(false, '当前年龄不再开放生育计划。');
-  if (l.children.filter(alive).filter(c => c.age < 6).length >= 2) return result(false, '幼儿还小，先照顾好眼前的孩子。');
-  pending(l, 'child-plan', '是否迎接一个孩子', `${alive(l.partner) ? `与${l.partner.name}共同` : '你准备独自'}承担生育和育儿的责任。`, [option('birth', '迎接孩子', '出生后立刻决定由谁照顾。'), option('wait', '暂缓计划', '把时间留给现有生活。')]); return result(true, '请选择生育计划。');
+ case 'plan-child': {
+   const why = fertilityBlock(l);
+   if (why) return result(false, why);
+   if (l.children.filter(alive).filter(c => c.age < 6).length >= 2) return result(false, '幼儿还小，先照顾好眼前的孩子。');
+   pending(l, 'child-plan', '要不要试着要一个孩子', `与${l.partner.name}一起尝试。检查要花钱，这一年也可能没有孩子。没有伴侣不会进入这一步。`, [option('birth', '尝试生育', '付检查费。成功才会有一个有名字的孩子，失败则今年不能再试。'), option('wait', '暂缓计划', '把时间留给现有生活，不花钱。')]); return result(true, '请选择是否尝试。出生不是必然。');
+  }
  case 'child-care': { const child = l.children.find(c => alive(c) && c.age < 6 && c.supportPayer !== 'player' && (!s.care[c.id] || payload.childId === c.id)); if (!child) return result(false, '没有需要重新安排照护的幼儿。'); childCare(l, child); return result(true, '请选择照护安排。'); }
  case 'adopt-dog': case 'adopt-cat':
   if (s.pet?.alive) return result(false, `请先照顾好${s.pet.name}。`);
@@ -205,6 +263,13 @@ export function systemChoice(l, p, index) {
  switch (p.system) {
  case 'child-plan':
   if (key === 'birth') {
+   const why = fertilityBlock(l);
+   if (why) { log(l, '没有开始生育', why); break; }
+   if (s.lastConceptionAge === l.age) { log(l, '今年已经试过', '一年只安排一次生育尝试。'); break; }
+   s.lastConceptionAge = l.age; spend(l, gdp(l) * .04);
+   const page = l.partner.age ?? l.age;
+   const conceived = chance(l, Math.max(.12, .62 - Math.max(0, l.age - 32) * .02 - Math.max(0, page - 32) * .02 - (l.stats.health < 40 ? .2 : 0)));
+   if (!conceived) { stats(l, { happiness: -4, health: -2 }); log(l, '这一年没有迎来孩子', `${l.name}和${l.partner.name}试过了。检查和等待都花了钱，新生儿没有来。今年不能再试。`); break; }
    const c = { ...person(l), id: `child-${yearOf(l)}-${l.children.length}`, birthYear: yearOf(l), age: 0, alive: true, bond: 75, development: 50 };
    l.children.push(c); spend(l, gdp(l) * .08); stats(l, { happiness: 8, health: -3 });
    s.residence.with = 'family';
@@ -260,10 +325,10 @@ export function systemChoice(l, p, index) {
   log(l, `${c.name}：${o.label}`, `实际支付${billed}${l.insurance && billed ? '（保险承担70%）' : ''}。${key === 'delay' ? '拖延使病情加重，后续仍需面对。' : '此后每年继续用药、观察与复查。'}`, 'health'); action(l, 'hospital', o.label); break;
  }
  case 'migration-country': migrationParty(l, key); break;
- case 'migration-party': if (key !== 'cancel') move(l, p.countryId, key === 'family'); break;
+ case 'migration-party': if (key !== 'cancel') move(l, p.countryId, key === 'family', p.mode || 'none'); break;
  case 'migration-review':
   s.lastMigrationReview = l.age;
-  if (key === 'home') returnHome(l); else if (key === 'reunite') reunite(l); else { stats(l, { knowledge: 2 }); log(l, '继续在海外生活', `你决定继续住在${l.country.name}，与亲人保持联系。`, 'migration'); } break;
+  if (key === 'home') returnHome(l); else if (key === 'reunite') reunite(l); else if (key === 'pr') tryResidency(l); else { stats(l, { knowledge: 2 }); log(l, '继续按当前身份住下去', `你留在${l.country.name}。这不会自动变成永居，开销仍按这里计算。`, 'migration'); } break;
  case 'housing': { const outcome = setHousing(l, key); if (!outcome.ok) log(l, '暂未改变住处', outcome.message); break; }
  case 'pet-crisis': {
   const pet = s.pet; if (!pet?.alive) break;
@@ -280,11 +345,37 @@ export function systemChoice(l, p, index) {
   else log(l, '老家的安排', '你把这件事记在心里，想着以后再慢慢安排。');
   break; }
  case 'world-crisis':
-  if (key === 'migrate') { systemAction(l, 'move-abroad'); break; }
-  if (key === 'shelter') { spend(l, gdp(l) * .035); stats(l, { health: 2, happiness: -1 }); action(l, 'moving', '暂时前往安全住所'); }
-  else { spend(l, gdp(l) * .015); stats(l, { health: -2, happiness: -2 }); }
-  log(l, '危机中的选择', `面对年度情境，你选择了${o.label}。`, 'world'); break;
- default: l.pending = p; return false;
+  if (key === 'migrate') { log(l, '开始问能不能离开', '移民不是买到的船票。接下来要选国家，签证可能被拒，避难路线也可能中断。', 'world'); systemAction(l, 'move-abroad'); break; }
+  if (key === 'shelter') {
+   spend(l, gdp(l) * .035);
+   if (!chance(l, .62)) { spend(l, gdp(l) * .04); stats(l, { health: -6, happiness: -5 }); log(l, '避难没有走通', '你赶到了集合点，但名额和路都断了。钱和身体都受了损，人还在原地。', 'world'); break; }
+   stats(l, { health: 2, happiness: -1 }); action(l, 'moving', '暂时前往安全住所'); log(l, '暂时避到了更安全的地方', '这一次避难走通了。它不是保证，下一次仍可能失败。', 'world'); break;
+  }
+  spend(l, gdp(l) * .015); stats(l, { health: -2, happiness: -2 }); log(l, '危机中的选择', `面对年度情境，你选择了${o.label}。钱已经花出去，安全并不因此确定。`, 'world'); break;
+ case 'opportunity': {
+   if (key === 'skip' || key === 'cancel') { log(l, '让这个消息过去', '你听见了，但没有去追。机会不会在原地等你。'); break; }
+   const kind = p.offerKind;
+   if (kind === 'local') {
+    const preview = localIncome(l, p.jobKind);
+    const pass = chance(l, .28 + (l.stats.knowledge || 0) * .002 + Math.min(.2, (l.careerYears || 0) * .02));
+    if (!pass) { stats(l, { happiness: -2 }); log(l, '本地的位置没有你', `面试结束了。以你现在的学历和${l.careerYears || 0}年经验，对方选了别人。你仍是${l.job}。`, 'work'); break; }
+    l.jobKind = p.jobKind; l.remote = false; l.employerGdp = null; l.employerCountryId = l.country.id; l.retired = false;
+    l.job = { apprentice: '维修学徒', office: '行政职员', technical: '技术人员' }[p.jobKind] || '本地职员';
+    l.income = preview; log(l, '本地录用了你', `年收入${l.income}，按${l.country.name}的物价、学历和经验计算。以后仍可能失业。`, 'work');
+   } else if (kind === 'raise') {
+    if (!chance(l, Math.min(.7, .18 + (l.careerYears || 0) * .03 + (l.stats.knowledge || 0) * .002)) || !(l.income > 0)) { log(l, '评估没有通过', `你已有${l.careerYears || 0}年经验，这次名单上没有你。岗位和收入维持原样。`, 'work'); break; }
+    l.income = Math.round(l.income * 1.14); l.job = '资深' + String(l.job || '职员').replace(/^资深/, '');
+    log(l, '晋升名单上有你', `年收入调整为${l.income}。这是在${l.country.name}的物价上加的，不是一张永远有效的证明。`, 'work');
+   } else if (kind === 'remote') {
+    if (!chance(l, .32 + (l.stats.knowledge || 0) * .002)) { log(l, '远程岗位没你', '对方要的经验和时区你暂时对不上。', 'work'); break; }
+    l.remote = true; l.employerGdp = l.country.gdp; l.employerCountryId = l.country.id; l.jobKind = 'remote'; l.job = '远程职员'; l.retired = false; l.income = localIncome(l, 'remote');
+    log(l, '做成了一份远程工作', `年收入${l.income}，按现在雇主所在的物价计算。以后换国家，这份收入还在，开销按你住的地方算。`, 'work');
+   } else if (kind === 'pr') tryResidency(l);
+   else if (kind === 'home-offer') returnHome(l, 'transfer');
+   else if (kind === 'abroad') move(l, p.countryId, false, 'transfer');
+   break;
+  }
+  default: l.pending = p; return false;
  }
  return true;
 }
@@ -449,19 +540,68 @@ export function systemsYear(l, options = {}) {
   if (c.severity <= 0) { c.resolved = true; log(l, '病情得到控制', `${c.name}经过持续治疗，症状得到控制。`, 'health'); }
   else if ((c.severity >= 50 || l.age - (c.lastReviewAge ?? c.diagnosedAge) >= 3) && !l.pending) medicalChoice(l, c);
  }
- if (r.abroadSince != null && l.age - (s.lastMigrationReview ?? r.abroadSince) >= 3 && !l.pending) offer(l, 'migration-review', '海外的第三年', `你住在${l.country.name}，家人在${country(r.familyCountryId)?.name || '原居国'}。下一步如何安排？`, [option('stay', '继续留居'), ...(r.familyCountryId !== r.countryId && (alive(l.partner) || l.children.some(c => alive(c) && c.age < 18 && c.supportPayer !== 'player')) ? [option('reunite', '接家人团聚')] : []), option('home', '回原居国生活')]);
+ if (r.abroadSince != null && l.age - (s.lastMigrationReview ?? r.abroadSince) >= 3 && !l.pending) {
+   const years = l.age - r.abroadSince; const home = country(r.homeCountry); const familyHere = r.familyCountryId === r.countryId;
+   const separated = !familyHere && (alive(l.partner) || l.children.some(c => alive(c) && c.age < 18 && c.supportPayer !== 'player'));
+   offer(l, 'migration-review', `在${l.country.name}的第${years}年`, familyHere ? `你和家人都在${l.country.name}，已经${years}年。身份仍是${s.residency === 'permanent' ? '长期居留' : '临时居留'}，留下不会自动变成永居。回${home?.name || '原居国'}会结束这段居住；非远程工作不会跟回去。` : `你在${l.country.name}，家人在${country(r.familyCountryId)?.name || '原居国'}。分开已经${years}年。团聚要另付搬迁费，也不会自动办成。`, [option('stay', '继续按当前身份住下去', '不会自动获得永居。开销仍按这里计算。'), ...(separated ? [option('reunite', '接家人团聚', '需要搬迁费和生活储备，家人到齐以后才同住。')] : []), ...(s.residency !== 'permanent' && years >= 4 ? [option('pr', '申请长期居留', '申请费不退。可能被拒，被拒后三年不能再申。')] : []), option('home', '回原居国生活', '非远程的工作不会跟回去，收入会先归零，开销改按原居国。')]);
+  }
  if (options.events !== false) { hometownEvents(l); intimateEvents(l); }
  s.world = worldFor(yearOf(l));
  if (['war', 'crisis'].includes(s.world.kind) && l.age >= 18) { spend(l, gdp(l) * .025); stats(l, { happiness: -2, health: -1 }); if (options.events !== false) offer(l, 'world-crisis', s.world.title, s.world.detail, s.world.kind==='war' ? [option('stay', '留守并准备物资'), option('shelter', '暂时避难'), option('migrate', '考虑移民')] : [option('stay', '缩减开支，准备应急物资'), option('shelter', '动用应急预算渡过危机'), option('migrate', '寻找其他地方的机会')]); }
  else if (s.world.kind === 'science') stats(l, { health: .5 });
+ if (options.events !== false && !l.pending) hearOpportunity(l);
  return l;
 }
 
+
+function tryResidency(l) {
+ const s = l.systems;
+ if (s.residency === 'permanent') { log(l, '已经是长期居留', '不用再申请一次。'); return; }
+ if ((s.prUntil || 0) > l.age) { log(l, '永居申请还在冷却', `上次被拒。要到${s.prUntil}岁才能再递。`); return; }
+ const fee = Math.round(gdp(l) * .04); spend(l, fee);
+ if (!chance(l, Math.min(.7, visaOdds(l) + .05))) { s.prUntil = l.age + 3; stats(l, { happiness: -3 }); log(l, '长期居留没有通过', `申请费${fee}已经交掉。你仍是临时居留，最早${s.prUntil}岁可以再试。欠款和没有收入仍可能让你被要求离开。`, 'migration'); return; }
+ s.residency = 'permanent'; log(l, '拿到了长期居留', `你付了${fee}。这不是公民身份，严重欠款仍可能被重新审查，但一次换工作不会立刻把你送走。`, 'migration');
+}
+function hearOpportunity(l) {
+ if (l.pending || l.dead || l.retired || l.age < 18 || l.age > 67) return;
+ if (!chance(l, .62)) return;
+ const employedNow = (l.income || 0) > 0 && !['待业', '尚未工作', '学生', '退休', '求职中'].includes(l.job || '');
+ if (employedNow && chance(l, .12)) {
+  l.income = 0; l.job = '待业'; l.remote = false; l.jobKind = null;
+  log(l, '这份工作结束了', `没有人提前保证岗位。你在${l.country.name}失去了收入，${l.careerYears || 0}年经验还留着。接下来只能等新的消息，或自己去投。`, 'work');
+  return;
+ }
+ const dest = pick(l, COUNTRIES.filter(c => c.id !== l.country.id));
+ const r = l.systems.residence;
+ const kinds = employedNow ? ['raise', 'local', 'abroad'] : ['local', 'abroad'];
+ if ((l.careerYears || 0) >= 4 || ['university', 'masters', 'vocational', 'high'].includes(l.school?.credential)) kinds.push('remote');
+ if (r.abroadSince != null && l.age - r.abroadSince >= 4 && l.systems.residency === 'temporary') kinds.push('pr');
+ if (r.abroadSince != null) kinds.push('home-offer');
+ const kind = pick(l, kinds);
+ if (kind === 'local') {
+  const jobKind = pick(l, ['apprentice', 'office', 'technical']);
+  const preview = localIncome(l, jobKind);
+  pending(l, 'opportunity', '有人提起一个本地的位置', `在${l.country.name}，以你的学历和${l.careerYears || 0}年经验，这份工作不一定录用。若做成，年收入大约${preview}，按这里的物价计算。`, [option('try', '去试试', '花时间面试，可能没有回音。'), option('skip', '先不接', '消息会过去，你留在现在的状态。')], { offerKind: 'local', jobKind });
+ } else if (kind === 'raise') {
+  pending(l, 'opportunity', '主管提起你的名字', `你在这里做了${l.careerYears || 0}年。晋升不看你想不想，看他们认不认。没通过就留在原岗位。`, [option('try', '参加评估', '可能被拒绝。'), option('skip', '当作没听见', '岗位维持原样。')], { offerKind: 'raise' });
+ } else if (kind === 'remote') {
+  pending(l, 'opportunity', '一份可以不坐在办公室的工作', `申请可能失败。若做成，以后换国家这份收入还在，开销仍按你住的地方算。`, [option('try', '去申请', '失败就还是现在的工作。'), option('skip', '先不申请', '机会会过去。')], { offerKind: 'remote' });
+ } else if (kind === 'pr') {
+  pending(l, 'opportunity', `可以申请在${l.country.name}长期留下`, `你已住了${l.age - r.abroadSince}年，身份仍是临时的。申请费不退，可能被拒，被拒后三年不能再申。`, [option('try', '递交申请', '花钱，结果不确定。'), option('skip', '以后再说', '继续临时居留。')], { offerKind: 'pr' });
+ } else if (kind === 'home-offer') {
+  const home = country(r.homeCountry);
+  const cheaper = home && home.gdp < l.country.gdp * .75;
+  pending(l, 'opportunity', '老家有人叫你回去', `${home?.name || '原居国'}的物价和${l.country.name}不一样。如果回去接那份本地工作，收入按老家重算，开销也改按老家。${cheaper ? '消费没这边高，收入通常会降，账单会轻一些。' : ''}`, [option('try', '回去看看那份工作', '人会回去，收入按老家重算。'), option('skip', '继续留在这里', '老家的消息就过去了。')], { offerKind: 'home-offer' });
+ } else {
+  const cheaper = dest.gdp < l.country.gdp * .75;
+  pending(l, 'opportunity', `听说${dest.name}有一个能接上的位置`, `你现在在${l.country.name}（人均参照 ${l.country.gdp}）。那边约为 ${dest.gdp}。去成的话，收入和开销都改按${dest.name}计算。${cheaper ? '消费没这边高，收入通常会降，但日子可能松一点。' : '物价更高时，收入有机会上去，开销也跟着涨。'}签证可能被拒，被拒后四年不能再走这条申请。`, [option('try', '去试试这份机会', '提交申请。被拒就留在原地。'), option('skip', '当作没听见', '你留在现在的地方。')], { offerKind: 'abroad', countryId: dest.id });
+ }
+}
 export function getHousehold(l) {
  initSystems(l); const r = l.systems.residence;
  const residents = [{ id: 'self', name: l.name, role: '自己', age: l.age, sex: l.sex, countryId: r.countryId }];
  const add = (p, id, role, fallbackAge) => { if (alive(p)) residents.push({ id, name: p.name, role, age: p.age ?? fallbackAge, sex: p.sex || (role === '母亲' ? '女' : role === '父亲' ? '男' : '未知'), countryId: r.countryId }); };
- if (r.with === 'parents') { add(l.family.mother, 'mother', '母亲', 55); add(l.family.father, 'father', '父亲', 57); }
+ if (r.with === 'parents') { add(l.family.mother, 'mother', '母亲', 55); add(l.family.father, 'father', '父亲', 57); for (const sib of l.family?.siblings || []) if (alive(sib) && (sib.age ?? 0) < 18) add(sib, sib.id || sib.name, sib.sex === '男' ? '弟弟' : '妹妹', 0); }
  if (['partner', 'family'].includes(r.with) && r.countryId === r.familyCountryId) add(l.partner, 'partner', '伴侣', l.age);
  if (r.with === 'family') for (const c of l.children) if (c.livesWithPlayer !== false && (c.age < 18 || c.livesWithPlayer === true) && (c.countryId || r.familyCountryId) === r.countryId) add(c, c.id, '孩子', 0);
  return residents;

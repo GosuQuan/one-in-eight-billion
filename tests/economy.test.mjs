@@ -5,7 +5,7 @@ const copy=x=>JSON.parse(JSON.stringify(x));
 test('education and child costs subtract cash rather than add it',()=>{
  const l=createLife({seed:'cost-sign',country:'US'});l.age=17;l.money=100000;l.debt=0;
  advanceYear(l);const before=l.money;choose(l,0);assert.ok(l.money<before);
- l.age=29;l.pending=null;l.money=100000;advanceYear(l);const cash=l.money;choose(l,0);assert.ok(l.money<cash);assert.equal(l.children.length,1);
+ l.partner={name:'林夏',alive:true,age:29,sex:'女',bond:80};l.age=29;l.pending=null;l.money=100000;advanceYear(l);choose(l,0);assert.equal(l.pending.system,'child-plan');const cash=l.money;choose(l,0);assert.ok(l.money<cash);assert.ok(l.children.length===1||l.log.some(e=>/没有迎来孩子/.test(e.title)));
 });
 test('car and insurance recurring cost is charged once per year',()=>{
  const a=createLife({seed:'cost-once',country:'US'});a.age=30;a.money=1000000;a.income=0;a.longevity=100;

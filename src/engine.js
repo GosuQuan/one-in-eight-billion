@@ -1,7 +1,7 @@
 import { initSystems, systemsYear, systemChoice, systemAction } from './life-systems.js';
 import { initEducation, educationYear, educationMilestone, educationChoice } from './education.js';
 import { initFinance, financeYear, creditBlocked } from './finance.js';
-import { careerAction } from './career.js';
+import { careerAction, careerYear } from './career.js';
 export { systemAction };
 // A self-contained, deterministic life simulation for the demo.
 // All country/price figures are approximate teaching data, not official statistics.
@@ -158,7 +158,7 @@ export function createLife({era='now',mode='birth',seed=Date.now(),country,sex,n
   money:Math.round(c.gdp*(.015+wealth*.08)),income:0,job:'尚未工作',education:'尚未入学',partner:null,children:[],
   family:{mother:{...person(s,c,'女'),age:22+Math.floor(roll(s)*15),job:pick(s,['教师','店员','农民','护士','技术员']),alive:true},
    father:{...person(s,c,'男'),age:24+Math.floor(roll(s)*16),job:pick(s,['司机','工人','农民','工程师','小店经营者']),alive:true},
-   background:wealth<.25?'生活拮据':wealth>.8?'相对宽裕':'普通家庭',wealth},
+   siblings:[],background:wealth<.22?'贫困':wealth<.48?'温饱':wealth<.78?'中产':'富裕',wealth},
   log:[],pending:null,dead:false,deathCause:null,deathAge:null,focus:'joy',companions:[],
   notes:[],
   longevity:clamp(c.life+(birthYear===1970?-6:birthYear>=2050?5:0)+(roll(s)-.5)*24,45,106),retired:false,
@@ -168,12 +168,21 @@ export function createLife({era='now',mode='birth',seed=Date.now(),country,sex,n
   const cc=countryFor(s,mode);s.companions.push({...person(s,cc),id:`companion-${i}`,country:JSON.parse(JSON.stringify(cc)),birthYear,
    life:Math.round(clamp(cc.life+(roll(s)-.5)*30,35,108)),age:0,dead:false,job:'尚未工作'});
  }
- log(s,'世界多了一个你',`${birthYear}年，你出生在${c.name}${c.city}的一个${s.family.background}。父母给你取名${s.name}。`,'birth');
+ s.classBand=s.family.background;
+  log(s,'世界多了一个你',`${birthYear}年，你出生在${c.name}${c.city}。对照当地人均 GDP，你家大约高于${Math.round(wealth*100)}%的家庭，更接近${s.family.background}。这是游戏里的分层，不是官方收入统计。父母给你取名${s.name}。`,'birth');
  log(s,'同一秒的远方','另外四个孩子也在这个世界睁开眼睛。你们彼此陌生，却一起走进时间。','world');
  initSystems(s); initEducation(s); initFinance(s);
  return s;
 }
 
+export function classStanding(life){
+ const gdp=life.country?.gdp||1;
+ const worth=netWorth(life);
+ const ratio=worth/gdp;
+ const birth=Math.max(0,Math.min(1,life.family?.wealth??.4));
+ const band=life.age<18?(birth<.22?'贫困':birth<.48?'温饱':birth<.78?'中产':'富裕'):(ratio<.15?'贫困':ratio<1.2?'温饱':ratio<4.5?'中产':'富裕');
+ return {band,ratio,worth,birth};
+}
 export function netWorth(life){
  upgradeLife(life);
  const stockValue=life.holdings.reduce((sum,h)=>sum+h.shares*(life.market.stocks[h.symbol]?.price||0),0);
@@ -224,8 +233,8 @@ export function applyEffects(life,effects={}){
  if(effects.education)details.push('学历改由逐年学业决定，这次选择不直接授予学历');
  if(effects.education)life.education=effects.education;
  if(effects.retired){life.retired=true;life.job='退休';}
- if(effects.partner){const p=ensurePartner(life);systemAction(life,'housing',{with:'family'});details.push(`与${p.name}成为伴侣`);}
- if(effects.child){const c=ensureChild(life);systemAction(life,'child-care');details.push(`孩子${c.name}来到家中`);}
+ if(effects.partner){const r=systemAction(life,'seek-partner');details.push(r.message||'可以表达心意，对方仍可能拒绝');}
+ if(effects.child||effects.conception){const r=systemAction(life,'plan-child');details.push(r.ok?r.message:'没有适龄伴侣，这次不会有孩子');}
  if(effects.relocate){systemAction(life,'move-abroad',{countryId:effects.relocate});details.push('开始讨论迁居与同行安排');}
  if(effects.insurance){life.insurance=true;details.push('有了医疗保险');}
  if(effects.car){life.car=true;if(!life.possessions.includes('car'))life.possessions.push('car');details.push('有了自己的车');}
@@ -281,6 +290,7 @@ function familyStep(life){
   life.partner.age=(life.partner.age||life.age)+1;
  }
  for(const c of life.children)c.age=Math.max(0,life.age-(c.birthYear-life.birthYear));
+  for(const sib of life.family?.siblings||[])if(sib&&sib.alive!==false)sib.age=(sib.age||0)+1;
  for(const p of [life.family.mother,life.family.father]){
   if(!p||p.alive===false)continue;p.age=(p.age||60)+1;
   if(p.age>72&&chance(life,.035+(p.age-72)*.006)){
@@ -290,11 +300,6 @@ function familyStep(life){
  }
  if(life.age>=18){
   const studying=life.school?.program&&!life.school.program.paused&&['apply-university','apply-masters','apply-high','apply-vocational'].includes(life.school.program.id);
-  if(!life.retired&&!studying&&life.income===0&&!['学生','尚未工作','退休'].includes(life.job)&&chance(life,.42)){
-   life.income=Math.round(life.country.gdp*({masters:.85,university:.7,high:.5,vocational:.48,basic:.32,primary:.28}[life.school?.credential]||.3));
-   life.job=life.job==='求职中'?'重新入职的职员':'零工';
-   log(life,'重新找到工作','投出的简历终于有了回音。新的岗位不算完美，但生活重新有了节奏。','work');
-  }
   const minor=life.children.filter(c=>c.age<18&&c.alive!==false&&!c.dead&&c.supportPayer!=='player').length;
   let cost=life.country.gdp*(.2+(life.house?0:.06)+minor*.05+(life.car?.012:0)+(life.insurance?.012:0));
   if(life.income===0&&life.age<22)cost=life.country.gdp*.045;
@@ -327,10 +332,10 @@ const MILESTONES={
   {label:'参加运动队',description:'在操场上学会合作，也把身体练好。',effects:{health:9,social:8}},
   {label:'帮家里做事',description:'分担家务，也攒下一点零用钱。',effects:{social:5,money:0,cash:400,happiness:3}}]},
  30:{title:'家的形状',text:'你开始想象未来的家，会是什么样子。',options:[
-  {label:'迎接一个孩子',description:'育儿需要金钱、精力和耐心。',effects:{child:true,happiness:10,health:-3,cash:'-gdp:.15'}},
+  {label:'和伴侣尝试要一个孩子',description:'没有适龄伴侣就不会出生。即使尝试，这一年也可能没有孩子。',effects:{conception:true}},
   {label:'先照顾自己',description:'把时间留给自己的生活与兴趣。',effects:{health:5,happiness:7,cash:1200}}]},
  35:{title:'另一座城市',text:'外地的一次机会，让你想到搬家。',options:[
-  {label:'搬去新的国家',description:'适应陌生环境，寻找新的工作空间。',effects:{relocate:'__random__',social:-8,knowledge:6,cash:'-gdp:.25',incomePct:.2}},
+  {label:'去问那个外地机会',description:'只是开始申请。签证可能失败；去成后收入和开销都按目的地重算。',effects:{relocate:'__random__'}},
   {label:'留下扎根',description:'继续经营熟悉的人际关系。',effects:{social:10,happiness:6}}]},
  40:{title:'工作与生活的分量',text:'你已经积累了一些经验，也有了新的取舍。',options:[
   {label:'提交晋升申请',description:'根据技能、关系与工作投入竞争岗位，也可能被拒绝。',effects:{career:'promotion'}},
@@ -395,7 +400,7 @@ const EVENTS=[
  {id:'found_wallet',age:[8,16],weight:.5,cond:()=>true,build:l=>({title:'长椅上的钱包',text:'一只旧钱包躺在长椅上，里面有一张身份证和几张纸币。',type:'event',options:[
   {key:'return',label:'交给附近的店员',description:'也许失主会回来找。',effects:{social:5,happiness:3}},
   {key:'keep',label:'先收起来',description:'没有人看见。',effects:{cash:600,happiness:-3}}]})},
- {id:'sibling_born',age:[2,11],weight:.5,cond:l=>!l.family.sibling,build:l=>({title:'家里多了一个人',text:'你有了一个弟弟或妹妹。家里突然变得很吵，也变得很满。',type:'warm',effects:{social:4,happiness:2}})},
+ {id:'sibling_try',age:[1,14],weight:.55,cond:l=>{const m=l.family?.mother,f=l.family?.father;if(!m||m.alive===false||!f||f.alive===false)return false;if((m.age??99)<20||(m.age??0)>45||(f.age??0)>62)return false;if((l.family.siblings||[]).length>=3)return false;return (l.family.lastSiblingTry??-9)+4<=l.age;},build:l=>{l.family.siblings||=[];l.family.lastSiblingTry=l.age;const mature=Math.max(0,(l.family.mother.age||40)-34)*.015+Math.max(0,(l.family.father.age||40)-50)*.01;if(!chance(l,Math.max(.12,.58-mature)))return{title:'家里没有添人',text:`${l.family.mother.name}和${l.family.father.name}都还在，也提过再要一个孩子。母亲${l.family.mother.age}岁，父亲${l.family.father.age}岁。这一年没有迎来新生儿。`,type:'family',effects:{happiness:-1}};const sex=chance(l,.5)?'男':'女';const sib={...person(l,l.country,sex),id:`sibling-${l.birthYear+l.age}-${l.family.siblings.length}`,age:0,birthYear:l.birthYear+l.age,alive:true,bond:55};l.family.siblings.push(sib);return{title:`${sib.name}出生了`,text:`${l.family.mother.name}生下了${sex==='男'?'弟弟':'妹妹'}${sib.name}。这是一个会和你一起长大的人。`,type:'warm',effects:{social:3,happiness:2}};}},
  {id:'child_illness',age:[1,10],weight:.5,cond:()=>true,build:l=>({title:'半夜的发烧',text:'你烧到三十九度，父母抱着你去了医院。走廊的灯很白。',type:'bad',effects:{medical:true,health:-4,cash:-600,happiness:-2}})},
  {id:'exam_pressure',age:[12,18],weight:1,cond:()=>true,build:l=>({title:'一场重要的考试',text:'成绩会决定下一步能去哪里。书桌上的台灯亮到很晚。',type:'event',options:[
   {key:'cram',label:'熬夜复习',description:'把能记住的都记住。',effects:{knowledge:8,health:-3}},
@@ -561,7 +566,8 @@ export function advanceYear(life,options={}){
  for(const [k,v] of Object.entries(focus))life.stats[k]=clamp(life.stats[k]+v);
  life.stats.health-=(age<40?.3:age<65?.75:1.6);
  if(age<18)life.stats.knowledge=clamp(life.stats.knowledge+((life.school?.basicProgress>0||life.school?.program)&&!life.school?.program?.paused?2:.4));
- if(age>=18&&!life.retired&&life.income>0)life.income*=1+(life.focus==='work'?.045:.02);
+ careerYear(life);
+  if(age>=18&&!life.retired&&life.income>0)life.income*=1+(life.focus==='work'?.045:.02);
  if(life.retired&&life.income<=0)life.income=Math.round(life.country.gdp*.2);
  marketStep(life);
  appreciationStep(life);
@@ -580,7 +586,11 @@ export function advanceYear(life,options={}){
   life.dead=true;life.deathAge=age;life.deathCause='身体长期衰弱';life.income=0;life.pending=null;
   log(life,'这一生，走到了终点',`${age}岁时，你的人生停在这里。那些相遇、选择与普通的日子，组成了独一无二的一生。`,'death');
  }
- for(const k of Object.keys(life.stats))life.stats[k]=clamp(life.stats[k]);
+ if(!life.dead&&life.debt>life.country.gdp*.8&&(life.income<life.country.gdp*.5||life.debt>Math.max(life.income*3,life.country.gdp)))life.stats.happiness=Math.min(life.stats.happiness,58);
+  const standing=classStanding(life);
+  if(life.classBand&&life.classBand!==standing.band&&life.age>=18){const order=['富裕','中产','温饱','贫困'];const fell=order.indexOf(standing.band)>order.indexOf(life.classBand);log(life,fell?'家境往下掉了一截':'越过了原来的那条线',fell?`欠款、失业或亏掉的钱把你从${life.classBand}带到${standing.band}。在${life.country.name}，接下来的账单变了。`:`工作、经验和你待的地方让日子越过了${life.classBand}。你现在更接近${standing.band}，仍可能掉回去。`,'life');}
+  life.classBand=standing.band;
+  for(const k of Object.keys(life.stats))life.stats[k]=clamp(life.stats[k]);
  life.money=Math.max(0,round(life.money));life.income=Math.max(0,round(life.income));life.debt=Math.max(0,round(life.debt));
  return life;
 }
