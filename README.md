@@ -1,5 +1,7 @@
 # 80亿分之1 · 人生模拟 Demo
 
+**简体中文** · [English](README.en.md) · [Українська](README.uk.md)
+
 八十亿种可能，仅此一次的人生。随机出生、作出选择，从出生走到一生的回顾。
 
 **[在线试玩 ↗](https://gosuquan.github.io/one-in-eight-billion/)** · **[交互原型 ↗](https://gosuquan.github.io/one-in-eight-billion/docs/prototype.html)** · [流程与设计说明](docs/PROTOTYPE.md)
@@ -138,7 +140,7 @@ tests/                     引擎与浏览器验证
 scripts/                   静态服务、录制、素材生成与多语言检查
 ```
 
-## 多语言 · Languages
+## 多语言
 
 目前有简体中文、English、Українська。界面右上角可以切换语言，也可以用 `?lang=en` / `?lang=uk` 打开。没有手动选过时，按浏览器的语言偏好依次匹配；都不支持时显示英文。
 
@@ -148,11 +150,7 @@ scripts/                   静态服务、录制、素材生成与多语言检�
 - 已经写进人生记录的文字保留当时的语言；切换语言后，新发生的事件用新语言。
 - `npm run test:i18n`：检查缺少的译文，并用同样的随机种子在中文、英文、乌克兰文下各模拟 240 段人生，确认翻译没有改变任何数值、选择或结局。
 - `node scripts/i18n-check.mjs compare pseudo`：伪语言把每个汉字换成拉丁字母，能找出没经过 `tr()` 的文案和依赖中文措辞的逻辑；浏览器里打开 `?lang=pseudo` 可以检查界面。
-
-Languages: 简体中文, English, Українська. Use the switch in the top-right corner or open `?lang=en` / `?lang=uk`. Until you pick one, the game follows your browser's preferred languages in order and falls back to English.
-Simplified Chinese is the source text: strings in the code are wrapped in `tr()`, and `src/locales/<lang>/` maps each Chinese string to its translation, falling back to Chinese when one is missing. Translations may use `{n|one|few|many}` plurals (in `Intl.PluralRules` order) and `{~male|female}` for words that agree with the player's sex.
-Values the game logic compares (sex, jobs, school status, family standing, market mood, household roles) stay in Chinese in the save and are translated only on display with `label()`.
-`npm run test:i18n` reports missing translations and replays 240 seeded lives in Chinese, English and Ukrainian to prove the translations change no numbers, choices or endings.
+- README 另有 [English](README.en.md) 和 [Українська](README.uk.md) 版本；修改本文件时请一并更新。
 
 ## 数据与复刻范围
 
