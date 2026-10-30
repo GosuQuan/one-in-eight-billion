@@ -1,5 +1,7 @@
 # 80亿分之1 · 人生模拟 Demo
 
+**简体中文** · [English](README.en.md) · [Українська](README.uk.md)
+
 八十亿种可能，仅此一次的人生。随机出生、作出选择，从出生走到一生的回顾。
 
 **[在线试玩 ↗](https://gosuquan.github.io/one-in-eight-billion/)** · **[交互原型 ↗](https://gosuquan.github.io/one-in-eight-billion/docs/prototype.html)** · [流程与设计说明](docs/PROTOTYPE.md)
@@ -126,6 +128,8 @@ python scripts/make-demo-gif.py
 index.html                 游戏入口
 src/engine.js              可序列化、带种子的纯模拟引擎
 src/app.js                 页面、状态、选择、存档与导出
+src/i18n.js                多语言：tr() / label() 与语言选择
+src/locales/en/, uk/       英文、乌克兰文译文（以中文原文为键）
 src/art.js                 原创 SVG 地图、像素场景与头像
 src/style.css              桌面 / 手机 / 深色样式
 docs/demo.gif              实际操作动图
@@ -133,8 +137,20 @@ docs/prototype.html        可点击界面原型
 docs/prototype.png         原型总览
 docs/screenshots/          桌面与手机截图
 tests/                     引擎与浏览器验证
-scripts/                   静态服务、录制与素材生成
+scripts/                   静态服务、录制、素材生成与多语言检查
 ```
+
+## 多语言
+
+目前有简体中文、English、Українська。界面右上角可以切换语言，也可以用 `?lang=en` / `?lang=uk` 打开。没有手动选过时，按浏览器的语言偏好依次匹配；都不支持时显示英文。
+
+- 简体中文是源文本：代码里的中文用 `tr('……', {参数})` 包起来，其他语言在 `src/locales/<语言>/` 里把这句中文映射成译文。缺少译文时直接显示中文。
+- 占位符写作 `{name}`。需要单复数的语言写 `{n|形式1|形式2|…}`，顺序按 `Intl.PluralRules`（英文 one/other，乌克兰文 one/few/many），`#` 代表数字。动词或形容词要随玩家性别变化的语言写 `{~男性形式|女性形式}`。
+- 游戏逻辑会比较或解析的值（性别、职业、学历状态、家境、行情、家庭角色）在存档里保持中文，只在显示时用 `label()` 翻译。新增这类值时，请不要用 `tr()` 包它。
+- 已经写进人生记录的文字保留当时的语言；切换语言后，新发生的事件用新语言。
+- `npm run test:i18n`：检查缺少的译文，并用同样的随机种子在中文、英文、乌克兰文下各模拟 240 段人生，确认翻译没有改变任何数值、选择或结局。
+- `node scripts/i18n-check.mjs compare pseudo`：伪语言把每个汉字换成拉丁字母，能找出没经过 `tr()` 的文案和依赖中文措辞的逻辑；浏览器里打开 `?lang=pseudo` 可以检查界面。
+- README 另有 [English](README.en.md) 和 [Українська](README.uk.md) 版本；修改本文件时请一并更新。
 
 ## 数据与复刻范围
 

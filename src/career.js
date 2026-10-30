@@ -1,3 +1,4 @@
+import { tr, label } from './i18n.js';
 const record = (l, title, text) => l.log.push({ age: l.age, year: l.birthYear + l.age, title, text, type: 'work' });
 function roll(l) { l.randomState = (l.randomState + 0x6D2B79F5) >>> 0; let t = l.randomState; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; }
 const rank = { none: 0, primary: 1, basic: 2, high: 3, vocational: 3, university: 4, masters: 5 };
@@ -30,24 +31,24 @@ export function careerOptions(l) {
  const r = rank[l.school?.credential] ?? 0;
  const fulltime = !!(l.school?.program && !l.school.program.paused && ['apply-university', 'apply-masters', 'apply-high', 'apply-vocational'].includes(l.school.program.id));
  return [
-  { id: 'apprentice', label: '应聘维修学徒', description: '跟师傅做维修。录用后收入按当地物价、学历和已有经验计算，不是一份固定美元。', ...JOBS.apprentice },
-  { id: 'office', label: '应聘行政岗位', description: '需要高中或同等学历。面试可能失败，失败后仍是现在的状态。', ...JOBS.office },
-  { id: 'technical', label: '应聘技术岗位', description: '职业教育可以试；只有高中学历时，这份岗位不开放。', ...JOBS.technical, minimum: l.school?.credential === 'high' ? 4 : 3 },
-  { id: 'matched', label: '应聘专业对口岗位', description: '要大学学历。学历对上了，也不保证有空位。', ...JOBS.matched },
-  { id: 'remote', label: '申请远程工作', description: '做成以后换国家，这份收入还在；吃住仍按你脚下的地方计算。可能失败。', ...JOBS.remote },
-  { id: 'promotion', label: '提交晋升申请', description: '经验越多越容易被看见，仍可能被拒绝，拒绝后留在原岗位。', minimum: 0, chance: .18, factor: 0 }
- ].map(o => ({ ...o, disabled: l.age < 18 || l.dead || r < o.minimum || fulltime || l.careerLastAge === l.age || (o.id === 'promotion' && !employed(l)), reason: l.age < 18 ? '成年后开放' : l.careerLastAge === l.age ? '今年已经参加过招聘或晋升评估' : r < o.minimum ? '目前学历不满足岗位要求' : o.id === 'promotion' && !employed(l) ? '需要一份在职工作' : fulltime ? '全日制学习期间请先完成或暂停学业' : '', income: o.id === 'promotion' ? Math.round((l.income || 0) * 1.16) : localIncome(l, o.id) }));
+  { id: 'apprentice', label: tr('应聘维修学徒'), description: tr('跟师傅做维修。录用后收入按当地物价、学历和已有经验计算，不是一份固定美元。'), ...JOBS.apprentice },
+  { id: 'office', label: tr('应聘行政岗位'), description: tr('需要高中或同等学历。面试可能失败，失败后仍是现在的状态。'), ...JOBS.office },
+  { id: 'technical', label: tr('应聘技术岗位'), description: tr('职业教育可以试；只有高中学历时，这份岗位不开放。'), ...JOBS.technical, minimum: l.school?.credential === 'high' ? 4 : 3 },
+  { id: 'matched', label: tr('应聘专业对口岗位'), description: tr('要大学学历。学历对上了，也不保证有空位。'), ...JOBS.matched },
+  { id: 'remote', label: tr('申请远程工作'), description: tr('做成以后换国家，这份收入还在；吃住仍按你脚下的地方计算。可能失败。'), ...JOBS.remote },
+  { id: 'promotion', label: tr('提交晋升申请'), description: tr('经验越多越容易被看见，仍可能被拒绝，拒绝后留在原岗位。'), minimum: 0, chance: .18, factor: 0 }
+ ].map(o => ({ ...o, disabled: l.age < 18 || l.dead || r < o.minimum || fulltime || l.careerLastAge === l.age || (o.id === 'promotion' && !employed(l)), reason: l.age < 18 ? tr('成年后开放') : l.careerLastAge === l.age ? tr('今年已经参加过招聘或晋升评估') : r < o.minimum ? tr('目前学历不满足岗位要求') : o.id === 'promotion' && !employed(l) ? tr('需要一份在职工作') : fulltime ? tr('全日制学习期间请先完成或暂停学业') : '', income: o.id === 'promotion' ? Math.round((l.income || 0) * 1.16) : localIncome(l, o.id) }));
 }
 export function careerAction(l, id) {
  const o = careerOptions(l).find(x => x.id === id);
- if (!o || l.pending) return { ok: false, message: '请先处理当前选择' };
- if (o.disabled) return { ok: false, message: o.reason || '当前不能申请' };
+ if (!o || l.pending) return { ok: false, message: tr('请先处理当前选择') };
+ if (o.disabled) return { ok: false, message: o.reason || tr('当前不能申请') };
  l.careerLastAge = l.age;
  const probability = Math.min(.86, o.chance + (l.stats.knowledge || 0) * .002 + (l.stats.social || 0) * .001 + (l.focus === 'work' ? .08 : 0) + (id === 'promotion' ? Math.min(.28, (l.careerYears || 0) * .02) : 0));
  if (roll(l) >= probability) {
-  record(l, '没有等到那份录用通知', `${o.label}之后，对方选了更贴近岗位的人。${id === 'matched' ? '学历写在简历上，空位却要你还没有的项目经历。' : ''}${id === 'promotion' ? `你已有${l.careerYears || 0}年经验，这次评估仍没通过。` : ''}你仍是${l.job}。这样的消息以后还会再出现。`);
+  record(l, tr('没有等到那份录用通知'), tr('{label}之后，对方选了更贴近岗位的人。{x}{x2}你仍是{job}。这样的消息以后还会再出现。', {label: label(o.label), x: id === 'matched' ? tr('学历写在简历上，空位却要你还没有的项目经历。') : '', x2: id === 'promotion' ? tr('你已有{careerYears}年经验，这次评估仍没通过。', {careerYears: l.careerYears || 0}) : '', job: label(l.job)}));
   l.stats.happiness = Math.max(0, l.stats.happiness - 2);
-  return { ok: true, message: '这次没有通过' };
+  return { ok: true, message: tr('这次没有通过') };
  }
  if (id === 'promotion') { l.income = Math.round(l.income * 1.16); l.job = '资深' + String(l.job || '职员').replace(/^资深/, ''); }
  else {
@@ -56,8 +57,8 @@ export function careerAction(l, id) {
   else { l.employerGdp = null; l.employerCountryId = l.country.id; }
   l.income = localIncome(l, id, l.remote ? { gdp: l.employerGdp } : l.country);
  }
- record(l, id === 'promotion' ? '名字出现在晋升名单上' : '收到录用通知', `你现在是${l.job}，年收入${l.income}，按${l.remote ? '雇主所在地' : l.country.name}的物价、你的学历和${l.careerYears || 0}年经验计算。以后仍可能失业，换地方时收入和开销会重算。`);
- return { ok: true, message: `成为${l.job}，年收入${l.income}` };
+ record(l, id === 'promotion' ? tr('名字出现在晋升名单上') : tr('收到录用通知'), tr('你现在是{job}，年收入{income}，按{x}的物价、你的学历和{careerYears}年经验计算。以后仍可能失业，换地方时收入和开销会重算。', {job: label(l.job), income: l.income, x: l.remote ? tr('雇主所在地') : l.country.name, careerYears: l.careerYears || 0}));
+ return { ok: true, message: tr('成为{job}，年收入{income}', {job: label(l.job), income: l.income}) };
 }
 export function careerYear(l) {
  if (!l || l.dead || l.age < 18 || l.retired || l.careerYearSeen === l.age) return;

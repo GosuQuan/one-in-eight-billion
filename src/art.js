@@ -1,3 +1,4 @@
+import { tr } from './i18n.js';
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export { escape };
 
@@ -6,13 +7,13 @@ export function worldMap(){
  let dots='';const inside=(x,y,p)=>{let c=false;for(let i=0,j=p.length-1;i<p.length;j=i++)if((p[i][1]>y)!=(p[j][1]>y)&&x<(p[j][0]-p[i][0])*(y-p[i][1])/(p[j][1]-p[i][1])+p[i][0])c=!c;return c;};
  for(let y=20;y<222;y+=5)for(let x=15;x<430;x+=5)if(lands.some(p=>inside(x,y,p)))dots+=`<circle cx="${x}" cy="${y}" r="1.1"/>`;
  const locations=[[80,60],[98,65],[112,121],[124,142],[238,68],[246,71],[262,55],[247,107],[240,129],[258,124],[291,93],[299,98],[308,101],[321,91],[350,84],[347,128],[382,182],[393,76],[227,97],[272,83],[91,84],[143,153]];
- return `<svg class="world-map" viewBox="0 0 440 240" role="img" aria-label="世界人口分布示意地图"><g fill="currentColor" opacity=".23">${dots}</g><g fill="var(--wine)">${locations.map(([x,y],i)=>`<circle class="map-pulse" cx="${x}" cy="${y}" r="${i%3+2.5}" style="animation-delay:${i*.17}s" opacity="${.4+i%4*.15}"/>`).join('')}</g></svg>`;
+ return `<svg class="world-map" viewBox="0 0 440 240" role="img" aria-label="${tr('世界人口分布示意地图')}"><g fill="currentColor" opacity=".23">${dots}</g><g fill="var(--wine)">${locations.map(([x,y],i)=>`<circle class="map-pulse" cx="${x}" cy="${y}" r="${i%3+2.5}" style="animation-delay:${i*.17}s" opacity="${.4+i%4*.15}"/>`).join('')}</g></svg>`;
 }
 
 export function scene(age=0,night=false){
  const people=age>28?3:2;
  const person=(x,y,color,scale=1)=>`<g transform="translate(${x} ${y}) scale(${scale})"><path d="M-7 0v-7h3v-3h8v3h3v7" fill="#483d38"/><path d="M-5-6h10v10H-5z" fill="#e8b997"/><path d="M-6 4h12v13H-6z" fill="${color}"/><path d="M-6 17h4v7h-4zm8 0h4v7H2z" fill="#4b4c49"/><path d="M-3-2h1v2h-1zm5 0h1v2H2z" fill="#362f31"/></g>`;
- return `<svg viewBox="0 0 640 220" class="scene" role="img" aria-label="像素风的房子、树木和一家人" shape-rendering="crispEdges"><defs><linearGradient id="sky" x2="0" y2="1"><stop stop-color="${night?'#727f9b':'#c6dfdd'}"/><stop offset="1" stop-color="${night?'#e1c6bb':'#edf0dc'}"/></linearGradient></defs><path fill="url(#sky)" d="M0 0h640v220H0z"/><circle cx="510" cy="45" r="22" fill="#f8e7b2"/><g fill="#ffffff" opacity=".75"><path d="M55 40h28v-6h37v7h21v10H55zm297-12h19v-6h25v5h23v10h-67z"/></g><path d="M0 152l65-28 68 12 73-25 71 28 62-15 101 25 70-18 130 15v74H0z" fill="#a6bd9c"/><path d="M0 172l130-12 140 10 163-8 207 7v51H0z" fill="#7e9c77"/><path d="M0 203h640v17H0z" fill="#688761"/><path d="M358 177h90v43h-90z" fill="#d8c9a9"/><path d="M339 91h122v87H339z" fill="#f2eee2"/><path d="M329 93l71-49 72 49z" fill="#a85d58"/><path d="M345 87l55-35 56 35z" fill="#ba7066"/><path d="M364 105h22v26h-22zm52 0h22v26h-22z" fill="#809fa0"/><path d="M374 105h2v26h-2zm-10 12h22v2h-22zm62-12h2v26h-2zm-10 12h22v2h-22z" fill="#e2deca"/><path d="M392 139h22v39h-22z" fill="#a28668"/><path d="M408 157h2v3h-2z" fill="#ecdbb1"/><path d="M438 49h12v32h-12z" fill="#a88677"/><path d="M96 120h10v76H96zm466 3h8v72h-8z" fill="#8b8164"/><path d="M70 110h14V94h37v16h14v35h-15v10H83v-10H70zm470 4h13V99h25v15h16v29h-14v13h-27v-13h-13z" fill="#71947b"/><path d="M77 111h12v-9h23v9h14v23H77zm470 8h12v-10h14v10h13v17h-39z" fill="#8ead89"/><g stroke="#dbe0c5" stroke-width="3"><path d="M145 174v27m28-27v27m28-27v27m28-27v27M140 183h96m-96 11h96"/></g>${person(277,171,'#a05462')}${person(305,171,'#647e94')}${people===3?person(326,185,'#d4a15c',.65):person(291,192,'#d4a15c',.45)}<g fill="#e6dca1"><path d="M32 191h3v4h-3zm122 17h3v3h-3zm317-16h3v3h-3zm126 11h3v3h-3z"/></g><path d="M0 217h640v3H0z" fill="#536e52"/></svg>`;
+ return `<svg viewBox="0 0 640 220" class="scene" role="img" aria-label="${tr('像素风的房子、树木和一家人')}" shape-rendering="crispEdges"><defs><linearGradient id="sky" x2="0" y2="1"><stop stop-color="${night?'#727f9b':'#c6dfdd'}"/><stop offset="1" stop-color="${night?'#e1c6bb':'#edf0dc'}"/></linearGradient></defs><path fill="url(#sky)" d="M0 0h640v220H0z"/><circle cx="510" cy="45" r="22" fill="#f8e7b2"/><g fill="#ffffff" opacity=".75"><path d="M55 40h28v-6h37v7h21v10H55zm297-12h19v-6h25v5h23v10h-67z"/></g><path d="M0 152l65-28 68 12 73-25 71 28 62-15 101 25 70-18 130 15v74H0z" fill="#a6bd9c"/><path d="M0 172l130-12 140 10 163-8 207 7v51H0z" fill="#7e9c77"/><path d="M0 203h640v17H0z" fill="#688761"/><path d="M358 177h90v43h-90z" fill="#d8c9a9"/><path d="M339 91h122v87H339z" fill="#f2eee2"/><path d="M329 93l71-49 72 49z" fill="#a85d58"/><path d="M345 87l55-35 56 35z" fill="#ba7066"/><path d="M364 105h22v26h-22zm52 0h22v26h-22z" fill="#809fa0"/><path d="M374 105h2v26h-2zm-10 12h22v2h-22zm62-12h2v26h-2zm-10 12h22v2h-22z" fill="#e2deca"/><path d="M392 139h22v39h-22z" fill="#a28668"/><path d="M408 157h2v3h-2z" fill="#ecdbb1"/><path d="M438 49h12v32h-12z" fill="#a88677"/><path d="M96 120h10v76H96zm466 3h8v72h-8z" fill="#8b8164"/><path d="M70 110h14V94h37v16h14v35h-15v10H83v-10H70zm470 4h13V99h25v15h16v29h-14v13h-27v-13h-13z" fill="#71947b"/><path d="M77 111h12v-9h23v9h14v23H77zm470 8h12v-10h14v10h13v17h-39z" fill="#8ead89"/><g stroke="#dbe0c5" stroke-width="3"><path d="M145 174v27m28-27v27m28-27v27m28-27v27M140 183h96m-96 11h96"/></g>${person(277,171,'#a05462')}${person(305,171,'#647e94')}${people===3?person(326,185,'#d4a15c',.65):person(291,192,'#d4a15c',.45)}<g fill="#e6dca1"><path d="M32 191h3v4h-3zm122 17h3v3h-3zm317-16h3v3h-3zm126 11h3v3h-3z"/></g><path d="M0 217h640v3H0z" fill="#536e52"/></svg>`;
 }
 
 export function portrait(age=0,sex='男'){
@@ -51,16 +52,16 @@ export function gachaCard(country,{revealed=false,flip=0}={}){
  const c=country||{};
  const f=Number(c.life),g=Number(c.gdp);
  const stats=[
-  [Number.isFinite(f)?f:'—','平均寿命 · 岁'],
-  [Number.isFinite(g)?'$'+Math.round(g).toLocaleString('en-US'):'—','人均 GDP'],
+  [Number.isFinite(f)?f:'—',tr('平均寿命 · 岁')],
+  [Number.isFinite(g)?'$'+Math.round(g).toLocaleString('en-US'):'—',tr('人均 GDP')],
  ];
  const star='<svg class="gacha-star" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.6 6.2 6.7.5-5.1 4.4 1.6 6.6L12 16l-5.8 3.7 1.6-6.6L2.7 8.7l6.7-.5z"/></svg>';
  const globe='<svg class="gacha-globe" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4.2" ry="9"/><path d="M3 12h18M4.6 7h14.8M4.6 17h14.8"/></svg>';
  return `<div class="gacha-card${revealed?' flipped':''}" style="--flip:${revealed?1:Math.max(0,Math.min(1,Number(flip)||0))}" data-country="${escape(c.id||'')}">
-  <div class="gacha-face gacha-back" aria-hidden="true"><span class="gacha-q">？</span>${star}${globe}</div>
+  <div class="gacha-face gacha-back" aria-hidden="true"><span class="gacha-q">${tr('？')}</span>${star}${globe}</div>
   <div class="gacha-face gacha-front">
    <span class="gacha-flag">${c.flag||'🏳️'}</span>
-   <h3 class="gacha-name">${escape(c.name||'未知之地')}</h3>
+   <h3 class="gacha-name">${escape(c.name||tr('未知之地'))}</h3>
    <p class="gacha-city">${escape([c.city,c.region].filter(Boolean).join(' · '))}</p>
    <div class="gacha-stats">${stats.map(([v,l])=>`<div class="gacha-stat"><strong>${v}</strong><span>${l}</span></div>`).join('')}</div>
   </div>
@@ -120,6 +121,6 @@ export function avatarSVG(life,{size=72}={}){
    +px(5,13,2,2,pants)+px(9,13,2,2,pants)
    +px(5,15,2,1,shoe)+px(9,15,2,1,shoe);
  }
- const nm=escape(o.name||'无名');
+ const nm=escape(o.name||tr('无名'));
  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="${size}" height="${size}" class="avatar-svg" shape-rendering="crispEdges" data-avatar="${nm}·${age}" role="img" aria-label="${nm}·${age}">${s}</svg>`;
 }
