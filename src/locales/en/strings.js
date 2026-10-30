@@ -319,7 +319,7 @@ export default {
   "{age} 岁 · {education} · {job}": "Age {age} · {education} · {job}",
   "尚未工作": "Not working yet",
   "学习、求职与债务": "Study, jobs & debt",
-  "申请、缴费、考核和录用分开计算。费用和录取机会是游戏平衡假设，不是官方统计。现金不够不会自动借债。": "Applying, paying, testing and hiring are worked out separately. Costs and admission odds are game-balance assumptions, not official statistics. Running short of cash won't put you into debt automatically.",
+  "申请、缴费、考核和录用分开计算。费用和录取机会是游戏平衡假设，不是官方统计。现金不够不会自动借债。": "Applying, paying, testing and hiring are worked out separately. Costs and admission odds are game-balance assumptions, not official statistics. School fees and tuition are never paid with an automatic loan.",
   "学历": "Education",
   "在读": "Enrolled",
   " · 休学": " · on leave",
