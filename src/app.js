@@ -25,6 +25,12 @@ let history = Array.isArray(store.history) ? store.history.map(upgradeLife) : []
 let view = 'home', paused = false, auto = false, speed = 1, music = false, modalKind = '', lastFocus, archived = false;
 let gachaCountry = null, gachaFlipped = false;
 let investTab = 'overview', travelCompanion = 'solo';
+// A waiting choice can be minimized to a bar so the rest of the page can be looked over first.
+let collapsedChoice = '';
+const choiceKey = () => life?.pending ? `${life.age}|${life.pending.title}` : '';
+const choiceCollapsed = () => !!collapsedChoice && collapsedChoice === choiceKey();
+// Buttons that change the life wait until the minimized choice is made.
+const CHANGES_LIFE = ['focus', 'system', 'edu', 'job', 'fin', 'fund', 'withdraw', 'stockRisk', 'stockSell', 'buy', 'car', 'house', 'loan', 'repay', 'travel'];
 let startTime = Date.now(), stepTime = 0, toastTimer, timer, audio, audioTimer;
 const focusNames = { study: tr('学习'), work: tr('事业'), health: tr('健康'), family: tr('家人'), joy: tr('体验生活') };
 const statNames = { health: [tr('健康'), '#4b897b'], happiness: [tr('幸福'), '#c0a260'], knowledge: [tr('知识'), '#638e9b'], social: [tr('人际'), '#b37380'] };
@@ -105,7 +111,7 @@ function renderLife(){
    <section class="panel"><h3>${tr('人生地图')} <small>${tr('一格 = 一年')}</small></h3><div class="life-grid">${lifeGrid()}</div><div class="grid-legend"><span>${tr('已走过 {age} 年', {age: life.age})}</span><span>${tr('此刻')} <i style="color:var(--wine)">■</i></span></div></section>
    <section class="panel country-panel"><h3>${e(c.flag)} ${e(c.name)} <small>${tr('目前居住地')}</small></h3><dl class="country-dl"><div><dt>${tr('平均寿命参考')}</dt><dd>${tr('{life} 岁', {life: c.life})}</dd></div><div><dt>${tr('人均 GDP（PPP）')}</dt><dd>${money(c.gdp)}</dd></div><div><dt>${tr('地区')}</dt><dd>${e(c.region)}</dd></div><div><dt>${tr('世界')}</dt><dd>${eraNames[life.era] || tr('现在的世界')}</dd></div></dl><p class="tiny" style="margin-top:14px">${tr('你的每一次选择，都在这些数字之外留下痕迹。')}</p></section>
   </aside>
- </div><div class="life-bottom"><span><i class="live-dot" style="display:inline-block;margin-right:6px"></i>${tr('{x} · 已自动保存', {x: paused?tr('时间暂停，人生可以慢慢读。'):auto?tr('自动抉择中，静静看一生展开。'):tr('时间向前，故事还在继续。')})}</span><button class="plain" data-action="note">${tr('✎ 写下一点想法')}</button></div></main>`;
+ </div><div class="life-bottom"><span><i class="live-dot" style="display:inline-block;margin-right:6px"></i>${tr('{x} · 已自动保存', {x: paused?tr('时间暂停，人生可以慢慢读。'):auto?tr('自动抉择中，静静看一生展开。'):tr('时间向前，故事还在继续。')})}</span><button class="plain" data-action="note">${tr('✎ 写下一点想法')}</button></div>${life.pending&&choiceCollapsed()?choiceDockHTML():''}</main>`;
  if(life.pending && !auto) showChoice();
 }
 function updateCounters(){const secs=(Date.now()-startTime)/1000;if($('#birth-counter'))$('#birth-counter').textContent=num(secs*4.18);if($('#death-counter'))$('#death-counter').textContent=num(secs*1.95);}
@@ -127,11 +133,14 @@ function renderEnding(){
 
 function showModal(html,kind='info',wide=false){
  if(!modalKind)lastFocus=document.activeElement;
- modalKind=kind;overlay.innerHTML=`<section class="dialog ${wide?'wide':''}" role="dialog" aria-modal="true" aria-labelledby="dialog-title">${kind==='choice'?'':`<button class="dialog-close" data-action="close" aria-label="${tr('关闭弹窗')}">×</button>`}${html}</section>`;overlay.hidden=false;document.body.style.overflow='hidden';
+ modalKind=kind;overlay.innerHTML=`<section class="dialog ${wide?'wide':''}" role="dialog" aria-modal="true" aria-labelledby="dialog-title">${kind==='choice'?`<button class="dialog-collapse" data-action="collapse-choice" aria-label="${tr('收起选择，先看看再决定')}">${tr('收起')} ▾</button>`:`<button class="dialog-close" data-action="close" aria-label="${tr('关闭弹窗')}">×</button>`}${html}</section>`;overlay.hidden=false;document.body.style.overflow='hidden';
  setTimeout(()=>overlay.querySelector('textarea,button')?.focus(),30);
 }
 function closeModal(){overlay.hidden=true;overlay.innerHTML='';modalKind='';document.body.style.overflow='';lastFocus?.isConnected&&lastFocus.focus();stepTime=Date.now();}
-function showChoice(){if(!life.pending||modalKind==='choice')return;const p=life.pending;showModal(`<div class="dialog-kicker">${tr('{age} 岁 / {birthYear} · {x}', {age: life.age, birthYear: life.birthYear+life.age, x: p.kind==='event'?tr('一件没有预料到的事'):p.kind==='system'?tr('人生还在继续'):tr('人生的岔路口')})}</div><h2 id="dialog-title">${e(p.title)}</h2><p>${e(p.text)}</p><div class="choice-list">${p.options.map((o,i)=>`<button class="choice-btn" data-choice="${i}"><strong>${e(label(o.label))} <span>↗</span></strong><small>${e(o.description || tr('选择属于你的方向'))}</small></button>`).join('')}</div><p class="tiny" style="margin:16px 0 0">${p.system==='thread'||p.system==='thread-start'?tr('你是在跟一个具体的人相处。选完以后，这条故事还会再找上门，也可能在这里停住。'):tr('没有最优解，只有你愿意走的路。选择后时间会继续。')}</p>`,'choice');}
+function collapseChoice(){collapsedChoice=choiceKey();closeModal();renderLife();$('.choice-dock')?.focus();}
+function expandChoice(){collapsedChoice='';$('.choice-dock')?.remove();showChoice();}
+const choiceDockHTML=()=>`<button class="choice-dock" data-action="expand-choice" aria-expanded="false"><span class="choice-dock-kicker">${tr('等你做选择')}</span><strong>${e(life.pending.title)}</strong><span class="choice-dock-open">${tr('展开选择')} ▴</span></button>`;
+function showChoice(){if(!life.pending||modalKind==='choice'||choiceCollapsed())return;const p=life.pending;showModal(`<div class="dialog-kicker">${tr('{age} 岁 / {birthYear} · {x}', {age: life.age, birthYear: life.birthYear+life.age, x: p.kind==='event'?tr('一件没有预料到的事'):p.kind==='system'?tr('人生还在继续'):tr('人生的岔路口')})}</div><h2 id="dialog-title">${e(p.title)}</h2><p>${e(p.text)}</p><div class="choice-list">${p.options.map((o,i)=>`<button class="choice-btn" data-choice="${i}"><strong>${e(label(o.label))} <span>↗</span></strong><small>${e(o.description || tr('选择属于你的方向'))}</small></button>`).join('')}</div><p class="tiny" style="margin:16px 0 0">${p.system==='thread'||p.system==='thread-start'?tr('你是在跟一个具体的人相处。选完以后，这条故事还会再找上门，也可能在这里停住。'):tr('没有最优解，只有你愿意走的路。选择后时间会继续。')}</p>`,'choice');}
 
 function noteDialog(farewell=false){showModal(`<div class="dialog-kicker">${farewell?tr('写给这一生'):tr('在时间里，暂停片刻')}</div><h2 id="dialog-title">${farewell?tr('你想对自己说些什么？'):tr('把此刻的想法，留在这里。')}</h2><p>${tr('只保存在你的浏览器里，不会发布到任何地方。')}</p><textarea id="note-text" maxlength="300" placeholder="${tr('写下一句话……')}" aria-label="${tr('你的想法')}">${e(farewell?life.farewell||'':'')}</textarea><button class="cta" data-action="${farewell?'save-farewell':'save-note'}">${tr('留下这句话 →')}</button>`,farewell?'farewell':'note');}
 
@@ -222,7 +231,6 @@ function openTravel(){
 
 function optionButtons(items,attr){return items.map(o=>`<button class="choice-btn" data-${attr}="${e(o.id)}" ${o.disabled?'disabled':''}><strong>${e(label(o.label))} <span>↗</span></strong><small>${e(o.disabled?o.reason:o.description)}</small></button>`).join('');}
 function openStudy(){
- if(life.pending){toast(tr('请先处理眼前的选择'));return;}
  const school=life.school||{},program=school.program,bill=life.finance?.lastBill,aid=familyAidQuote(life);
  showModal(`<div class="dialog-kicker">${tr('{age} 岁 · {education} · {job}', {age: life.age, education: e(label(life.education)||tr('尚未入学')), job: e(label(life.job)||tr('尚未工作'))})}</div><h2 id="dialog-title">${tr('学习、求职与债务')}</h2><p>${tr('申请、缴费、考核和录用分开计算。费用和录取机会是游戏平衡假设，不是官方统计。现金不够不会自动借债。')}</p><div class="metric-grid"><div><span>${tr('学历')}</span><strong style="font-size:13px">${e(label(life.education)||tr('尚未入学'))}</strong></div><div><span>${tr('在读')}</span><strong style="font-size:13px">${program?e(`${program.label} ${program.progress}/${program.duration}${program.paused?tr(' · 休学'):''}`):tr('没有')}</strong></div><div><span>${tr('欠款')}</span><strong style="font-size:13px">${money(life.debt)}</strong></div><div><span>${tr('家人可助')}</span><strong style="font-size:13px">${aid.eligible?money(aid.amount):tr('暂不可用')}</strong></div></div>${bill?`<p class="small-note">${tr('上一期账单：利息 {interest}，应还 {due}，实还 {paid}，尚欠 {balance}。', {interest: money(bill.interest), due: money(bill.due), paid: money(bill.paid), balance: money(bill.balance)})}</p>`:''}<h3>${tr('教育')}</h3><div class="choice-list">${optionButtons(educationOptions(life),'edu')}</div><h3>${tr('求职')}</h3><div class="choice-list">${optionButtons(careerOptions(life),'job')}</div><div class="choice-list" style="margin-top:14px"><button class="choice-btn" data-fin="family-aid"><strong>${tr('请家人帮忙还一部分')} <span>↗</span></strong><small>${tr('按家庭积蓄和关系决定能还多少，不是全额代偿；至少隔三年。')}</small></button><button class="choice-btn" data-fin="austerity"><strong>${tr('缩减三年日常开支')} <span>↗</span></strong><small>${tr('生活费减少两成，债务、学费和抚养费仍要付。')}</small></button><button class="choice-btn" data-fin="repayment-plan"><strong>${tr('协商三年还款')} <span>↗</span></strong><small>${tr('利率降到 4%，期间不能再借新债。')}</small></button></div>`,'study',true);
 }
@@ -230,6 +238,7 @@ function openStudy(){
 app.addEventListener('click',handleClick);app.addEventListener('change',event=>{const s=event.target.closest('[data-lang]');if(s){save();setLanguage(s.value);}});overlay.addEventListener('click',handleClick);
 function handleClick(event){
  const b=event.target.closest('button,[data-gacha-card]');if(!b)return;
+ if(life?.pending&&view==='life'&&modalKind!=='choice'&&CHANGES_LIFE.some(k=>b.dataset[k]!==undefined)){toast(tr('请先处理眼前的选择'));return;}
  if(b.dataset.pref){prefs[b.dataset.pref]=b.dataset.value;save();renderHome();return;}
  if(b.dataset.speed){speed=Number(b.dataset.speed);renderLife();return;}
  if(b.dataset.focus){setFocus(life,b.dataset.focus);save();renderLife();return;}
@@ -262,7 +271,9 @@ function handleClick(event){
   case 'confirm-new':startNew();break;
   case 'begin':view='life';paused=false;stepTime=Date.now();save();renderLife();window.scrollTo(0,0);break;
   case 'resume':paused=false;stepTime=Date.now();renderLife();window.scrollTo(0,0);break;
-  case 'next':step();stepTime=Date.now();break;
+  case 'next':if(choiceCollapsed()){expandChoice();break;}step();stepTime=Date.now();break;
+  case 'collapse-choice':collapseChoice();break;
+  case 'expand-choice':expandChoice();break;
   case 'pause':paused=!paused;stepTime=Date.now();renderLife();break;
   case 'auto':auto=!auto;toast(auto?tr('自动抉择已开启'):tr('自动抉择已关闭'));renderLife();break;
   case 'theme':store.dark=!store.dark;document.body.classList.toggle('dark',store.dark);save();break;
@@ -286,9 +297,9 @@ function handleClick(event){
 }
 document.addEventListener('keydown',event=>{
  if(view==='gacha'&&event.target.closest('[data-gacha-card]')&&(event.key==='Enter'||event.code==='Space')){event.preventDefault();event.target.closest('[data-gacha-card]').click();return;}
- if(modalKind){if(event.key==='Escape'&&modalKind!=='choice')closeModal();if(event.key==='Tab'){const els=[...overlay.querySelectorAll('button,textarea,a,input')].filter(el=>!el.disabled);if(!els.length)return;if(event.shiftKey&&document.activeElement===els[0]){event.preventDefault();els.at(-1).focus();}else if(!event.shiftKey&&document.activeElement===els.at(-1)){event.preventDefault();els[0].focus();}}return;}
+ if(modalKind){if(event.key==='Escape'){if(modalKind==='choice')collapseChoice();else closeModal();}if(event.key==='Tab'){const els=[...overlay.querySelectorAll('button,textarea,a,input')].filter(el=>!el.disabled);if(!els.length)return;if(event.shiftKey&&document.activeElement===els[0]){event.preventDefault();els.at(-1).focus();}else if(!event.shiftKey&&document.activeElement===els.at(-1)){event.preventDefault();els[0].focus();}}return;}
  if(view!=='life'||event.target.closest('button,input,textarea,select,a'))return;
- if(event.code==='Space'){event.preventDefault();paused=!paused;stepTime=Date.now();renderLife();}else if(event.code==='ArrowRight'){event.preventDefault();step();}
+ if(event.code==='Space'){event.preventDefault();paused=!paused;stepTime=Date.now();renderLife();}else if(event.code==='ArrowRight'){event.preventDefault();if(choiceCollapsed())expandChoice();else step();}
 });
 document.addEventListener('visibilitychange',()=>{stepTime=Date.now();if(document.hidden)save();});
 window.addEventListener('beforeunload',save);

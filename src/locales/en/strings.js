@@ -2018,4 +2018,9 @@ export default {
   // added after review
   "{stat}{change}": "{stat} {change}",
   "NO.": "NO.",
+  // app.js: minimized choice
+  "收起": "Minimize",
+  "收起选择，先看看再决定": "Minimize this choice and look around first",
+  "等你做选择": "Waiting for your choice",
+  "展开选择": "Show choices",
 };
