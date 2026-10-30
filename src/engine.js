@@ -1,4 +1,4 @@
-import { initSystems, systemsYear, systemChoice, systemAction } from './life-systems.js';
+import { initSystems, systemsYear, systemChoice, systemAction, peopleMilestone } from './life-systems.js';
 import { initEducation, educationYear, educationMilestone, educationChoice } from './education.js';
 import { initFinance, financeYear, creditBlocked } from './finance.js';
 import { careerAction, careerYear } from './career.js';
@@ -381,6 +381,7 @@ function prepareEffects(effects,life){
 function setMilestone(life,age){
  if([15,18,22].includes(age)){educationMilestone(life,age);return;}
  if(age===26){if(!life.partner||life.partner.alive===false)systemAction(life,'seek-partner');return;}
+ if(age===5||age===12){peopleMilestone(life,age);return;}
  const m=MILESTONES[age];if(!m)return;
  const options=m.options.map(o=>({label:o.label,description:o.description,effects:prepareEffects(o.effects,life)}));
  life.pending={kind:'milestone',title:m.title,text:m.text,options};

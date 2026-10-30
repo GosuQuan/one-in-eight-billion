@@ -84,11 +84,17 @@ test('pending blocks advancement without changing random state or log',()=>{
 test('different choices change state and log actual consequences',()=>{
   const a=createLife({seed:'choices'});
   while(!a.pending) advanceYear(a);
-  const b=clone(a);choose(a,0);choose(b,1);
+  const b=clone(a);
+  const club=a.pending.cast.science.name,team=a.pending.cast.sport.name;
+  choose(a,0);choose(b,1);
   assert.notDeepEqual(a.stats,b.stats);
-  assert.equal(a.log.at(-1).type,'consequence');
-  assert.match(a.log.at(-1).text,/学识\+10/);
+  assert.ok(a.stats.knowledge>b.stats.knowledge);
+  assert.ok(b.stats.health>a.stats.health);
+  assert.equal(a.log.at(-1).type,'social');
+  assert.match(a.log.at(-1).text,new RegExp(club));
+  assert.match(b.log.at(-1).text,new RegExp(team));
   assert.notEqual(a.log.at(-1).title,b.log.at(-1).title);
+  assert.equal(a.friends.some(f=>f.name===team),false);
 });
 
 test('JSON round-trip at a pending choice resumes exactly through death',()=>{
@@ -108,6 +114,10 @@ test('focus influences income and health without forcing a random event',()=>{
   while(work.pending) choose(work,0);
   const health=clone(work);
   work.income=health.income=1000;work.job=health.job='职员';
+  work.debt=health.debt=0;
+  if(work.systems?.finance){work.systems.finance.arrears=0;health.systems.finance.arrears=0;}
+  work.systems.residence.abroadSince=health.systems.residence.abroadSince=null;
+  work.systems.residency=health.systems.residency='citizen';
   setFocus(work,'work');setFocus(health,'health');
   advanceYear(work,{events:false});advanceYear(health,{events:false});
   assert.ok(work.income>health.income);

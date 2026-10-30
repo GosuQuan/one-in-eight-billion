@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createLife, COUNTRIES, advanceYear, choose } from '../src/engine.js';
 import { financeYear } from '../src/finance.js';
-import { initSystems, systemsYear, systemAction, systemChoice, getHousehold, getSceneState } from '../src/life-systems.js';
+import { initSystems, systemsYear, systemAction, systemChoice, getHousehold, getSceneState, peopleMilestone } from '../src/life-systems.js';
 const clone = x => JSON.parse(JSON.stringify(x));
 function adult(seed = 'systems') { const l = createLife({ seed, country: 'CN' }); l.age = 28; l.income = 20000; l.money = 500000; initSystems(l); l.systems.residence.with = 'alone'; return l; }
 function select(l, key) { const p = l.pending; assert.equal(p?.kind, 'system'); const i = p.options.findIndex(o => o.key === key); assert.ok(i >= 0, key); assert.equal(systemChoice(l, p, i), true); }
@@ -232,4 +232,57 @@ test('a heard local job stays within the current schooling', () => {
  const kinds = new Set();
  for (let i = 0; i < 60; i++) { l.pending = null; l.age++; l.systems.lastYear = null; systemsYear(l); if (l.pending?.offerKind === 'local') kinds.add(l.pending.jobKind); }
  assert.ok(kinds.size > 0, 'a local offer appears'); assert.deepEqual([...kinds], ['apprentice']);
+});
+
+test('after-school choice starts a named story that can continue or fail', () => {
+ const l = adult('thread-story'); l.age = 12; l.systems.lastYear = 11;
+ peopleMilestone(l, 12);
+ assert.equal(l.pending.system, 'thread-start');
+ const labels = l.pending.options.map(o => o.label).join(' ');
+ const club = l.pending.cast.science.name, team = l.pending.cast.sport.name, home = l.pending.cast.home.name;
+ assert.ok(labels.includes(club) && labels.includes(team) && labels.includes(home));
+ assert.notEqual(club, team);
+ select(l, 'science');
+ assert.equal(l.friends.filter(f => f.name === team).length, 0);
+ const friend = l.friends.find(f => f.name === club);
+ assert.ok(friend.thread && !friend.thread.ended);
+ assert.ok(l.log.some(e => e.text.includes(club)));
+ l.age = friend.thread.nextAge; l.systems.lastYear = null; l.pending = null;
+ systemsYear(l);
+ assert.equal(l.pending?.system, 'thread');
+ assert.ok(l.pending.text.includes(club) || l.pending.title.includes(club));
+ select(l, 'together');
+ assert.ok(l.log.some(e => (e.title + e.text).includes(club)));
+ assert.equal(l.children.length, 0);
+});
+test('staying with a parent does not invent a new child', () => {
+ const l = adult('thread-home'); l.age = 12;
+ peopleMilestone(l, 12);
+ const parent = l.pending.cast.home.name;
+ select(l, 'home');
+ assert.equal(l.systems.homeThread.name, parent);
+ assert.equal(l.children.length, 0);
+ l.age = l.systems.homeThread.nextAge; l.systems.lastYear = null;
+ systemsYear(l);
+ assert.equal(l.pending.system, 'thread');
+ assert.ok((l.pending.title + l.pending.text).includes(parent));
+});
+test('a storyline can introduce someone new or fail to', () => {
+ let met = false, missed = false;
+ for (let seed = 0; seed < 24 && !(met && missed); seed++) {
+  const l = adult('thread-next-' + seed); l.age = 16;
+  peopleMilestone(l, 12);
+  select(l, 'science');
+  const friend = l.friends.find(f => f.thread);
+  friend.thread.stage = 3; friend.thread.nextAge = l.age; friend.bond = 80;
+  l.systems.lastYear = null; l.pending = null;
+  systemsYear(l);
+  if (l.pending?.beat !== 'science-3') continue;
+  const before = l.friends.length;
+  select(l, 'ask');
+  met ||= l.friends.length > before;
+  missed ||= l.friends.length === before && l.log.some(e => /没能促成|没有/.test(e.title + e.text));
+ }
+ assert.ok(met, 'introduction can succeed');
+ assert.ok(missed, 'introduction can fail');
 });

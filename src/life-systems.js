@@ -383,6 +383,8 @@ export function systemChoice(l, p, index) {
    else if (kind === 'abroad') move(l, p.countryId, false, 'transfer');
    break;
   }
+  case 'thread-start': startThread(l, p, key); break;
+  case 'thread': resolveThread(l, p, key); break;
   default: l.pending = p; return false;
  }
  return true;
@@ -505,6 +507,7 @@ export function systemsYear(l, options = {}) {
  initSystems(l); const s = l.systems, r = s.residence;
  if (l.dead || s.lastYear === l.age) return l;
  s.lastYear = l.age;
+ if (options.events !== false) threadYear(l);
  if (options.events !== false && l.age >= 5 && !l.friends.length) befriend(l);
  for (const f of l.friends.filter(alive)) { if (!(f.lastContactAge === l.age && f.age === l.age)) f.age = (f.age ?? l.age - 1) + 1; if (l.age - (f.lastContactAge ?? l.age) > 1) f.bond = clamp(f.bond - (f.countryId === r.countryId ? 2 : 4)); }
  if (alive(l.partner)) {
@@ -609,6 +612,195 @@ function hearOpportunity(l) {
   pending(l, 'opportunity', `听说${dest.name}有一个能接上的位置`, `你现在在${l.country.name}（人均参照 ${l.country.gdp}）。那边约为 ${dest.gdp}。去成的话，收入和开销都改按${dest.name}计算。${cheaper ? '消费没这边高，收入通常会降，但日子可能松一点。' : '物价更高时，收入有机会上去，开销也跟着涨。'}签证可能被拒，被拒后四年不能再走这条申请。`, [option('try', '去试试这份机会', '提交申请。被拒就留在原地。'), option('skip', '当作没听见', '你留在现在的地方。')], { offerKind: 'abroad', countryId: dest.id });
  }
 }
+function namedPeer(l, metThrough) {
+ const seq = l.systems.friendSequence = (l.systems.friendSequence || 0) + 1;
+ return { ...person(l), id: `friend-${seq}`, age: l.age, bond: 42, countryId: l.country.id, alive: true, metThrough, sharedMemory: '还没有共同的回忆', lastContactAge: l.age };
+}
+export function peopleMilestone(l, age) {
+ initSystems(l);
+ const parent = [l.family.mother, l.family.father].find(alive) || null;
+ const club = namedPeer(l, age >= 12 ? '科学小组' : '一起看书');
+ const team = namedPeer(l, '运动队');
+ const homeName = parent?.name || '家里';
+ const title = age >= 12 ? '自己的课余时间' : '还没上学的那个下午';
+ const text = age >= 12
+  ? `课业变多了。${club.name}在等你做实验，${team.name}在操场喊你，${homeName}也需要人搭把手。你选了谁，接下来几年就会绕着这个人发生，而且不一定顺利。`
+  : `${club.name}想和你一起把故事听完，${team.name}在外面等你，${homeName}还在屋里。今天下午跟谁过，以后就会记住谁。`;
+ pending(l, 'thread-start', title, text, [
+  option('science', age >= 12 ? `和${club.name}做实验` : `和${club.name}听故事`, `${club.name}会变成固定见面的人。事情可能做成，也可能中途散掉。`),
+  option('sport', `和${team.name}出去`, `${team.name}想拉你做搭档。加练、受伤或者散伙都还没发生。`),
+  option('home', `留在${homeName}身边`, `这不是独自做家务。${homeName}会记住你在不在。`),
+ ], { cast: { science: club, sport: team, home: parent ? { role: parent === l.family.father ? 'father' : 'mother', name: parent.name } : null } });
+ log(l, title, text, 'choice');
+}
+function remember(f, l) { f.lastContactAge = l.age; f.bond = clamp(f.bond); }
+function threadYear(l) {
+ if (l.pending || l.dead || l.age < 6) return;
+ const home = l.systems.homeThread;
+ if (home && !home.ended && home.nextAge <= l.age) { offerHomeBeat(l, home); return; }
+ const f = l.friends.find(f => alive(f) && f.thread && !f.thread.ended && f.thread.nextAge <= l.age);
+ if (f) offerFriendBeat(l, f);
+}
+function offerFriendBeat(l, f) {
+ const t = f.thread;
+ if (f.countryId && f.countryId !== l.country.id) {
+  pending(l, 'thread', `${f.name}还在原来的地方`, `你们因为${f.metThrough}认识。你已经不住在同一个地方，这条线不会自动跟着你走。`, [option('write', `给${f.name}写信`, '可能有回音，也可能没有。'), option('letgo', '先各自生活', '人还在，故事先停在这里。')], { friendId: f.id, beat: 'apart' });
+  return;
+ }
+ if (t.kind === 'sport') {
+  if (t.stage <= 1) pending(l, 'thread', `${f.name}想加练`, `你们从${t.since}岁起一起运动。${f.name}说这周还想再练一次。留下会累，也可能受伤；回去，${f.name}会觉得你不是真的想一起。`, [option('stay', `留下来和${f.name}练`, '健康和关系都会变，受伤也有可能。'), option('home', '先回家', '关系会松一点，故事还没结束。')], { friendId: f.id, beat: 'sport-1' });
+  else if (t.stage === 2) pending(l, 'thread', `${f.name}受伤了`, `${f.name}训练时扭了脚，问你能不能去看看。去要花一点钱和时间；不去，你们可能就不再约了。`, [option('visit', `去看${f.name}`, '花钱，关系会靠近。'), option('skip', '继续自己练', '你的身体还在进步，这段搭档可能到此为止。')], { friendId: f.id, beat: 'sport-2' });
+  else if (t.stage === 3) {
+   const other = namedPeer(l, `${f.name}介绍`);
+   pending(l, 'thread', `${f.name}要介绍一个人`, `${f.name}说${other.name}也常在这边。见一面可能多一个朋友，年龄够的话也许有一次周末的零工；对方也可能不想见。`, [option('meet', `去见${other.name}`, '不保证认识成功，更不保证有工作。'), option('later', '这次不见', '和原来的人保持现状，这条线先停。')], { friendId: f.id, beat: 'sport-3', mentor: other });
+  } else t.ended = true;
+  return;
+ }
+ if (t.stage <= 1) pending(l, 'thread', `${f.name}把事情带到了你面前`, `你们从${t.since}岁起因为${f.metThrough}见面。${f.name}说这次一个人做不完。一起做，可能被看见，也可能互相埋怨。`, [option('together', `和${f.name}一起做完`, '花几个晚上。成功或失败都会留下。'), option('alone', `让${f.name}自己收尾`, '你腾出时间，一起做事的关系会松掉。')], { friendId: f.id, beat: 'science-1' });
+ else if (t.stage === 2) pending(l, 'thread', `${f.name}提起一个机会`, `${f.name}听到一个对外的小比赛，想拉你一起报名。要交一点费用。赢了会有人记住你们，输了就只是一次尝试。`, [option('enter', `和${f.name}报名`, '费用不退。结果不确定。'), option('stop', '这次算了', `${f.name}会失望，这条线可以停在这里。`)], { friendId: f.id, beat: 'science-2' });
+ else if (t.stage === 3) {
+  const other = namedPeer(l, `${f.name}介绍`);
+  pending(l, 'thread', `${f.name}说可以帮你引见`, `${f.name}认识${other.name}。你如果开口，对方可能愿意见你，也可能推说没空。见上一面不等于拿到任何资格。`, [option('ask', `请${f.name}介绍`, '可能认识一个新人，也可能白跑一趟。'), option('stay', `只和${f.name}来往`, '不展开新的人，原来的故事先告一段落。')], { friendId: f.id, beat: 'science-3', mentor: other });
+ } else t.ended = true;
+}
+function offerHomeBeat(l, home) {
+ const parent = home.role === 'father' ? l.family.father : l.family.mother;
+ if (!alive(parent)) { home.ended = true; log(l, `${home.name}不在了`, '你还想接着帮家里，可是那个人已经不在。这条线停在这里。', 'family'); return; }
+ home.name = parent.name;
+ if (home.stage <= 1) pending(l, 'thread', `${parent.name}又提起下午的事`, `自从${home.since}岁那个下午，${parent.name}知道你会留下来。现在又问你：这阵子还帮不帮。继续会有一点零用钱，也会占掉你自己的时间。`, [option('keep', `继续帮${parent.name}`, '拿到一点钱，关系更近。'), option('own', '把下午要回来', `${parent.name}可能理解，也可能不说话。`)], { beat: 'home-1' });
+ else if (home.stage === 2) {
+  const sib = (l.family.siblings || []).find(c => alive(c) && (c.age ?? 0) < 12);
+  if (sib) pending(l, 'thread', `${parent.name}让你看着${sib.name}`, `${sib.name}还小。${parent.name}问你能不能带一会儿。这是两个有名字的人，不是一项家务数值。`, [option('watch', `带${sib.name}出去`, '你们会多一段共同的记忆。'), option('study', '说你要做自己的事', `${sib.name}会记住你拒绝了。`)], { beat: 'home-2', siblingId: sib.id });
+  else pending(l, 'thread', `${parent.name}今天起不来`, `${parent.name}说身上没劲。你留在家里，还是去过自己的下午，${parent.name}都看在眼里。`, [option('stay', `留下来陪${parent.name}`, '没有报酬，人会记住。'), option('go', '还是出去', '关系会远一点。')], { beat: 'home-2' });
+ } else if (home.stage === 3) pending(l, 'thread', `要不要开口找${parent.name}`, `你需要一笔大约${Math.round(gdp(l) * .04)}的开支。${parent.name}想帮，但不一定帮得起。开口可能只听到“家里也紧”。`, [option('ask', `问${parent.name}能不能帮一点`, '最多帮一部分，也可能一点都没有。'), option('no', '不麻烦家里', '这条线到这里结束。')], { beat: 'home-3' });
+ else home.ended = true;
+}
+function startThread(l, p, key) {
+ const s = l.systems;
+ const cast = p.cast || {};
+ if (key === 'home') {
+  const role = cast.home?.role;
+  const parent = role === 'father' ? l.family.father : l.family.mother;
+  if (!alive(parent)) { log(l, '家里没有人在', '你想留下来，可是这天下午没有人应你。', 'family'); return; }
+  s.homeThread = { role, name: parent.name, stage: 1, since: l.age, nextAge: l.age + 2, ended: false };
+  parent.bond = clamp((parent.bond ?? 60) + 4);
+  const pocket = Math.round(gdp(l) * (l.age >= 12 ? .012 : .004));
+  l.money += pocket; stats(l, { happiness: 2, social: 3 });
+  log(l, `和${parent.name}过了一个下午`, `你留下来分担手上的事。${parent.name}把${pocket}塞到你手里。过一阵还会再找你，帮不帮得上要到时候才知道。`, 'family');
+  return;
+ }
+ const f = cast[key === 'sport' ? 'sport' : 'science'];
+ if (!f?.name) return;
+ f.thread = { kind: key === 'sport' ? 'sport' : 'science', stage: 1, since: l.age, nextAge: l.age + 2, ended: false };
+ f.sharedMemory = key === 'sport' ? '第一次一起跑到喘不上气' : (l.age >= 12 ? '第一天下午一起洗烧杯' : '一起把旧书翻到最后一页');
+ f.metThrough = key === 'sport' ? '运动队' : (l.age >= 12 ? '科学小组' : '一起看书');
+ l.friends.push(f); remember(f, l);
+ stats(l, key === 'sport' ? { health: 4, social: 4 } : { knowledge: 4, social: 3 });
+ log(l, `认识了${f.name}`, key === 'sport' ? `${f.name}拉你去了外面。你们约好下次还一起。受伤、散伙或者认识新人，都还没发生。` : `${f.name}和你把这个下午过完了。你们约好继续见面。做成做砸，都要等下一次。`, 'social');
+}
+function resolveThread(l, p, key) {
+ const s = l.systems;
+ const f = p.friendId ? l.friends.find(x => x.id === p.friendId) : null;
+ const beat = p.beat;
+ if (beat === 'apart' && f?.thread) {
+  if (key === 'letgo') { f.thread.ended = true; log(l, `和${f.name}先停在这里`, `${f.name}还在原来的地方。你们没有断掉这个人，只是不再推进这件事。`, 'social'); return; }
+  const reply = chance(l, .6);
+  f.bond = clamp(f.bond + (reply ? 4 : -3)); f.thread.nextAge = l.age + 3; remember(f, l);
+  log(l, reply ? `${f.name}回信了` : '信没有回音', reply ? `${f.name}写了近况。人没有搬到你身边，故事只能隔着距离慢慢继续。` : `你把信寄给了${f.name}。这一次没有回音，关系淡了一点。`, 'social');
+  return;
+ }
+ if (beat === 'science-1' && f?.thread) {
+  if (key === 'alone') { f.bond = clamp(f.bond - 8); f.thread.ended = true; remember(f, l); log(l, `${f.name}不再来找你`, `你让${f.name}自己收尾。过了两周，${f.name}没有再约你。人还在，一起做事的线断了。`, 'social'); return; }
+  const ok = chance(l, Math.min(.8, .42 + (l.stats.knowledge || 0) * .003));
+  f.bond = clamp(f.bond + (ok ? 10 : -5)); stats(l, { knowledge: ok ? 6 : 2, happiness: ok ? 3 : -2 });
+  f.sharedMemory = ok ? '实验做成的那个晚上' : '实验失败后互相不说话的走廊';
+  f.thread.stage = 2; f.thread.nextAge = l.age + 2; f.thread.strained = !ok; remember(f, l);
+  log(l, ok ? `和${f.name}做成了` : `${f.name}和你吵了一架`, ok ? `老师看见了你们的结果。${f.name}说下次还有机会，想继续拉你。` : `东西没有做出来。${f.name}埋怨你拖了时间，你也觉得委屈。人还在，后面的机会会更难。`, 'social');
+  return;
+ }
+ if (beat === 'science-2' && f?.thread) {
+  if (key === 'stop') { f.bond = clamp(f.bond - 4); f.thread.ended = true; remember(f, l); log(l, `你拒绝了${f.name}`, `${f.name}自己去问了报名的事，没有再拉你。这条线停了。`, 'social'); return; }
+  const fee = Math.round(gdp(l) * .008); spend(l, fee);
+  const ok = chance(l, Math.max(.15, .36 + f.bond / 400 - (f.thread.strained ? .15 : 0)));
+  f.thread.stage = 3; f.thread.nextAge = l.age + 2; remember(f, l);
+  if (ok) { const prize = Math.round(gdp(l) * .02); l.money += prize; f.bond = clamp(f.bond + 8); stats(l, { knowledge: 4, happiness: 4 }); f.sharedMemory = '一起拿到名次的那天'; log(l, `和${f.name}一起去了`, `报名费${fee}。你们拿到了一个小名次，带回${prize}。${f.name}说有人想认识你们。那还不是资格，只是下一次可以去问问。`, 'social'); }
+  else { f.bond = clamp(f.bond - 2); stats(l, { happiness: -2 }); log(l, `和${f.name}没能入选`, `报名费${fee}已经交掉。名单上没有你们。${f.name}说没关系，但回家的路上话很少。`, 'social'); }
+  return;
+ }
+ if (beat === 'science-3' && f?.thread) {
+  f.thread.ended = true; remember(f, l);
+  if (key !== 'ask') { f.bond = clamp(f.bond + 2); log(l, `和${f.name}的故事先停在这里`, `你没有去见新的人。${f.name}还是你认识的那一个。`, 'social'); return; }
+  const mentor = p.mentor;
+  const ok = chance(l, Math.min(.75, .3 + f.bond / 200));
+  if (!ok || !mentor) { stats(l, { happiness: -1 }); log(l, `${f.name}没能促成`, mentor ? `${mentor.name}说最近没空。你和${f.name}白等了一个下午，谁也没有因此得到新的路。` : `${f.name}一时找不到可以引见的人。`, 'social'); return; }
+  mentor.bond = 36; mentor.sharedMemory = `${f.name}介绍你们认识的那个下午`; l.friends.push(mentor); remember(mentor, l);
+  stats(l, { knowledge: 3, social: 4 }); log(l, `经${f.name}认识了${mentor.name}`, `${mentor.name}跟你们坐了一会儿，留下一个联系方式。没有承诺录取、工作或任何资格，只是多了一个以后还能再联系的人。`, 'social');
+  return;
+ }
+ if (beat === 'sport-1' && f?.thread) {
+  if (key === 'home') { f.bond = clamp(f.bond - 5); f.thread.stage = 2; f.thread.nextAge = l.age + 2; remember(f, l); log(l, `你先回了家`, `${f.name}在操场上又练了一会儿。下次见面，话会少一点。`, 'social'); return; }
+  const hurt = chance(l, .28);
+  if (hurt) { stats(l, { health: -6, social: 2 }); f.bond = clamp(f.bond + 6); f.sharedMemory = '你受伤时来看你的那个傍晚'; log(l, `加练时你受伤了`, `${f.name}把你送到校医那里。健康掉了一截，${f.name}没有丢下你。`, 'social'); }
+  else { stats(l, { health: 5, social: 3 }); f.bond = clamp(f.bond + 4); log(l, `和${f.name}加练完了`, `没有受伤。你们约好还一起练，也说好不要每次都硬撑。`, 'social'); }
+  f.thread.stage = 2; f.thread.nextAge = l.age + 2; remember(f, l);
+  return;
+ }
+ if (beat === 'sport-2' && f?.thread) {
+  if (key === 'skip') { f.bond = clamp(f.bond - 8); stats(l, { health: 2 }); f.thread.ended = chance(l, .55); if (!f.thread.ended) f.thread.nextAge = l.age + 3; remember(f, l); log(l, f.thread.ended ? `${f.name}不再约你` : `${f.name}还是来了`, f.thread.ended ? `你没有去看${f.name}。后来的训练名单里没有你。` : `${f.name}养好了脚，又来找你，但没有以前热络。`, 'social'); return; }
+  const bill = Math.round(gdp(l) * .01); spend(l, bill);
+  f.bond = clamp(f.bond + 10); f.sharedMemory = `去看${f.name}的那一次`; f.thread.stage = 3; f.thread.nextAge = l.age + 2; remember(f, l); stats(l, { social: 3, happiness: 2 });
+  log(l, `你去看了${f.name}`, `花了${bill}。${f.name}说等好了，要介绍一个也常在这边的人给你。那个人还不一定想见你。`, 'social');
+  return;
+ }
+ if (beat === 'sport-3' && f?.thread) {
+  f.thread.ended = true; remember(f, l);
+  if (key !== 'meet') { log(l, `你没有去见新的人`, `${f.name}点点头，没有再约。原来的搭档还在。`, 'social'); return; }
+  const mentor = p.mentor;
+  const ok = chance(l, Math.min(.7, .28 + f.bond / 220));
+  if (!ok || !mentor) { log(l, `${p.mentor?.name || '那个人'}没有出现`, `${f.name}等了很久，最后说大概是记错了时间。你们没有新的朋友，也没有新的活。`, 'social'); return; }
+  mentor.bond = 34; mentor.sharedMemory = `${f.name}拉你们见面`; l.friends.push(mentor); remember(mentor, l); stats(l, { social: 4 });
+  if (l.age >= 15 && chance(l, .5)) { const pay = Math.round(gdp(l) * .015); l.money += pay; log(l, `经${f.name}认识了${mentor.name}`, `${mentor.name}让你周末去店里帮了一次，给了${pay}。这不是一份稳定工作，下周还有没有班，要再问。`, 'social'); }
+  else log(l, `经${f.name}认识了${mentor.name}`, `${mentor.name}和你们说了会儿话。没有给你位置，也没有承诺，只是多认识了一个人。`, 'social');
+  return;
+ }
+ const home = s.homeThread;
+ if (!home) return;
+ const parent = home.role === 'father' ? l.family.father : l.family.mother;
+ if (beat === 'home-1') {
+  if (!alive(parent)) { home.ended = true; return; }
+  if (key === 'own') {
+   const ok = chance(l, .55);
+   parent.bond = clamp((parent.bond ?? 60) + (ok ? 1 : -8));
+   home.ended = true; stats(l, { happiness: ok ? 2 : -2 });
+   log(l, ok ? `${parent.name}说去吧` : `${parent.name}没再说话`, ok ? `${parent.name}让你去过自己的下午，晚饭仍给你留了位置。` : `你把下午要了回来。${parent.name}点了点头，那顿饭吃得很静。`, 'family');
+   return;
+  }
+  const pocket = Math.round(gdp(l) * .012); l.money += pocket; parent.bond = clamp((parent.bond ?? 60) + 6); stats(l, { social: 2 });
+  home.stage = 2; home.nextAge = l.age + 2;
+  log(l, `又帮了${parent.name}一阵`, `${parent.name}给了你${pocket}。说好过些日子还有事找你，不一定是钱。`, 'family');
+  return;
+ }
+ if (beat === 'home-2') {
+  if (!alive(parent)) { home.ended = true; return; }
+  const sib = (l.family.siblings || []).find(c => c.id === p.siblingId);
+  home.stage = 3; home.nextAge = l.age + 2;
+  if (sib && key === 'watch') { sib.bond = clamp((sib.bond ?? 50) + 8); parent.bond = clamp((parent.bond ?? 60) + 3); stats(l, { social: 3, happiness: 2 }); log(l, `带${sib.name}出去了一趟`, `${parent.name}在家休息。${sib.name}一路叫你的名字。你们有了一件以后能一起说的事。`, 'family'); return; }
+  if (sib) { sib.bond = clamp((sib.bond ?? 50) - 4); log(l, `你没有带${sib.name}`, `${sib.name}听到了。${parent.name}自己看着孩子，没责备你，也没像以前那样把事情交给你。`, 'family'); return; }
+  if (key === 'stay') { parent.bond = clamp((parent.bond ?? 60) + 6); stats(l, { happiness: 1 }); log(l, `你陪着${parent.name}`, `没什么大事。${parent.name}后来能起床了，记得是你留了下来。`, 'family'); return; }
+  parent.bond = clamp((parent.bond ?? 60) - 4); log(l, `你还是出去了`, `${parent.name}说自己可以。你走的时候，屋里没有再叫你。`, 'family');
+  return;
+ }
+ if (beat === 'home-3') {
+  home.ended = true;
+  if (key !== 'ask' || !alive(parent)) { log(l, '你没有开口', alive(parent) ? `你决定不麻烦${parent.name}。缺的那笔钱还得自己想办法。` : '你想问的人已经不在了。', 'family'); return; }
+  const need = Math.round(gdp(l) * .04);
+  const can = (l.family?.wealth ?? .5) > .3 && chance(l, .5);
+  if (!can) { stats(l, { happiness: -1 }); log(l, `${parent.name}帮不上`, `${parent.name}听完，沉默了一会儿，说家里也紧，${need}凑不出来。你没有拿到钱。`, 'family'); return; }
+  const gift = Math.round(need * .45); l.money += gift; parent.bond = clamp((parent.bond ?? 60) + 2);
+  log(l, `${parent.name}帮了一部分`, `${parent.name}拿出${gift}，还差的要你自己补。这不是一笔永远的资助。`, 'family');
+ }
+}
+
 export function getHousehold(l) {
  initSystems(l); const r = l.systems.residence;
  const residents = [{ id: 'self', name: l.name, role: '自己', age: l.age, sex: l.sex, countryId: r.countryId }];

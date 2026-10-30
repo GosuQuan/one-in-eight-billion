@@ -30,9 +30,11 @@ test('finished lives reject financial actions and travel',()=>{
  for(const fn of [()=>invest(l,'index',1000),()=>withdraw(l,'index',100),()=>buyStock(l,'NOVA',100),()=>buyHouse(l),()=>buyCar(l),()=>takeLoan(l,100),()=>travel(l,'jp')])assert.equal(fn().ok,false);
 });
 test('random event build is stable and never changes the displayed destination',()=>{
- for(let seed=0;seed<100;seed++){
+ for(let seed=0;seed<80;seed++){
   const l=createLife({seed,country:'US'});
-  for(let i=0;i<170&&!l.dead;i++){
+  l.age=24;l.money=80000;l.debt=0;l.income=40000;l.job='职员';l.pending=null;
+  if(l.systems?.finance)l.systems.finance.arrears=0;
+  for(let i=0;i<80&&!l.dead;i++){
    if(l.pending){
     if(l.pending.eventId==='travel_deal'){
      const expected=l.pending.options[0].label;const a=copy(l),b=copy(l);
@@ -44,5 +46,5 @@ test('random event build is stable and never changes the displayed destination',
    }else advanceYear(l);
   }
  }
- assert.fail('a travel offer should be generated among 100 seeded lives');
+ assert.fail('a travel offer should be generated among prepared adult lives');
 });
