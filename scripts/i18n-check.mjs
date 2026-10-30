@@ -31,7 +31,8 @@ async function dump() {
   const FOCUS = ['study', 'work', 'health', 'family', 'joy'];
   const safe = f => { try { return f(); } catch (err) { return { error: String(err.message) }; } };
   const out = { static: { COUNTRIES, DESTINATIONS, STOCKS, STOCK_RISKS, PURCHASES }, lives: [] };
-  for (let seed = 1; seed <= SEEDS; seed++) {
+  const first = Number(process.env.FIRST || 1), last = Number(process.env.LAST || SEEDS);
+  for (let seed = first; seed <= last; seed++) {
     const life = createLife({ seed, era: ['now', 'past', 'future', 'any'][seed % 4], mode: seed % 2 ? 'birth' : 'pop' });
     const results = [];
     for (let n = 0; n < 240 && !life.dead; n++) {
@@ -59,8 +60,8 @@ async function dump() {
   if (arg) writeFileSync(arg, json); else process.stdout.write(json);
 }
 
-function run(lang) {
-  const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), 'dump'], { env: { ...process.env, LIFE_LANG: lang }, maxBuffer: 1 << 30, encoding: 'utf8' });
+function run(lang, first, last) {
+  const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), 'dump'], { env: { ...process.env, LIFE_LANG: lang, FIRST: String(first), LAST: String(last) }, maxBuffer: 1 << 30, encoding: 'utf8' });
   if (r.status !== 0) { console.error(r.stderr); process.exit(1); }
   return JSON.parse(r.stdout);
 }
@@ -69,7 +70,6 @@ function run(lang) {
 const unpseudo = s => s.replace(/~([0-9a-z]+);/g, (_, c) => String.fromCharCode(parseInt(c, 36)));
 
 function compare(lang = 'en') {
-  const zh = run('zh-CN'), other = run(lang);
   const structural = [], leaks = new Map();
   const walk = (a, b, path, key) => {
     if (structural.length > 40) return;
@@ -91,7 +91,11 @@ function compare(lang = 'en') {
     }
     if (a !== b) structural.push(`${path}: ${a} became ${b}`);
   };
-  walk(zh, other, '$', '');
+  // in batches, so the JSON of long lives (and the much longer pseudo text) stays under the string size limit
+  for (let first = 1; first <= SEEDS; first += 40) {
+    const last = Math.min(SEEDS, first + 39);
+    walk(run('zh-CN', first, last), run(lang, first, last), `$[seeds ${first}-${last}]`, '');
+  }
   console.log(`${SEEDS} lives compared, zh-CN vs ${lang}`);
   console.log(structural.length ? `\nSTRUCTURAL DIFFERENCES (translation changed game logic):\n${structural.slice(0, 40).join('\n')}` : 'structure: identical');
   console.log(`untranslated strings: ${leaks.size}`);

@@ -3,6 +3,7 @@ import { COUNTRIES } from './engine.js';
 import { inferKind, localIncome, careerOptions } from './career.js';
 import { tr, label } from './i18n.js';
 import { personName } from './names.js';
+import { familyCovers } from './finance.js';
 
 const clamp = n => Math.max(0, Math.min(100, Number(n) || 0));
 const copy = x => JSON.parse(JSON.stringify(x));
@@ -15,7 +16,7 @@ const chance = (l, p) => roll(l) < p;
 const pickWeighted = (l, xs) => { const total = xs.reduce((sum, x) => sum + (x.w || 1), 0); let n = roll(l) * total; for (const x of xs) { n -= (x.w || 1); if (n < 0) return x; } return xs.at(-1); };
 const log = (l, title, text, type = 'family') => l.log.push({ age: l.age, year: yearOf(l), title, text, type });
 function stats(l, effects) { for (const [k, v] of Object.entries(effects)) l.stats[k] = clamp(l.stats[k] + v); }
-function spend(l, n) { n = Math.max(0, Math.round(n)); const paid = Math.min(l.money, n); l.money -= paid; l.debt = (l.debt || 0) + n - paid; return n; }
+function spend(l, n) { n = Math.max(0, Math.round(n)); const paid = Math.min(l.money, n); l.money -= paid; if (l.age < 18) familyCovers(l, n - paid); else l.debt = (l.debt || 0) + n - paid; return n; }
 function medicalBill(l, amount) { return spend(l, amount * (l.insurance ? .3 : 1)); }
 function action(l, type, text, from = '', to = '') { l.systems.actionSequence++; l.sceneAction = { id: `scene-${l.age}-${l.systems.actionSequence}`, type, age: l.age, text, from, to }; }
 const option = (key, label, description = '') => ({ key, label, description });

@@ -4,6 +4,9 @@ const clamp=n=>Math.max(0,Math.min(100,n));
 function roll(l){l.randomState=(l.randomState+0x6D2B79F5)>>>0;let t=l.randomState;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296;}
 const record=(l,title,text)=>l.log.push({age:l.age,year:l.birthYear+l.age,title,text,type:'finance'});
 const alive=p=>p&&p.alive!==false&&!p.dead;
+// Before 18 the family pays what the child's own cash can't cover, first from the savings it keeps for helping out.
+// A child never takes on debt.
+export function familyCovers(l,amount){const f=initFinance(l);f.familyReserve=Math.max(0,f.familyReserve-Math.round(amount));}
 export function initFinance(l){
  const f=l.finance ||= {};
  f.arrears ??= 0; f.lastYear ??= null; f.lastAidAge ??= null; f.repaymentUntil ??= -1; f.austerityUntil ??= -1;
