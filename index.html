@@ -14,8 +14,32 @@
 </head>
 <body>
   <div id="app"><p class="loading">正在翻开一本人生……</p></div>
+  <script>
+    // Show the title and loading line in the reader's language while the game's modules and translations load.
+    // Same order as detect() in src/i18n.js: ?lang=, then the switcher choice, then the browser's languages, else English.
+    (function () {
+      var text = {
+        en: ['One in Eight Billion · Life simulation', 'Opening a life…'],
+        uk: ['Один із 8 мільярдів · Симулятор життя', 'Відкриваємо нове життя…']
+      };
+      function pick(code) {
+        var c = String(code || '').toLowerCase().split(/[-_]/)[0];
+        return c === 'zh' || text[c] ? c : null;
+      }
+      var saved = null;
+      try { saved = localStorage.getItem('one-in-eight-demo:lang'); } catch (e) {}
+      var lang = pick(new URLSearchParams(location.search).get('lang')) || pick(saved);
+      var preferred = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language];
+      for (var i = 0; !lang && i < preferred.length; i++) lang = pick(preferred[i]);
+      lang = lang || 'en';
+      if (!text[lang]) return;
+      document.documentElement.lang = lang;
+      document.title = text[lang][0];
+      document.querySelector('#app .loading').textContent = text[lang][1];
+    })();
+  </script>
   <div id="overlay" hidden></div>
   <div id="toast" role="status" aria-live="polite"></div>
-  <noscript>请开启 JavaScript，开始这段人生。 / Turn on JavaScript to begin this life.</noscript>
+  <noscript>请开启 JavaScript，开始这段人生。 / Turn on JavaScript to begin this life. / Увімкни JavaScript, щоб почати це життя.</noscript>
 </body>
 </html>
