@@ -2018,4 +2018,6 @@ export default {
   // added after review
   "{stat}{change}": "{stat} {change}",
   "NO.": "NO.",
+  // added after review
+  "家里为你留出了${money}：小时候生病、意外和你自己的选择都从这里花，吃住和上学用品由家里负担。": " Your family has set aside ${money} for you. Childhood illnesses, mishaps and your own choices are paid from it; food, a home and school supplies are on the family.",
 };

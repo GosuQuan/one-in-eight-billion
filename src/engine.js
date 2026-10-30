@@ -173,7 +173,7 @@ export function createLife({era='now',mode='birth',seed=Date.now(),country,sex,n
    life:Math.round(clamp(cc.life+(roll(s)-.5)*30,35,108)),age:0,dead:false,job:'尚未工作'});
  }
  s.classBand=s.family.background;
-  log(s,tr('世界多了一个你'),tr('{birthYear}年，你出生在{name}{city}。对照当地人均 GDP，你家大约高于{wealth}%的家庭，更接近{background}。这是游戏里的分层，不是官方收入统计。父母给你取名{name2}。', {birthYear, name: c.name, city: c.city, wealth: Math.round(wealth*100), background: label(s.family.background), name2: s.name}),'birth');
+  log(s,tr('世界多了一个你'),tr('{birthYear}年，你出生在{name}{city}。对照当地人均 GDP，你家大约高于{wealth}%的家庭，更接近{background}。这是游戏里的分层，不是官方收入统计。父母给你取名{name2}。', {birthYear, name: c.name, city: c.city, wealth: Math.round(wealth*100), background: label(s.family.background), name2: s.name})+tr('家里为你留出了${money}：小时候生病、意外和你自己的选择都从这里花，吃住和上学用品由家里负担。', {money: s.money}),'birth');
  log(s,tr('同一秒的远方'),tr('另外四个孩子也在这个世界睁开眼睛。你们彼此陌生，却一起走进时间。'),'world');
  initSystems(s); initEducation(s); initFinance(s);
  return s;
