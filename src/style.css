@@ -115,3 +115,4 @@
  .ending-metrics.six div:nth-child(2n){border-right:0}
  .ending-metrics strong{font-size:19px}
 }
+.lang-select{appearance:none;-webkit-appearance:none;background:transparent;border:0;color:inherit;font:inherit;cursor:pointer;padding:0 2px}.lang-select:focus-visible{outline:1px solid currentColor;outline-offset:2px}
