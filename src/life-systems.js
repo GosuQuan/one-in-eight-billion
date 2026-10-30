@@ -2,6 +2,7 @@
 import { COUNTRIES } from './engine.js';
 import { inferKind, localIncome, careerOptions } from './career.js';
 import { tr, label } from './i18n.js';
+import { personName } from './names.js';
 
 const clamp = n => Math.max(0, Math.min(100, Number(n) || 0));
 const copy = x => JSON.parse(JSON.stringify(x));
@@ -22,7 +23,7 @@ function pending(l, system, title, text, options, context = {}) { l.pending = { 
 function offer(l, ...args) { if (!l.pending) pending(l, ...args); }
 const result = (ok, message) => ({ ok, message });
 const gdp = l => l.country.gdp;
-function person(l) { const sex = roll(l) < .5 ? '男' : '女'; const names = l.country.names; return { name: tr('{surname}{given}', { surname: pick(l, names.surnames), given: pick(l, names[sex === '男' ? 'male' : 'female']), country: l.country.id, sex }), sex }; }
+function person(l) { const sex = roll(l) < .5 ? '男' : '女'; return { name: personName(l, l.country, sex, roll), sex }; }
 
 export function initSystems(l) {
  if (!l || typeof l !== 'object') return l;

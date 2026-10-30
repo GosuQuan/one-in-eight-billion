@@ -3,6 +3,7 @@ import { initEducation, educationYear, educationMilestone, educationChoice } fro
 import { initFinance, financeYear, creditBlocked } from './finance.js';
 import { careerAction, careerYear } from './career.js';
 import { tr, label, setPlayer } from './i18n.js';
+import { personName } from './names.js';
 export { systemAction };
 // A self-contained, deterministic life simulation for the demo.
 // All country/price figures are approximate teaching data, not official statistics.
@@ -104,7 +105,7 @@ const chance=(life,p)=>roll(life)<p;
 const pick=(life,xs)=>xs[Math.floor(roll(life)*xs.length)];
 const pickWeighted=(life,xs,weight=x=>x.weight||1)=>{const total=xs.reduce((s,x)=>s+weight(x),0);let n=roll(life)*total;for(const x of xs){n-=weight(x);if(n<0)return x;}return xs[xs.length-1];};
 const countryFor=(life,mode)=>{const key=mode==='pop'||mode==='population'?'pop':'birth';let n=roll(life)*COUNTRIES.reduce((sum,c)=>sum+c[key],0);return COUNTRIES.find(c=>(n-=c[key])<0)||COUNTRIES.at(-1);};
-const person=(life,c,sex=roll(life)<.5?'男':'女')=>({name:tr('{surname}{given}', {surname:pick(life,c.names.surnames), given:pick(life,c.names[sex==='男'?'male':'female']), country:c.id, sex}),sex});
+const person=(life,c,sex=roll(life)<.5?'男':'女')=>({name:personName(life,c,sex,roll),sex});
 const log=(life,title,text,type='life')=>life.log.push({age:life.age,year:life.birthYear+life.age,title,text,type});
 const statLabels={health:tr('健康'),happiness:tr('幸福'),knowledge:tr('学识'),social:tr('人际')};
 const FOCUS_EFFECTS={study:{knowledge:4},work:{knowledge:1,health:-1,happiness:-1},health:{health:3,happiness:1},family:{social:3,happiness:2},joy:{happiness:3,social:1}};
