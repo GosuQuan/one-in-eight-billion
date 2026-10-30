@@ -1,6 +1,6 @@
 // Original, serializable life systems. Monetary figures are illustrative PPP units.
 import { COUNTRIES } from './engine.js';
-import { inferKind, localIncome } from './career.js';
+import { inferKind, localIncome, careerOptions } from './career.js';
 
 const clamp = n => Math.max(0, Math.min(100, Number(n) || 0));
 const copy = x => JSON.parse(JSON.stringify(x));
@@ -296,7 +296,15 @@ export function systemChoice(l, p, index) {
   if (key === 'cancel' || alive(l.partner) || l.age < 18 || s.lastCourtAge === l.age) break;
   const f = l.friends.find(f => f.id === key && alive(f) && f.age >= 18); if (!f) break;
   s.lastCourtAge = l.age; const ok = chance(l, Math.min(.85, .15 + f.bond / 140 - (f.countryId !== l.country.id ? .2 : 0)));
-  if (ok) { l.partner = { ...f, income: Math.round(gdp(l) * .45), bond: Math.max(50, f.bond), distanceYears: 0, togetherSince: l.age }; s.residence.familyCountryId = f.countryId; }
+  if (ok) {
+   const minors = l.children.filter(c => alive(c) && c.age < 18 && c.supportPayer !== 'player');
+   const placeOf = c => c.countryId || s.residence.familyCountryId;
+   const kidsAway = minors.some(c => placeOf(c) !== l.country.id);
+   const kidsHere = minors.some(c => placeOf(c) === l.country.id);
+   l.partner = { ...f, countryId: l.country.id, income: Math.round(gdp(l) * .45), bond: Math.max(50, f.bond), distanceYears: 0, togetherSince: l.age };
+   if (!kidsAway) s.residence.familyCountryId = l.country.id;
+   if (s.residence.with !== 'parents') s.residence.with = kidsHere ? 'family' : 'partner';
+  }
   else f.bond = clamp(f.bond - 3);
   log(l, ok ? '关系有了新的名字' : '心意没有得到回应', `${f.name}${ok ? '愿意和你试着交往。你们约好，先认真了解彼此的日常。' : '认真听完，仍希望做朋友。你有些失落，也尊重了这个答复。'}`, 'love'); break; }
  case 'divorce': if (key !== 'cancel' && l.age >= 18 && l.partner?.name === p.partnerName) settleSeparation(l, key); break;
@@ -360,7 +368,7 @@ export function systemChoice(l, p, index) {
     const pass = chance(l, .28 + (l.stats.knowledge || 0) * .002 + Math.min(.2, (l.careerYears || 0) * .02));
     if (!pass) { stats(l, { happiness: -2 }); log(l, '本地的位置没有你', `面试结束了。以你现在的学历和${l.careerYears || 0}年经验，对方选了别人。你仍是${l.job}。`, 'work'); break; }
     l.jobKind = p.jobKind; l.remote = false; l.employerGdp = null; l.employerCountryId = l.country.id; l.retired = false;
-    l.job = { apprentice: '维修学徒', office: '行政职员', technical: '技术人员' }[p.jobKind] || '本地职员';
+    l.job = { apprentice: '维修学徒', office: '行政职员', technical: '技术人员', matched: '专业对口岗位' }[p.jobKind] || '本地职员';
     l.income = preview; log(l, '本地录用了你', `年收入${l.income}，按${l.country.name}的物价、学历和经验计算。以后仍可能失业。`, 'work');
    } else if (kind === 'raise') {
     if (!chance(l, Math.min(.7, .18 + (l.careerYears || 0) * .03 + (l.stats.knowledge || 0) * .002)) || !(l.income > 0)) { log(l, '评估没有通过', `你已有${l.careerYears || 0}年经验，这次名单上没有你。岗位和收入维持原样。`, 'work'); break; }
@@ -573,13 +581,17 @@ function hearOpportunity(l) {
  }
  const dest = pick(l, COUNTRIES.filter(c => c.id !== l.country.id));
  const r = l.systems.residence;
- const kinds = employedNow ? ['raise', 'local', 'abroad'] : ['local', 'abroad'];
- if ((l.careerYears || 0) >= 4 || ['university', 'masters', 'vocational', 'high'].includes(l.school?.credential)) kinds.push('remote');
+ const open = careerOptions(l).filter(o => !o.disabled && o.id !== 'promotion');
+ const localJobs = open.filter(o => o.id !== 'remote');
+ const kinds = ['abroad'];
+ if (localJobs.length) kinds.push('local');
+ if (employedNow) kinds.push('raise');
+ if (open.some(o => o.id === 'remote')) kinds.push('remote');
  if (r.abroadSince != null && l.age - r.abroadSince >= 4 && l.systems.residency === 'temporary') kinds.push('pr');
  if (r.abroadSince != null) kinds.push('home-offer');
  const kind = pick(l, kinds);
  if (kind === 'local') {
-  const jobKind = pick(l, ['apprentice', 'office', 'technical']);
+  const jobKind = pick(l, localJobs).id;
   const preview = localIncome(l, jobKind);
   pending(l, 'opportunity', '有人提起一个本地的位置', `在${l.country.name}，以你的学历和${l.careerYears || 0}年经验，这份工作不一定录用。若做成，年收入大约${preview}，按这里的物价计算。`, [option('try', '去试试', '花时间面试，可能没有回音。'), option('skip', '先不接', '消息会过去，你留在现在的状态。')], { offerKind: 'local', jobKind });
  } else if (kind === 'raise') {
@@ -602,7 +614,7 @@ export function getHousehold(l) {
  const residents = [{ id: 'self', name: l.name, role: '自己', age: l.age, sex: l.sex, countryId: r.countryId }];
  const add = (p, id, role, fallbackAge) => { if (alive(p)) residents.push({ id, name: p.name, role, age: p.age ?? fallbackAge, sex: p.sex || (role === '母亲' ? '女' : role === '父亲' ? '男' : '未知'), countryId: r.countryId }); };
  if (r.with === 'parents') { add(l.family.mother, 'mother', '母亲', 55); add(l.family.father, 'father', '父亲', 57); for (const sib of l.family?.siblings || []) if (alive(sib) && (sib.age ?? 0) < 18) add(sib, sib.id || sib.name, sib.sex === '男' ? '弟弟' : '妹妹', 0); }
- if (['partner', 'family'].includes(r.with) && r.countryId === r.familyCountryId) add(l.partner, 'partner', '伴侣', l.age);
+ if (['partner', 'family'].includes(r.with) && alive(l.partner) && (l.partner.countryId || r.familyCountryId) === r.countryId) add(l.partner, 'partner', '伴侣', l.age);
  if (r.with === 'family') for (const c of l.children) if (c.livesWithPlayer !== false && (c.age < 18 || c.livesWithPlayer === true) && (c.countryId || r.familyCountryId) === r.countryId) add(c, c.id, '孩子', 0);
  return residents;
 }

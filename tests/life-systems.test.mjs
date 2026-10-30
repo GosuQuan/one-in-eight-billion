@@ -211,3 +211,25 @@ test('siblings are named people or the birth does not happen', () => {
  }
  assert.ok(named, 'a named sibling appears'); assert.ok(missed, 'a parental birth can fail');
 });
+
+test('a new partner does not relocate children who still live elsewhere', () => {
+ const l = adult('court-away');
+ l.country = JSON.parse(JSON.stringify(COUNTRIES.find(c => c.id === 'US')));
+ l.systems.residence.countryId = 'US'; l.systems.residence.abroadSince = 26; l.systems.residence.homeCountry = 'CN'; l.systems.residence.familyCountryId = 'CN'; l.systems.residence.with = 'alone';
+ l.children = [{ id: 'child-x', name: '小林', age: 4, alive: true, countryId: 'CN', bond: 70, supportPayer: null }];
+ const friend = { id: 'friend-9', name: '陈夏', sex: '女', age: 28, alive: true, bond: 100, countryId: 'US' };
+ l.friends = [friend];
+ for (let i = 0; i < 8 && !l.partner; i++) { l.pending = null; l.systems.lastCourtAge = null; if (i) l.age++; systemAction(l, 'seek-partner'); select(l, friend.id); }
+ assert.ok(l.partner, 'courtship eventually succeeds');
+ assert.equal(l.partner.countryId, 'US'); assert.equal(l.children[0].countryId, 'CN'); assert.equal(l.systems.residence.familyCountryId, 'CN');
+ const home = getHousehold(l).map(p => p.role);
+ assert.ok(home.includes('伴侣')); assert.equal(home.includes('孩子'), false);
+});
+test('a heard local job stays within the current schooling', () => {
+ const l = adult('no-degree-job');
+ l.school = { credential: 'primary' }; l.income = 0; l.job = '待业'; l.jobKind = null; l.careerYears = 0; l.stats.knowledge = 0;
+ l.family.mother.alive = false; l.family.father.alive = false; l.partner = null;
+ const kinds = new Set();
+ for (let i = 0; i < 60; i++) { l.pending = null; l.age++; l.systems.lastYear = null; systemsYear(l); if (l.pending?.offerKind === 'local') kinds.add(l.pending.jobKind); }
+ assert.ok(kinds.size > 0, 'a local offer appears'); assert.deepEqual([...kinds], ['apprentice']);
+});

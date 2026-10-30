@@ -148,7 +148,7 @@ test('investing, withdrawing, stock trading and fees move cash and net worth cor
 
 test('stock_tip offers risk tolerance choices, settles distinct gains and losses, and logs outcomes',()=>{
  let pending;
- for(let seed=0;seed<10&&!pending;seed++){
+ for(let seed=0;seed<24&&!pending;seed++){
   const life=createLife({seed,country:'US'});life.age=22;life.money=120000;life.debt=0;life.income=60000;life.job='职员';
   for(let n=0;n<180&&!life.dead;n++){
    if(life.pending?.eventId==='stock_tip'){pending=clone(life);break;}
