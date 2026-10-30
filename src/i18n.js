@@ -4,6 +4,7 @@
 //   {name}               inserts a param
 //   {n|one|other}        plural forms in the order of PLURAL_FORMS below, # stands for the number
 //   {~male|female}       picks a form by the player's sex, for languages where verbs and adjectives agree with "you"
+//   {name:loc}           runs the param through the language's '@loc' function (grammatical case for place names)
 // The language is fixed for a page load, so module-level tables can call tr() once.
 const STORE_KEY = 'one-in-eight-demo:lang';
 export const LANGUAGES = { 'zh-CN': '简体中文', en: 'English', uk: 'Українська' };
@@ -48,9 +49,10 @@ let playerFemale = false;
 export function setPlayer(sex) { playerFemale = sex === '女'; }
 
 const plurals = new Intl.PluralRules(numberLocale);
-const fill = (text, params) => text.replace(/\{~([^|{}]*)\|([^|{}]*)\}/g, (m, male, female) => (playerFemale ? female : male)).replace(/\{(\w+)((?:\|[^|{}]*)+)?\}/g, (m, k, forms) => {
+const fill = (text, params) => text.replace(/\{~([^|{}]*)\|([^|{}]*)\}/g, (m, male, female) => (playerFemale ? female : male)).replace(/\{(\w+)(?::(\w+))?((?:\|[^|{}]*)+)?\}/g, (m, k, form, forms) => {
   if (!params || !(k in params)) return m;
-  if (!forms) return String(params[k]);
+  const inflect = form && dict?.['@' + form];
+  if (!forms) return typeof inflect === 'function' ? inflect(String(params[k])) : String(params[k]);
   const list = forms.slice(1).split('|'), order = PLURAL_FORMS[lang] || PLURAL_FORMS.en;
   const index = Math.max(0, order.indexOf(plurals.select(Number(params[k]))));
   return list[Math.min(index, list.length - 1)].replace(/#/g, String(params[k]));

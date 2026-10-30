@@ -212,7 +212,7 @@ function spend(life,amount){
 }
 function applyStats(life,effects,details){
  for(const k of ['health','happiness','knowledge','social']){
-  if(typeof effects[k]==='number'&&effects[k]!==0){life.stats[k]=clamp(life.stats[k]+effects[k]);details.push(`${statLabels[k]}${effects[k]>=0?'+':''}${effects[k]}`);}
+  if(typeof effects[k]==='number'&&effects[k]!==0){life.stats[k]=clamp(life.stats[k]+effects[k]);details.push(tr('{stat}{change}', {stat: statLabels[k], change: `${effects[k]>=0?'+':''}${effects[k]}`}));}
  }
 }
 function ensurePartner(life){
