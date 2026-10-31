@@ -832,3 +832,75 @@ test('a refused talk with a sibling keeps that name for two years', () => {
   }
   assert.equal(cleared, true);
 });
+
+test('elder care keeps visiting for two years and stops if the parent is gone', () => {
+  const elderOf = (seed) => {
+    const l = adult(seed, 40);
+    l.family.mother = { ...(l.family.mother || {}), name: '林母', alive: true, age: 74, bond: 50 };
+    if (l.family.father) l.family.father.alive = false;
+    return l;
+  };
+  let refused = false, kept = false;
+  for (let i = 0; i < 24 && !(refused && kept); i++) {
+    const l = elderOf('elder-' + i);
+    const fee = Math.round(l.country.gdp * .04);
+    const before = l.money;
+    livedAction(l, 'elder-care');
+    assert.equal(l.money, before - fee);
+    assert.equal(l.debt, 0);
+    assert.equal(l.job, '职员');
+    assert.equal(l.income, 40000);
+    assert.equal(livedAction(l, 'elder-care').ok, false);
+    if (l.log.some(e => e.title === '父母把你挡回去了')) {
+      assert.equal(l.family.mother.bond, 50);
+      assert.equal(l.lived.elderKeep, undefined);
+      const held = l.money;
+      l.age = 41;
+      livedYear(l, { events: false });
+      assert.equal(l.money, held);
+      assert.equal(l.job, '职员');
+      assert.equal(l.income, 40000);
+      assert.ok(!l.log.some(e => e.title === '林母还等你再来'));
+      refused = true;
+    }
+    if (l.log.some(e => e.title === '这一年照着林母')) {
+      assert.equal(l.family.mother.bond, 54);
+      assert.equal(l.lived.elderKeep.name, '林母');
+      assert.equal(l.lived.elderKeep.until, 42);
+      const after = l.money;
+      livedYear(l, { events: false });
+      assert.equal(l.money, after);
+      const trip = Math.round(l.country.gdp * .008);
+      l.age = 41;
+      livedYear(l, { events: false });
+      assert.equal(l.money, after - trip);
+      assert.equal(l.family.mother.bond, 54);
+      assert.equal(l.job, '职员');
+      assert.equal(l.income, 40000);
+      assert.ok(l.log.some(e => e.age === 41 && e.title === '林母还等你再来'));
+      l.age = 42;
+      livedYear(l, { events: false });
+      assert.equal(l.money, after - trip * 2);
+      l.age = 43;
+      livedYear(l, { events: false });
+      assert.equal(l.money, after - trip * 2);
+      assert.ok(!l.log.some(e => e.age === 43 && e.title === '林母还等你再来'));
+      kept = true;
+    }
+  }
+  assert.equal(refused, true);
+  assert.equal(kept, true);
+
+  const gone = elderOf('elder-gone');
+  initLived(gone);
+  gone.lived.elderKeep = { name: '林母', until: 42 };
+  const held = gone.money;
+  gone.family.mother.alive = false;
+  gone.age = 41;
+  livedYear(gone, { events: false });
+  assert.equal(gone.lived.elderKeep, null);
+  assert.equal(gone.money, held);
+  assert.equal(gone.job, '职员');
+  assert.equal(gone.income, 40000);
+  assert.ok(!gone.log.some(e => e.title === '林母还等你再来'));
+});

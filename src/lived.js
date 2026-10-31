@@ -39,7 +39,7 @@ export const LIVED_ACTS = [
  { id: 'bully', title: '正视那个针对你的同学', ages: [8, 16], cost: '不花钱', time: '没说开的话，接下来三年心情和相处都会更紧', risk: '已经有这样一个人，就不会再造一个', mark: '对方有名字。不和解，名字还在，日常会紧几年' },
  { id: 'reconcile', title: '试着和那个同学说开', ages: [8, 20], cost: '不花钱', time: '一次谈话', risk: '对方可以不接受，关系会更僵', mark: '说开了才结束这段针对' },
  { id: 'puberty', title: '承认身体在变', ages: [11, 16], cost: '不花钱', time: '这一年', risk: '只发生一次', mark: '情绪和跟人相处的把握会晃一下，没有别的奖励' },
- { id: 'elder-care', title: '照顾年老的父母', ages: [25, 70], cost: '大约当地水平的 4%', time: '这一年的照护', risk: '父母可能说不用你管，钱仍可能已经垫上', mark: '照护过会留在你们的关系里' },
+ { id: 'elder-care', title: '照顾年老的父母', ages: [25, 70], cost: '大约当地水平的 4%，后来两年还有更小的来回', time: '这一年，再加上后来两年', risk: '父母可能说不用你管，钱仍可能已经垫上', mark: '照护会再走两年。人若不在了就停，也不会变成工作' },
  { id: 'sibling', title: '和兄弟姐妹谈一次', ages: [12, 70], cost: '不花钱', time: '一次', risk: '对方可能不想谈', mark: '谈崩了，接下来两年会点出对方的名字。谈成了，这段别扭就停' },
  { id: 'grief-visit', title: '去看望离开的人', ages: [10, 90], cost: '大约当地水平的 1%，没去成也不退', time: '一天', risk: '路可能断，没有正在想念的人就没有可去的地方', mark: '看成了心情松一点。没看成，钱也花了。想念都不会提前结束' },
  { id: 'letter', title: '写一封不会寄出的信', ages: [10, 90], cost: '不花钱', time: '一个晚上', risk: '离开超过八年，或没有这个人，就写不成', mark: '信留在档案里。人离开后的八年里都还写得成' },
@@ -244,8 +244,8 @@ function run(l, id) {
    const p = elder(l); const fee = Math.round(g * .04); spend(l, fee); v.elderAt = l.age;
    if (!p) return { ok: false, message: '没有需要照顾的年长父母。' };
    if (!chance(l, .62)) { log(l, '父母把你挡回去了', `${p.name}说还不用。垫上的${fee}退不回来，照护没有开始。`); return { ok: true, message: '对方说还不用。' }; }
-   p.bond = clamp((p.bond || 50) + 4); p.caredAge = l.age;
-   log(l, `这一年照着${p.name}`, `医药和来回大约${fee}。${p.name}的日子轻一点，你的时间少了一块。这不能阻止以后的分别。`);
+   p.bond = clamp((p.bond || 50) + 4); p.caredAge = l.age; v.elderKeep = { name: p.name, until: l.age + 2 };
+   log(l, `这一年照着${p.name}`, `医药和来回大约${fee}。${p.name}的日子轻一点，你的时间少了一块。接下来两年还会再去，人若不在了就停。这不能阻止以后的分别，也不会变成工作。`);
    return { ok: true, message: `照过${p.name}这一年。` };
   }
   case 'sibling': {
@@ -630,6 +630,14 @@ function tick(l) {
   }
  }
  if (v.hobby && !v.hobbyTried) v.hobbyYears += 1;
+ if (v.elderKeep && l.age <= v.elderKeep.until && l.age > v.elderKeep.until - 2) {
+  const who = parents(l).find(p => p.name === v.elderKeep.name);
+  if (!who) v.elderKeep = null;
+  else {
+   const trip = Math.round(gdp(l) * .008); spend(l, trip); stats(l, { happiness: -1 });
+   log(l, `${who.name}还等你再来`, `照护留到${v.elderKeep.until}岁。这一趟大约${trip}，职位没有因此变化。`);
+  }
+ }
  if ((v.cheapUntil || 0) >= l.age) stats(l, { health: -0.4 });
  if ((v.leaveUntil || 0) >= l.age && v.leaveCut !== l.age && (l.income || 0) > 0) { v.leaveCut = l.age; l.income = Math.round(l.income * .7); }
  if (formal(l)) { v.pensionYears += 1; v.pensionPot += Math.round(gdp(l) * .012); }
@@ -698,6 +706,7 @@ export function livedBrief(l) {
  if ((v.examWait || 0) > (l.age || 0)) bits.push(`等到${v.examWait}岁再申请`);
  if ((v.choreUntil || 0) >= (l.age || 0) && l.partner?.name) bits.push(`家务别扭：${l.partner.name}`);
  if (v.siblingRift && (v.siblingRift.until || 0) >= (l.age || 0)) bits.push(`隔阂：${v.siblingRift.name}`);
+  if (v.elderKeep && (v.elderKeep.until || 0) >= (l.age || 0)) bits.push(`照护：${v.elderKeep.name}`);
  if (abroad(l) && !v.fluent) bits.push(`当地语言还生疏（${v.barrierYears}年）`);
  if ((v.pensionYears || 0) > 0) bits.push(`养老累计 ${v.pensionYears} 年`);
  return bits.join(' · ');
