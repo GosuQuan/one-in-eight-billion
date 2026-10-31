@@ -1086,3 +1086,52 @@ test('a refused neighbor favor costs money and keeps that name for a year', () =
   assert.equal(helped, true);
   assert.equal(refused, true);
 });
+
+test('a missed birthday gift keeps that name for one more year', () => {
+  let missed = false, arrived = false;
+  for (let i = 0; i < 40 && !(missed && arrived); i++) {
+    const l = adult('bday-' + i, 30);
+    const mother = l.family.mother;
+    mother.countryId = 'JP';
+    mother.bond = 50;
+    const name = mother.name;
+    const before = l.money;
+    const happy = l.stats.happiness;
+    const gift = Math.round(l.country.gdp * .004);
+    livedAction(l, 'birthday');
+    assert.equal(l.job, '职员');
+    assert.equal(l.income, 40000);
+    if (l.log.some(e => e.title === `给${name}的礼物没送到`)) {
+      assert.equal(l.money, before - gift);
+      assert.equal(l.debt, 0);
+      assert.equal(mother.bond, 48);
+      assert.equal(l.lived.giftMiss.name, name);
+      assert.equal(l.lived.giftMiss.until, 31);
+      const held = l.money;
+      livedYear(l, { events: false });
+      assert.equal(l.money, held);
+      assert.ok(!l.log.some(e => e.age === 30 && e.title === `${name}还记着没收到的礼物`));
+      l.age = 31;
+      livedYear(l, { events: false });
+      assert.equal(l.money, held);
+      assert.equal(l.stats.happiness, happy - 1);
+      assert.equal(l.job, '职员');
+      assert.equal(l.income, 40000);
+      assert.ok(l.log.some(e => e.age === 31 && e.title === `${name}还记着没收到的礼物`));
+      l.age = 32;
+      livedYear(l, { events: false });
+      assert.equal(l.stats.happiness, happy - 1);
+      assert.equal(l.money, held);
+      assert.ok(!l.log.some(e => e.age === 32 && e.title === `${name}还记着没收到的礼物`));
+      missed = true;
+    }
+    if (l.log.some(e => e.title === `${name}的生日`)) {
+      assert.equal(l.money, before - gift);
+      assert.equal(mother.bond, 53);
+      assert.equal(l.lived.giftMiss ?? null, null);
+      arrived = true;
+    }
+  }
+  assert.equal(missed, true);
+  assert.equal(arrived, true);
+});

@@ -75,7 +75,7 @@ export const LIVED_ACTS = [
  { id: 'internship', title: '试一份短期实习', ages: [16, 23], cost: '地方可以不收你', time: '短短一段，不是岗位', risk: '大约四成半被回绝；有正式工作就不必再实习', mark: '带教有名字，补贴不是职业' },
  { id: 'injury', title: '处理工作时的伤', ages: [18, 65], cost: '医药大约当地水平的 2%，再损失一小段收入', time: '停下来处理', risk: '没有工作，或身体还没有报警，就不会走到这一步', mark: '职位还在。这一年和下一年伤还没好，也不能升职' },
  { id: 'sick-leave', title: '请病假', ages: [18, 67], cost: '大约三周工资，职位先留着', time: '这一段', risk: '没有工作或身体还撑得住，请不了', mark: '这一年不能升职。假若没批，今年也不能再请' },
- { id: 'birthday', title: '给一个具体的人过生日', ages: [6, 90], cost: '大约当地水平的 0.4%', time: '这一天', risk: '人若在别处，礼物大约四成送不到', mark: '送到了关系近一点，送不到钱也花了' },
+ { id: 'birthday', title: '给一个具体的人过生日', ages: [6, 90], cost: '大约当地水平的 0.4%', time: '这一天，送不到的话名字再留一年', risk: '人若在别处，礼物大约四成送不到', mark: '送到了关系近一点。送不到钱也花了，这个名字还会再记一年' },
  { id: 'pet-night', title: '夜里守着老去的伙伴', ages: [10, 80], cost: '不另收费，但会欠下睡眠', time: '这一夜，睡眠债留下两年', risk: '伙伴不一定因此好起来，离开也不会被拦住', mark: '名字留在这一年，工作不会因此改变' },
  { id: 'hobby', title: '把爱好再做一年', ages: [10, 70], cost: '每年一点点时间', time: '做满八年才可能换到一笔钱', risk: '那一次也大约只有四分之一能入账，而且只试一次', mark: '入账也不是职业' }
 ];
@@ -505,7 +505,13 @@ function run(l, id) {
   case 'birthday': {
    const person = someone(l); const gift = Math.round(g * .004); spend(l, gift);
    const away = person.countryId && person.countryId !== l.country.id;
-   if (away && chance(l, .4)) { log(l, `给${person.name}的礼物没送到`, `花了${gift}。人在别处，这一次没送到。`); return { ok: true, message: '没送到。' }; }
+   if (away && chance(l, .4)) {
+    person.bond = clamp((person.bond || 40) - 2);
+    v.giftMiss = { name: person.name, until: l.age + 1 };
+    log(l, `给${person.name}的礼物没送到`, `花了${gift}。人在别处，这一次没送到。${person.name}还会再记一年。没有因此多一份工作。`);
+    return { ok: true, message: '没送到，名字还留一年。' };
+   }
+   if (v.giftMiss?.name === person.name) v.giftMiss = null;
    person.bond = clamp((person.bond || 40) + 3);
    log(l, `${person.name}的生日`, `礼物${gift}送到了。关系近一点，也就这一天。`);
    return { ok: true, message: `给${person.name}过了。` };
@@ -653,6 +659,11 @@ function tick(l) {
  if (v.injuryUntil && l.age === v.injuryUntil) { stats(l, { health: -1 }); log(l, '伤还没好利索', `${working(l) ? (l.job || '工作') + '还在。' : ''}去年工作时的伤这一年还在拖。没有人因此给你升职，也没有新的职位。`); }
  if (v.cheapUntil && l.age === v.cheapUntil) { stats(l, { health: -1 }); log(l, '便宜吃食还在身上', '去年省下的那点营养这一年还没补回来。没有人因此给你一份工作。'); }
  if (v.neighborCarry && l.age === v.neighborCarry.until) { stats(l, { happiness: -1 }); log(l, `${v.neighborCarry.name}没帮的事还在`, '拒绝过的那一次，这一年还得自己收尾。没有人因此给你一份工作。'); }
+ if (v.giftMiss && l.age === v.giftMiss.until) {
+  const who = [...parents(l), ...(l.friends || [])].find(p => p && p.name === v.giftMiss.name && p.alive !== false && !p.dead);
+  if (!who) v.giftMiss = null;
+  else { stats(l, { happiness: -1 }); log(l, `${who.name}还记着没收到的礼物`, '去年没送到的那一份，这一年还在。没有再花一笔，也没有因此多一份工作。'); }
+ }
  if ((v.leaveUntil || 0) >= l.age && v.leaveCut !== l.age && (l.income || 0) > 0) { v.leaveCut = l.age; l.income = Math.round(l.income * .7); }
  if (formal(l)) { v.pensionYears += 1; v.pensionPot += Math.round(gdp(l) * .012); }
  if (abroad(l) && !v.fluent) v.barrierYears += 1;
@@ -708,6 +719,7 @@ export function livedBrief(l) {
   if ((v.injuryUntil || 0) >= (l.age || 0)) bits.push('伤还没好');
   if (v.cheapUntil && (l.age || 0) <= v.cheapUntil) bits.push('吃得便宜');
   if (v.neighborCarry && (v.neighborCarry.until || 0) >= (l.age || 0)) bits.push(`自己扛：${v.neighborCarry.name}`);
+  if (v.giftMiss && (v.giftMiss.until || 0) >= (l.age || 0)) bits.push(`礼物没到：${v.giftMiss.name}`);
  if (v.grief?.length) bits.push(`想念${v.grief.map(g => g.name).join('、')}`);
  if (v.medLapse && (l.age || 0) <= v.medLapse.until) bits.push(`停药：${v.medLapse.name}`);
  if (v.bully && !v.bully.ended) bits.push(`针对：${v.bully.name}`);
