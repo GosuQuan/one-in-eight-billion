@@ -175,6 +175,36 @@ export function createLife({era='now',mode='birth',seed=Date.now(),country,sex,n
  return s;
 }
 
+export function incomePlace(life){
+ upgradeLife(life);
+ const income=Math.max(0,life.income||0), local=life.country?.gdp||1;
+ const localRank=income<=0?0:Math.max(1,Math.min(99,Math.round(50+28*Math.log2(Math.max(income/local,.05)))));
+ const gdps=COUNTRIES.map(c=>c.gdp).filter(n=>n>0);
+ const world=income<=0||!gdps.length?0:Math.max(1,Math.min(99,Math.round(gdps.filter(g=>income>=g).length/gdps.length*100)));
+ return {income,local:localRank,world};
+}
+export function lifeStage(life){
+ if((life.age||0)>=65||life.retired)return {id:'late',line:'这时候更在意身体，以及还愿意陪着你的人。'};
+ if((life.age||0)<6)return {id:'home',line:'这时候还在家里，日子绕着身边的人转。'};
+ if((life.age||0)<18)return {id:'school',line:'这时候要考虑升学。读不读得上，要看准备和条件。'};
+ if(life.systems?.business)return {id:'venture',line:'你在用存款经营一份事。这一年赚不赚得到，要看账。'};
+ return {id:'work',line:'这时候要考虑工作。也可以用存款创业，钱不够就开不了张。'};
+}
+export function improveLife(life){
+ upgradeLife(life);
+ if(life.dead)return {ok:false,message:'这一生已经结束'};
+ if(life.pending)return {ok:false,message:'请先处理眼前的选择'};
+ const g=life.country?.gdp||1;
+ const late=(life.age||0)>=65||life.retired;
+ const cost=Math.round(g*(life.age<18?.015:late?.03:.02));
+ const reserve=Math.round(g*(late?.06:.08));
+ if((life.money||0)<cost+reserve)return {ok:false,message:'留下生活所需以后，余钱不够'};
+ if(life.easeAge===life.age)return {ok:false,message:'这一年已经用余钱安排过一次'};
+ life.easeAge=life.age; life.money-=cost;
+ if(life.age<18){life.stats.knowledge=clamp(life.stats.knowledge+2); log(life,'为升学准备了一点',`花了${cost}。知识上升了一点。这不是录取，也不是一张文凭。`,'life'); return {ok:true,message:'准备了一点，还没有被录取'};}
+ if(late){life.stats.health=clamp(life.stats.health+2); life.stats.happiness=clamp(life.stats.happiness+2); const who=life.partner?.alive!==false&&life.partner?.name||life.family?.mother?.alive!==false&&life.family?.mother?.name||life.family?.father?.alive!==false&&life.family?.father?.name||'还愿意来的人'; log(life,'把余钱用在身体和陪伴上',`花了${cost}。身体和心情都上升了一点。${who}陪着你。这不是一次治好的承诺。`,'life'); return {ok:true,message:'身体和陪伴都安排了一点'};}
+ life.stats.happiness=clamp(life.stats.happiness+2); log(life,'用余钱把日子松开一点',`花了${cost}。心情上升了一点。这不是第二份工作，也没有请家里人来还债。`,'life'); return {ok:true,message:'日子松开了一点'};
+}
 export function classStanding(life){
  const gdp=life.country?.gdp||1;
  const worth=netWorth(life);
@@ -210,7 +240,7 @@ function spend(life,amount){
 }
 function applyStats(life,effects,details){
  for(const k of ['health','happiness','knowledge','social']){
-  if(typeof effects[k]==='number'&&effects[k]!==0){life.stats[k]=clamp(life.stats[k]+effects[k]);details.push(`${statLabels[k]}${effects[k]>=0?'+':''}${effects[k]}`);}
+  if(typeof effects[k]==='number'&&effects[k]!==0){life.stats[k]=clamp(life.stats[k]+effects[k]);details.push(`${statLabels[k]}${effects[k]>0?'上升':'下降'}`);}
  }
 }
 function ensurePartner(life){
@@ -227,7 +257,7 @@ export function applyEffects(life,effects={}){
  if(effects.cash){const value=effects.cash<0&&effects.medical&&life.insurance?effects.cash*.3:effects.cash;if(value<0)spend(life,-value);else life.money+=value;details.push(`现金${value>=0?'+':''}${round(value)}${effects.medical&&life.insurance?'（保险承担70%）':''}`);}
  if(effects.debt){life.debt=Math.max(0,life.debt+effects.debt);details.push(`负债${effects.debt>=0?'+':''}${round(effects.debt)}`);}
  if(typeof effects.income==='number'){life.income=Math.max(0,effects.income);details.push(`年收入调整为${round(life.income)}`);}
- if(typeof effects.incomePct==='number'){life.income=Math.max(0,life.income*(1+effects.incomePct));details.push(`年收入${effects.incomePct>=0?'+':''}${Math.round(effects.incomePct*100)}%`);}
+ if(typeof effects.incomePct==='number'){life.income=Math.max(0,life.income*(1+effects.incomePct));details.push(effects.incomePct>=0?'年收入上升':'年收入下降');}
  if(effects.career){const r=careerAction(life,effects.career);details.push(r.message);}
  if(effects.job)life.job=effects.job;
  if(effects.education)details.push('学历改由逐年学业决定，这次选择不直接授予学历');
@@ -247,7 +277,7 @@ export function applyEffects(life,effects={}){
   for(const type of ['index','bonds','property'])life.investments[type]=0;
   life.holdings=[];details.push(`卖出投资，到账约${round(total*.995)}`);
  }
- if(effects.healthRisk){const hurt=Math.round(effects.healthRisk);life.stats.health=clamp(life.stats.health-hurt);details.push(`健康-${hurt}`);}
+ if(effects.healthRisk){const hurt=Math.round(effects.healthRisk);life.stats.health=clamp(life.stats.health-hurt);details.push('健康下降');}
  return details;
 }
 
@@ -346,9 +376,9 @@ const MILESTONES={
  60:{title:'时间留给谁',text:'熟悉的人慢慢老去，相聚变得珍贵。',options:[
   {label:'陪伴家人与朋友',description:'让寻常的一餐多一些交谈。',effects:{social:12,happiness:12,incomePct:-.1}},
   {label:'学习一直想学的事',description:'重新体验初学者的好奇。',effects:{knowledge:12,happiness:9}}]},
- 65:{title:'新的生活节奏',text:'你可以重新安排工作的分量。',options:[
-  {label:'正式退休',description:'以积蓄和养老金支持平静生活。',effects:{retired:true,job:'退休',income:'gdp:.25',health:7,happiness:8}},
-  {label:'继续做些工作',description:'保留熟悉的节奏和同事。',effects:{job:'兼职顾问',income:'gdp:.45',social:6,health:-3}}]},
+ 65:{title:'身体和身边的人',text:'工作可以轻一点。更要紧的是身体还撑不撑得住，以及谁还愿意陪着你。',options:[
+  {label:'正式退休',description:'少做一点，把时间留给身体和还在身边的人。',effects:{retired:true,job:'退休',income:'gdp:.25',health:7,happiness:8}},
+  {label:'继续做些工作',description:'事情还在，身体会更累，陪伴也会少。',effects:{job:'兼职顾问',income:'gdp:.45',social:6,health:-3}}]},
  70:{title:'把经验传下去',text:'有人向你请教年轻时经历过的难题。',options:[
   {label:'参与社区互助',description:'帮助别人，也建立新的联结。',effects:{social:12,happiness:8}},
   {label:'写下人生故事',description:'为记忆找一个长久的住处。',effects:{knowledge:8,happiness:10}}]},

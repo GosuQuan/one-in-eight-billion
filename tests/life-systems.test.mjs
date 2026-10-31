@@ -319,3 +319,21 @@ test('telling someone can be turned down and still is not a partner', () => {
   }
   assert.equal(refused, true);
 });
+
+test('declining the same relationship question does not spend or ask again', () => {
+ const l = adult('later'); addPartner(l); l.partner.bond = 20; const money = l.money;
+ systemsYear(l); assert.equal(l.pending.system, 'relationship'); select(l, 'later');
+ assert.equal(l.pending, null); assert.equal(l.partner.bond, 20); assert.equal(l.money, money);
+ for (let i = 0; i < 6; i++) {
+  l.age += 1; systemsYear(l, { events: false });
+  assert.notEqual(l.pending?.system, 'relationship');
+  l.pending = null;
+ }
+});
+
+test('a business does not open on debt when savings cannot cover it', () => {
+ const l = adult('broke-shop'); l.money = 100; l.debt = 0;
+ systemAction(l, 'start-business', { name: '空店' }); select(l, 'service');
+ assert.equal(l.systems.business, null); assert.equal(l.debt, 0); assert.equal(l.money, 100);
+ assert.ok(l.log.some(e => e.title === '存款不够开张'));
+});

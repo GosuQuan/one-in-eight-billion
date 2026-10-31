@@ -230,7 +230,7 @@ export function systemAction(l, name, payload = {}) {
   s.relationshipActions.contact = l.age; return communicate(l, name === 'relationship-counsel' ? 'counsel' : 'talk'); }
  case 'start-business':
   if (s.business) return result(false, '已经有一家企业，可进入经营菜单。');
-  pending(l, 'business-start', '选择创业方向', '先投入启动资金，再承担每年的经营风险；投入不保证回本。', [option('shop', '社区小店', `投入约${Math.round(gdp(l) * .18)}，服务附近居民。`), option('service', '技术服务工作室', `投入约${Math.round(gdp(l) * .25)}，承接服务项目。`), option('food', '餐饮小馆', `投入约${Math.round(gdp(l) * .3)}，经营日常餐饮。`), option('cancel', '暂缓创业')], { businessName: String(payload.name || `${l.name}的小事业`).slice(0, 30) }); return result(true, '请选择行业。');
+  pending(l, 'business-start', '选择创业方向', '只能用手上的存款。还要留下大约当地水平 8% 的生活钱，钱不够就开不了张，也不会因此欠债。开张以后每年仍可能亏。', [option('shop', '社区小店', `投入约${Math.round(gdp(l) * .18)}，服务附近居民。`), option('service', '技术服务工作室', `投入约${Math.round(gdp(l) * .25)}，承接服务项目。`), option('food', '餐饮小馆', `投入约${Math.round(gdp(l) * .3)}，经营日常餐饮。`), option('cancel', '暂缓创业')], { businessName: String(payload.name || `${l.name}的小事业`).slice(0, 30) }); return result(true, '请选择行业。');
  case 'business-manage':
   if (!s.business) return result(false, '目前没有经营中的企业。');
   pending(l, 'business-manage', s.business.name, `行业：${s.business.sector}；员工${s.business.staff}人；上年净利润${s.business.income}。`, [option('hire', '招聘一名员工', '增加工资成本和服务能力。'), option('market', '投入营销', '花费预算争取客户。'), option('expand', '扩大经营', '追加资本，增加收益和亏损的幅度。'), option('close', '关闭并清算', '收回部分资本，结束年度经营风险。')]); return result(true, '请选择经营安排。');
@@ -319,6 +319,7 @@ export function systemChoice(l, p, index) {
  case 'relationship':
   if (!alive(l.partner)) break;
   if (key === 'separate') divorceOffer(l);
+  else if (key === 'later') { log(l, `和${l.partner.name}先这样过`, '你没有把这件事摊开。关系还是现在这样，同样的问题不会再自动出现。想谈的时候，可以自己去安排。'); }
   else { s.relationshipActions.contact = l.age; communicate(l, key); } break;
  case 'pet-care':
   if (!s.pet?.alive) break;
@@ -327,7 +328,9 @@ export function systemChoice(l, p, index) {
   else { s.pet.health = clamp(s.pet.health - 15); stats(l, { happiness: -3 }); }
   log(l, `${s.pet.name}的照顾`, `${o.label}，${s.pet.name}的健康为${Math.round(s.pet.health)}。`, 'pet'); break;
  case 'business-start':
-  if (key !== 'cancel') { const factor = { shop: .18, service: .25, food: .3 }[key]; if (!factor) break; const capital = Math.round(gdp(l) * factor); spend(l, capital); s.business = { name: p.businessName, sector: ({ shop: '零售', service: '技术服务', food: '餐饮' })[key], capital, income: 0, level: 1, staff: 0, marketing: 0, foundedAge: l.age }; log(l, '自己的事业开张', `${p.businessName}投入${capital}启动资金，进入${s.business.sector}行业。`, 'business'); action(l, 'business', '为自己的事业开张'); } break;
+  if (key !== 'cancel') { const factor = { shop: .18, service: .25, food: .3 }[key]; if (!factor) break; const capital = Math.round(gdp(l) * factor); const reserve = Math.round(gdp(l) * .08);
+    if ((l.money || 0) < capital + reserve) { log(l, '存款不够开张', `${p.businessName || '这件事'}至少要${capital}，还得留下大约${reserve}过日子。你现在手上只有${Math.round(l.money || 0)}。没有开张，也没有因此欠债。`); break; }
+    l.money -= capital; s.business = { name: p.businessName, sector: ({ shop: '零售', service: '技术服务', food: '餐饮' })[key], capital, income: 0, level: 1, staff: 0, marketing: 0, foundedAge: l.age }; log(l, '自己的事业开张', `${p.businessName}用存款投入${capital}，进入${s.business.sector}行业。留下的钱还要过日子。赚不赚得到，要等这一年的账。`, 'business'); action(l, 'business', '为自己的事业开张'); } break;
  case 'business-manage': {
   const b = s.business; if (!b) break;
   if (key === 'close') { const recovered = Math.round(b.capital * .4); l.money += recovered; log(l, '关上店门', `${b.name}结束经营，清算收回${recovered}。`, 'business'); s.business = null; }
@@ -548,7 +551,15 @@ export function systemsYear(l, options = {}) {
   stats(l, { happiness: 1, social: 1, health: care.mode === 'self' ? -.7 : 0 });
   log(l, `${c.name}又长大了一点`, `${c.age}岁；${({ self: l.name, partner: l.partner?.name, nursery: '托育机构', grandparents: grandparents(l).map(p => p.name).join('、') })[care.mode]}照护，费用${care.annualCost}，家庭收入损失${care.incomeLoss}。`);
  }
- if (alive(l.partner) && l.partner.bond < 35 && (s.lastRelationshipAge == null || l.age - s.lastRelationshipAge >= 3) && !l.pending) { s.lastRelationshipAge = l.age; offer(l, 'relationship', `与${l.partner.name}的距离`, '争执和沉默让关系变得脆弱，需要共同作出决定。', [option('talk', '认真沟通'), option('counsel', '接受伴侣咨询'), option('separate', '分开生活')]); }
+ if (alive(l.partner) && !l.pending) {
+   const name = l.partner.name;
+   if ((l.partner.bond || 0) >= 45) s.relationshipRecovered = name;
+   if (s.relationshipAsked === name && s.relationshipRecovered === name && (l.partner.bond || 0) < 20) { s.relationshipAsked = null; s.relationshipRecovered = null; }
+   if ((l.partner.bond || 0) < 35 && s.relationshipAsked !== name) {
+    s.relationshipAsked = name; s.lastRelationshipAge = l.age;
+    offer(l, 'relationship', `与${name}的距离`, '争执和沉默让关系变得脆弱。谈一次、去咨询，或者先这样过。先这样过，同样的问题不会再自动出现。', [option('talk', '认真沟通'), option('counsel', '接受伴侣咨询'), option('separate', '分开生活'), option('later', '先这样过', '不花钱，也不分开。想谈的时候自己去安排。')]);
+   }
+  }
  if (s.pet?.alive) {
   const pet = s.pet; pet.age++; spend(l, gdp(l) * (pet.kind === 'dog' ? .016 : .011)); pet.health = clamp(pet.health - (pet.age > 9 ? 7 : 2)); stats(l, { happiness: 1 });
   if (pet.health <= 0 || pet.age >= (pet.kind === 'dog' ? 17 : 21)) { pet.alive = false; stats(l, { happiness: -7 }); log(l, '和小伙伴告别', `${pet.name}在${pet.age}岁离开，你记得一起生活的那些日子。`, 'pet'); }

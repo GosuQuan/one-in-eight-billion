@@ -17,7 +17,7 @@ export function familyAidQuote(l){
  const bond=parents.length?parents.reduce((s,p)=>s+(p.bond??60),0)/parents.length:0;
  const proportion=Math.max(.05,Math.min(.35,.08+(l.family?.wealth??.4)*.22+(bond-50)*.001));
  const amount=Math.min(Math.round((l.debt||0)*proportion),f.familyReserve,Math.round((l.birthCountry||l.country).gdp*(.025+.12*(l.family?.wealth??.4))));
- return {amount:parents.length&&bond>=25?amount:0,proportion,parents,eligible:l.age>=18&&l.debt>0&&parents.length>0&&(f.lastAidAge==null||l.age-f.lastAidAge>=3)};
+ const covered=(l.debt||0)>0&&(l.money||0)>=l.debt;return {amount:parents.length&&bond>=25&&!covered?amount:0,proportion,parents,covered,eligible:l.age>=18&&l.debt>0&&!covered&&parents.length>0&&(f.lastAidAge==null||l.age-f.lastAidAge>=3)};
 }
 export function financeAction(l,id){
  const f=initFinance(l);
@@ -25,7 +25,8 @@ export function financeAction(l,id){
  if(l.pending)return {ok:false,message:'请先处理眼前的选择'};
  if(id==='family-aid'){
   const q=familyAidQuote(l);
-  if(!q.eligible)return {ok:false,message:q.parents.length?'家人也需要缓一缓，每隔三年才能再次求助':'已经没有可以承担这笔援助的父母'};
+  if(q.covered)return {ok:false,message:'手上的钱够自己还，不必再请家里人'};
+   if(!q.eligible)return {ok:false,message:q.parents.length?'家人也需要缓一缓，每隔三年才能再次求助':'已经没有可以承担这笔援助的父母'};
   f.lastAidAge=l.age;
   if(!q.amount){record(l,'电话另一端的账本',`${q.parents.map(p=>p.name).join('和')}听你说完了欠款，但家里的积蓄和你们目前的关系不足以支持这次求助。债务仍是${Math.round(l.debt)}。`);return {ok:true,message:'这次家人无法拿出钱，债务没有减少'};}
   const before=l.debt;l.debt-=q.amount;f.familyReserve-=q.amount;f.familyAidTotal+=q.amount;

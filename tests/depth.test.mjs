@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createLife,advanceYear,choose,takeLoan} from '../src/engine.js';
-import {financeAction} from '../src/finance.js';
+import {createLife,advanceYear,choose,takeLoan,incomePlace,lifeStage,improveLife} from '../src/engine.js';
+import {financeAction,familyAidQuote} from '../src/finance.js';
 import {careerAction} from '../src/career.js';
 
 const copy=x=>JSON.parse(JSON.stringify(x));
@@ -61,4 +61,55 @@ test('full-time study uses the real program id and can reject a job application'
  assert.equal(careerAction(l,'office').ok,false);
  l.school.program.paused=true;l.money=0;
  assert.match(careerAction(l,'office').message,/没有通过|行政/);
+});
+
+test('only money is written as a number; other changes say up or down',()=>{
+ const l=createLife({seed:'words',country:'CN'});
+ l.age=30;
+ l.pending={kind:'milestone',title:'t',text:'x',options:[{label:'先照顾自己',description:'把时间留给自己。',effects:{health:5,happiness:-2,cash:1200}}]};
+ choose(l,0);
+ const line=l.log.at(-1).text;
+ assert.match(line,/现金\+1200/);
+ assert.match(line,/健康上升/);
+ assert.match(line,/幸福下降/);
+ assert.doesNotMatch(line,/健康[+-]\d/);
+ assert.doesNotMatch(line,/幸福[+-]\d/);
+});
+
+test('family will not repay a debt the player can already cover',()=>{
+ const l=createLife({seed:'rich-debt',country:'US'});
+ l.age=30;l.debt=4000;l.money=80000;l.income=50000;
+ assert.equal(familyAidQuote(l).eligible,false);
+ assert.equal(financeAction(l,'family-aid').ok,false);
+ assert.equal(l.debt,4000);
+});
+
+test('surplus cash eases the current stage once a year and late life spends it on health and company',()=>{
+ const child=createLife({seed:'ease-child',country:'CN'});
+ child.age=12;child.money=child.country.gdp*2;child.debt=0;
+ const before=child.money;
+ assert.equal(lifeStage(child).id,'school');
+ assert.equal(improveLife(child).ok,true);
+ assert.ok(child.money<before);
+ assert.match(child.log.at(-1).text,/知识上升/);
+ assert.equal(improveLife(child).ok,false);
+ const late=createLife({seed:'ease-late',country:'CN'});
+ late.age=70;late.money=late.country.gdp*3;late.partner={name:'林晚',alive:true};
+ assert.equal(lifeStage(late).id,'late');
+ assert.equal(improveLife(late).ok,true);
+ assert.ok(late.log.some(e=>e.text.includes('林晚')&&e.text.includes('身体')));
+ const poor=createLife({seed:'ease-poor',country:'CN'});
+ poor.age=30;poor.money=10;
+ assert.equal(improveLife(poor).ok,false);
+ assert.equal(poor.money,10);
+});
+
+test('income place is a game estimate and is empty without income',()=>{
+ const l=createLife({seed:'place',country:'CN'});
+ l.income=0;
+ assert.equal(incomePlace(l).local,0);
+ l.income=l.country.gdp;
+ const place=incomePlace(l);
+ assert.ok(place.local>=45&&place.local<=55);
+ assert.ok(place.world>=1&&place.world<=99);
 });
