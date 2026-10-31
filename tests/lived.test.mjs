@@ -764,3 +764,71 @@ test('parental leave stays at seventy percent for two years and is not a promoti
   assert.equal(a.lived.leaveCut, 31);
   assert.equal(a.job, '职员');
 });
+
+test('a refused talk with a sibling keeps that name for two years', () => {
+  const withSib = (seed) => {
+    const l = adult(seed, 34);
+    l.family.siblings = [{ name: '林兄', alive: true, bond: 40 }];
+    return l;
+  };
+  let refused = false, settled = false;
+  for (let i = 0; i < 24 && !(refused && settled); i++) {
+    const l = withSib('sib-' + i);
+    livedAction(l, 'sibling');
+    assert.equal(l.job, '职员');
+    assert.equal(l.income, 40000);
+    assert.equal(livedAction(l, 'sibling').ok, false);
+    if (l.log.some(e => e.title === '兄弟姐妹不想谈')) {
+      assert.equal(l.family.siblings[0].bond, 34);
+      assert.equal(l.lived.siblingRift.name, '林兄');
+      assert.equal(l.lived.siblingRift.until, 36);
+      l.age = 35;
+      livedYear(l, { events: false });
+      assert.equal(l.family.siblings[0].bond, 33);
+      assert.equal(l.job, '职员');
+      assert.equal(l.income, 40000);
+      assert.ok(l.log.some(e => e.age === 35 && e.title === '林兄还记着那次没谈拢'));
+      refused = true;
+    }
+    if (l.log.some(e => e.title === '和兄弟姐妹说上了')) {
+      assert.equal(l.family.siblings[0].bond, 45);
+      assert.equal(l.lived.siblingRift, undefined);
+      l.age = 35;
+      livedYear(l, { events: false });
+      assert.ok(!l.log.some(e => e.title === '林兄还记着那次没谈拢'));
+      settled = true;
+    }
+  }
+  assert.equal(refused, true);
+  assert.equal(settled, true);
+
+  const gone = withSib('sib-gone');
+  initLived(gone);
+  gone.lived.siblingRift = { name: '林兄', until: 36 };
+  gone.family.siblings[0].alive = false;
+  gone.age = 35;
+  livedYear(gone, { events: false });
+  assert.equal(gone.lived.siblingRift, null);
+  assert.ok(!gone.log.some(e => e.title === '林兄还记着那次没谈拢'));
+  assert.equal(gone.job, '职员');
+  assert.equal(gone.income, 40000);
+
+  let cleared = false;
+  for (let i = 0; i < 40 && !cleared; i++) {
+    const l = withSib('sib-clear-' + i);
+    livedAction(l, 'sibling');
+    if (!l.lived.siblingRift) continue;
+    l.age = 35;
+    livedAction(l, 'sibling');
+    if (l.log.some(e => e.age === 35 && e.title === '和兄弟姐妹说上了')) {
+      assert.equal(l.lived.siblingRift, null);
+      assert.equal(l.job, '职员');
+      assert.equal(l.income, 40000);
+      l.age = 36;
+      livedYear(l, { events: false });
+      assert.ok(!l.log.some(e => e.age === 36 && e.title === '林兄还记着那次没谈拢'));
+      cleared = true;
+    }
+  }
+  assert.equal(cleared, true);
+});

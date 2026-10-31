@@ -40,7 +40,7 @@ export const LIVED_ACTS = [
  { id: 'reconcile', title: '试着和那个同学说开', ages: [8, 20], cost: '不花钱', time: '一次谈话', risk: '对方可以不接受，关系会更僵', mark: '说开了才结束这段针对' },
  { id: 'puberty', title: '承认身体在变', ages: [11, 16], cost: '不花钱', time: '这一年', risk: '只发生一次', mark: '情绪和跟人相处的把握会晃一下，没有别的奖励' },
  { id: 'elder-care', title: '照顾年老的父母', ages: [25, 70], cost: '大约当地水平的 4%', time: '这一年的照护', risk: '父母可能说不用你管，钱仍可能已经垫上', mark: '照护过会留在你们的关系里' },
- { id: 'sibling', title: '和兄弟姐妹谈一次', ages: [12, 70], cost: '不花钱', time: '一次', risk: '对方可能不想谈', mark: '谈崩了，名字还在，隔阂会留下' },
+ { id: 'sibling', title: '和兄弟姐妹谈一次', ages: [12, 70], cost: '不花钱', time: '一次', risk: '对方可能不想谈', mark: '谈崩了，接下来两年会点出对方的名字。谈成了，这段别扭就停' },
  { id: 'grief-visit', title: '去看望离开的人', ages: [10, 90], cost: '大约当地水平的 1%，没去成也不退', time: '一天', risk: '路可能断，没有正在想念的人就没有可去的地方', mark: '看成了心情松一点。没看成，钱也花了。想念都不会提前结束' },
  { id: 'letter', title: '写一封不会寄出的信', ages: [10, 90], cost: '不花钱', time: '一个晚上', risk: '离开超过八年，或没有这个人，就写不成', mark: '信留在档案里。人离开后的八年里都还写得成' },
  { id: 'adhere', title: '按医嘱把这一年的药用上', ages: [16, 90], cost: '大约当地水平的 1.2%，续不上也不退', time: '这一年', risk: '停过药再重新用，这一年也可能对不上剂量', mark: '用上了，病情才往下走，停药的拖尾也停' },
@@ -108,7 +108,7 @@ function open(l, id) {
   case 'reconcile': return !!(v.bully && !v.bully.ended && (v.bully.next || 0) <= l.age);
   case 'puberty': return !v.puberty;
   case 'elder-care': return !!elder(l) && l.age - (v.elderAt || -10) >= 3;
-  case 'sibling': return (l.family?.siblings || []).some(s => s && s.alive !== false);
+  case 'sibling': return (l.family?.siblings || []).some(s => s && s.alive !== false) && (v.siblingNext || 0) <= l.age;
   case 'grief-visit': return v.grief.some(g => l.age - g.since <= 4);
   case 'letter': return v.grief.some(g => l.age - g.since <= 8);
   case 'adhere': case 'skip-meds': return !!condition(l);
@@ -250,9 +250,17 @@ function run(l, id) {
   }
   case 'sibling': {
    const s = (l.family.siblings || []).find(x => x && x.alive !== false);
-   if (!chance(l, .5)) { if (s) s.bond = clamp((s.bond || 40) - 6); log(l, '兄弟姐妹不想谈', `${s?.name || '对方'}把话题岔开。隔阂留下了，人还是那一个。`); return { ok: true, message: '没谈成。' }; }
-   if (s) s.bond = clamp((s.bond || 40) + 5);
-   log(l, '和兄弟姐妹说上了', `${s?.name || '对方'}愿意讲近况。没有解决所有旧账，至少这一次没有不欢而散。`);
+   if (!s) return { ok: false, message: '没有可以谈的兄弟姐妹。' };
+   v.siblingNext = l.age + 1;
+   if (!chance(l, .5)) {
+    v.siblingRift = { name: s.name, until: l.age + 2 };
+    s.bond = clamp((s.bond || 40) - 6);
+    log(l, '兄弟姐妹不想谈', `${s.name}把话题岔开。隔阂留到${v.siblingRift.until}岁，人还是那一个。`);
+    return { ok: true, message: '没谈成。' };
+   }
+   s.bond = clamp((s.bond || 40) + 5);
+   if (v.siblingRift?.name === s.name) v.siblingRift = null;
+   log(l, '和兄弟姐妹说上了', `${s.name}愿意讲近况。没有解决所有旧账，至少这一次没有不欢而散。`);
    return { ok: true, message: '谈了一次。' };
   }
   case 'grief-visit': {
@@ -605,6 +613,13 @@ function tick(l) {
    log(l, `${partner.name}还记着那轮家务`, `别扭留到${v.choreUntil}岁。这一年没有重新说定，工作也不会因此出现。`);
   }
  }
+ if (v.siblingRift && l.age <= v.siblingRift.until && l.age > v.siblingRift.until - 2) {
+  const sib = (l.family?.siblings || []).find(x => x && x.name === v.siblingRift.name && x.alive !== false && !x.dead);
+  if (sib) {
+   sib.bond = clamp((sib.bond || 40) - 1); stats(l, { happiness: -1 });
+   log(l, `${sib.name}还记着那次没谈拢`, `隔阂留到${v.siblingRift.until}岁。这一年没有重新说开，工作也不会因此出现。`);
+  } else v.siblingRift = null;
+ }
  if (v.commuteOn) {
   if (working(l) && !l.remote && l.age > (v.commuteSince || 0)) {
    const fare = gdp(l) * .015; spend(l, fare); v.commuteYears += 1; v.commuteSince = l.age; stats(l, { happiness: -1 });
@@ -682,6 +697,7 @@ export function livedBrief(l) {
  if ((v.overtimeUntil || 0) > (l.age || 0)) bits.push('今年加过班');
  if ((v.examWait || 0) > (l.age || 0)) bits.push(`等到${v.examWait}岁再申请`);
  if ((v.choreUntil || 0) >= (l.age || 0) && l.partner?.name) bits.push(`家务别扭：${l.partner.name}`);
+ if (v.siblingRift && (v.siblingRift.until || 0) >= (l.age || 0)) bits.push(`隔阂：${v.siblingRift.name}`);
  if (abroad(l) && !v.fluent) bits.push(`当地语言还生疏（${v.barrierYears}年）`);
  if ((v.pensionYears || 0) > 0) bits.push(`养老累计 ${v.pensionYears} 年`);
  return bits.join(' · ');
