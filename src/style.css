@@ -115,3 +115,12 @@
  .ending-metrics.six div:nth-child(2n){border-right:0}
  .ending-metrics strong{font-size:19px}
 }
+@keyframes year-settle{from{opacity:.25;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes line-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes dialog-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.year-turn{animation:year-settle .85s cubic-bezier(.2,.7,.2,1)}
+.feed-fresh{animation:line-in .9s cubic-bezier(.2,.7,.2,1)}
+#overlay .dialog{animation:dialog-in .42s cubic-bezier(.2,.7,.2,1)}
+.year-track i{transition:width .8s cubic-bezier(.2,.7,.2,1)}
+.lived-list{max-height:62vh;overflow:auto;padding-right:4px}
+.lived-card small{display:block}

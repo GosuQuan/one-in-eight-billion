@@ -1,6 +1,7 @@
 // Original, serializable life systems. Monetary figures are illustrative PPP units.
 import { COUNTRIES } from './engine.js';
 import { inferKind, localIncome, careerOptions } from './career.js';
+import { initLived, livedYear, livedChoice } from './lived.js';
 
 const clamp = n => Math.max(0, Math.min(100, Number(n) || 0));
 const copy = x => JSON.parse(JSON.stringify(x));
@@ -42,6 +43,7 @@ export function initSystems(l) {
  for (let i = 0; i < l.friends.length; i++) { const f = l.friends[i]; f.id ??= `friend-${i}`; f.bond ??= 50; f.countryId ??= r.countryId; f.metThrough ??= '旧日相识'; }
  if (alive(l.partner)) { l.partner.bond ??= 60; l.partner.countryId ??= r.familyCountryId; l.partner.distanceYears ??= 0; }
  for (let i = 0; i < l.children.length; i++) { const c = l.children[i]; c.id ??= `child-${c.birthYear ?? yearOf(l) - (c.age || 0)}-${i}`; c.bond ??= 70; c.development ??= 50; }
+ initLived(l);
  return l;
 }
 function grandparents(l) { const r = l.systems.residence; return r.countryId === (r.parentsCountryId || r.homeCountry) ? [l.family.mother, l.family.father].filter(alive) : []; }
@@ -385,6 +387,7 @@ export function systemChoice(l, p, index) {
   }
   case 'thread-start': startThread(l, p, key); break;
   case 'thread': resolveThread(l, p, key); break;
+  case 'lived': livedChoice(l, key); break;
   default: l.pending = p; return false;
  }
  return true;
@@ -561,6 +564,7 @@ export function systemsYear(l, options = {}) {
  if (['war', 'crisis'].includes(s.world.kind) && l.age >= 18) { spend(l, gdp(l) * .025); stats(l, { happiness: -2, health: -1 }); if (options.events !== false) offer(l, 'world-crisis', s.world.title, s.world.detail, s.world.kind==='war' ? [option('stay', '留守并准备物资'), option('shelter', '暂时避难'), option('migrate', '考虑移民')] : [option('stay', '缩减开支，准备应急物资'), option('shelter', '动用应急预算渡过危机'), option('migrate', '寻找其他地方的机会')]); }
  else if (s.world.kind === 'science') stats(l, { health: .5 });
  if (options.events !== false && !l.pending) hearOpportunity(l);
+ livedYear(l, options);
  return l;
 }
 

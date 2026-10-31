@@ -10,6 +10,7 @@ import { financeAction, familyAidQuote } from './finance.js';
 import { escape as e, worldMap, portrait } from './art.js';
 import { scene } from './scene.js';
 import { systemAction, getHousehold, getSceneState } from './life-systems.js';
+import { livedAction, livedCatalogHTML } from './lived.js';
 import { worldHTML as worldPanel, choiceResultHTML as resultPanel, familyHTML as familyPanel, systemsDialogHTML } from './system-ui.js';
 import { gachaCard, avatarSVG } from './art.js';
 const $ = s => document.querySelector(s);
@@ -20,7 +21,7 @@ let store = read();
 let prefs = { era: 'now', mode: 'birth', pace: 'normal', ...store.prefs };
 let life = store.current ? upgradeLife(store.current) : null;
 let history = Array.isArray(store.history) ? store.history.map(upgradeLife) : [];
-let view = 'home', paused = false, auto = false, speed = 1, music = false, modalKind = '', lastFocus, archived = false;
+let view = 'home', paused = false, auto = false, speed = 1, music = false, modalKind = '', lastFocus, archived = false, paintedAge = null, yearTurned = false;
 let gachaCountry = null, gachaFlipped = false;
 let investTab = 'overview', travelCompanion = 'solo';
 let startTime = Date.now(), stepTime = 0, toastTimer, timer, audio, audioTimer;
@@ -68,7 +69,7 @@ function renderBirth(){
 const statHTML=()=>Object.entries(statNames).map(([k,[label,color]])=>`<div class="stat"><div class="stat-label"><span>${label}</span><b>${Math.round(life.stats[k])}</b></div><div class="stat-track"><i style="width:${life.stats[k]}%;background:${color}"></i></div></div>`).join('');
 const lifeGrid=()=>Array.from({length:110},(_,i)=>`<span class="${i<life.age?'lived':i===life.age?'now':''}" title="${i} 岁" aria-label="${i}岁${i<life.age?'，已走过':''}"></span>`).join('');
 const companionsHTML=()=>life.companions.map(p=>{const c=countryOf(p.country);const deathAge=p.deathAge??p.lifespan??p.life??85;const passed=life.age>=deathAge;return `<div class="companion ${passed?'passed':''}"><span class="flag">${e(c.flag)}</span><div class="info"><div class="name">${e(nameOf(p.name))}</div><p>${e(c.name)} · ${passed?`${deathAge} 岁，已告别`:`${life.age} 岁，仍在生活`}</p></div><i class="alive-dot"></i></div>`;}).join('');
-const feedHTML=()=>[...life.log].reverse().slice(0,40).map(l=>`<li class="feed-item ${e(l.type)}"><span class="feed-age">${({event:'✦ ',market:'↗ ',travel:'✈ ',family:'♡ ',finance:'$ ',consequence:'· '}[l.type]||'')}${l.age} 岁 / ${l.year || life.birthYear+l.age}</span><div class="feed-title">${e(l.title)}</div><p class="feed-text">${e(l.text)}</p></li>`).join('');
+const feedHTML=()=>[...life.log].reverse().slice(0,40).map((l,i)=>`<li class="feed-item ${e(l.type)}${i===0&&yearTurned?' feed-fresh':''}"><span class="feed-age">${({event:'✦ ',market:'↗ ',travel:'✈ ',family:'♡ ',finance:'$ ',consequence:'· '}[l.type]||'')}${l.age} 岁 / ${l.year || life.birthYear+l.age}</span><div class="feed-title">${e(l.title)}</div><p class="feed-text">${e(l.text)}</p></li>`).join('');
 const familyHTML=()=>familyPanel(life);
 const worldHTML=()=>worldPanel(life);
 const choiceResultHTML=()=>resultPanel(life);
@@ -81,7 +82,8 @@ const holdingHTML=()=>{const rows=life.holdings.map(h=>{const s=STOCKS.find(x=>x
 
 function renderLife(){
  view='life';const c=life.country;
- app.innerHTML=`<header class="topbar"><div class="wrap">${homeLink}<div class="age-display"><div class="age-number">${life.age}<small>岁</small></div><div class="age-year">${life.birthYear+life.age} 年<div class="year-track"><i style="width:${life.age/110*100}%"></i></div></div></div><div class="controls"><button class="ghost" data-action="pause" aria-pressed="${paused}">${paused?'▶ 继续':'Ⅱ 暂停'}</button><div class="speed-group" role="group" aria-label="播放速度">${[1,2,4,8].map(s=>`<button data-speed="${s}" class="${speed===s?'active':''}" aria-pressed="${speed===s}">${s}×</button>`).join('')}</div><button class="ghost" data-action="next">下一年 ›</button><button class="ghost ${auto?'active':''}" data-action="auto" aria-pressed="${auto}">自动抉择</button><button class="ghost" data-action="study">学习与生计</button><button class="ghost" data-action="invest">投资</button><button class="ghost" data-action="travel">旅行</button><button class="ghost" data-action="systems">家与人生</button><button class="plain theme" data-action="menu" aria-label="更多选项">⋯</button></div></div></header>
+ yearTurned=paintedAge!=null&&paintedAge!==life.age;paintedAge=life.age;
+ app.innerHTML=`<header class="topbar"><div class="wrap">${homeLink}<div class="age-display"><div class="age-number${yearTurned?' year-turn':''}">${life.age}<small>岁</small></div><div class="age-year">${life.birthYear+life.age} 年<div class="year-track"><i style="width:${life.age/110*100}%"></i></div></div></div><div class="controls"><button class="ghost" data-action="pause" aria-pressed="${paused}">${paused?'▶ 继续':'Ⅱ 暂停'}</button><div class="speed-group" role="group" aria-label="播放速度">${[1,2,4,8].map(s=>`<button data-speed="${s}" class="${speed===s?'active':''}" aria-pressed="${speed===s}">${s}×</button>`).join('')}</div><button class="ghost" data-action="next">下一年 ›</button><button class="ghost ${auto?'active':''}" data-action="auto" aria-pressed="${auto}">自动抉择</button><button class="ghost" data-action="study">学习与生计</button><button class="ghost" data-action="invest">投资</button><button class="ghost" data-action="travel">旅行</button><button class="ghost" data-action="systems">家与人生</button><button class="plain theme" data-action="menu" aria-label="更多选项">⋯</button></div></div></header>
  <main class="wrap">${worldHTML()}<div class="life-layout">
   <aside class="column">
    <section class="panel identity"><div class="id-band"><span>${e(c.flag)} ${e(c.name)}</span><span>人生档案</span></div><div class="id-body">${avatarSVG(life,{size:84})}<div class="id-info"><h2>${e(life.name)}</h2><p>${e(life.sex)} · ${life.birthYear} 年生 · ${life.age} 岁</p><p>${e(c.city)} · ${e(life.education || '尚未入学')}</p><p>${e(life.job || '还在慢慢长大')}</p></div></div><div class="mrz">LIFE&lt;${e(c.id)}&lt;${String(life.birthYear)}&lt;${e(String(life.id).slice(-12))}<br>ONE&lt;IN&lt;EIGHT&lt;BILLION&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</div></section>
@@ -127,7 +129,7 @@ function showModal(html,kind='info',wide=false){
  setTimeout(()=>overlay.querySelector('textarea,button')?.focus(),30);
 }
 function closeModal(){overlay.hidden=true;overlay.innerHTML='';modalKind='';document.body.style.overflow='';lastFocus?.isConnected&&lastFocus.focus();stepTime=Date.now();}
-function showChoice(){if(!life.pending||modalKind==='choice')return;const p=life.pending;showModal(`<div class="dialog-kicker">${life.age} 岁 / ${life.birthYear+life.age} · ${p.kind==='event'?'一件没有预料到的事':p.kind==='system'?'人生还在继续 · '+(p.system||'生活安排'):'人生的岔路口'}</div><h2 id="dialog-title">${e(p.title)}</h2><p>${e(p.text)}</p><div class="choice-list">${p.options.map((o,i)=>`<button class="choice-btn" data-choice="${i}"><strong>${e(o.label)} <span>↗</span></strong><small>${e(o.description || '选择属于你的方向')}</small></button>`).join('')}</div><p class="tiny" style="margin:16px 0 0">${p.system==='thread'||p.system==='thread-start'?'你是在跟一个具体的人相处。选完以后，这条故事还会再找上门，也可能在这里停住。':'没有最优解，只有你愿意走的路。选择后时间会继续。'}</p>`,'choice');}
+function showChoice(){if(!life.pending||modalKind==='choice')return;const p=life.pending;showModal(`<div class="dialog-kicker">${life.age} 岁 / ${life.birthYear+life.age} · ${p.kind==='event'?'一件没有预料到的事':p.kind==='system'?'人生还在继续 · '+(p.system||'生活安排'):'人生的岔路口'}</div><h2 id="dialog-title">${e(p.title)}</h2><p>${e(p.text)}</p><div class="choice-list">${p.options.map((o,i)=>`<button class="choice-btn" data-choice="${i}"><strong>${e(o.label)} <span>↗</span></strong><small>${e(o.description || '选择属于你的方向')}</small></button>`).join('')}</div><p class="tiny" style="margin:16px 0 0">${p.system==='thread'||p.system==='thread-start'?'你是在跟一个具体的人相处。选完以后，这条故事还会再找上门，也可能在这里停住。':p.system==='lived'?'这件事不会每年都打断你。做与不做，时间都会继续，只是后果会留下。':'没有最优解，只有你愿意走的路。选择后时间会继续。'}</p>`,'choice');}
 
 function noteDialog(farewell=false){showModal(`<div class="dialog-kicker">${farewell?'写给这一生':'在时间里，暂停片刻'}</div><h2 id="dialog-title">${farewell?'你想对自己说些什么？':'把此刻的想法，留在这里。'}</h2><p>只保存在你的浏览器里，不会发布到任何地方。</p><textarea id="note-text" maxlength="300" placeholder="写下一句话……" aria-label="你的想法">${e(farewell?life.farewell||'':'')}</textarea><button class="cta" data-action="${farewell?'save-farewell':'save-note'}">留下这句话 →</button>`,farewell?'farewell':'note');}
 
@@ -230,6 +232,7 @@ function handleClick(event){
  if(b.dataset.focus){setFocus(life,b.dataset.focus);save();renderLife();return;}
  if(b.dataset.choice!==undefined){const selected=life.pending?.options[Number(b.dataset.choice)];choose(life,Number(b.dataset.choice));life.lastChoiceResult={age:life.age,title:selected?.label||'新的选择',text:life.log.at(-1)?.text||'',id:Date.now()};closeModal();save();if(life.dead)finish();else renderLife();return;}
  if(b.dataset.system){const action=b.dataset.system;closeModal();const r=systemAction(life,action,{});save();renderLife();toast(r?.message||'生活有了新的安排');return;}
+ if(b.dataset.lived){const r=livedAction(life,b.dataset.lived);save();toast(r?.message||'这件事有了结果');if(view==='life')showModal(livedCatalogHTML(life),'lived',true);return;}
   if(b.dataset.edu){const r=educationAction(life,b.dataset.edu);save();toast(r.message);if(view==='life')openStudy();return;}
   if(b.dataset.job){const r=careerAction(life,b.dataset.job);save();toast(r.message);if(view==='life')openStudy();return;}
   if(b.dataset.fin){const r=financeAction(life,b.dataset.fin);save();toast(r.message);if(view==='life')openStudy();return;}
@@ -268,6 +271,7 @@ function handleClick(event){
   case 'note':noteDialog();break;
   case 'farewell':noteDialog(true);break;
   case 'systems':showModal(systemsDialogHTML(life),'systems',true);break;
+  case 'lived':showModal(livedCatalogHTML(life),'lived',true);break;
    case 'study':openStudy();break;
   case 'invest':openInvest();break;
   case 'travel':openTravel();break;
@@ -289,4 +293,4 @@ document.addEventListener('visibilitychange',()=>{stepTime=Date.now();if(documen
 window.addEventListener('beforeunload',save);
 document.body.classList.toggle('dark',!!store.dark);
 renderHome();
-timer=setInterval(()=>{updateCounters();if(view!=='life'||paused||document.hidden||modalKind)return;const duration=({slow:8000,normal:5200,fast:2400}[prefs.pace]||5200)/speed;if(Date.now()-stepTime>=duration){stepTime=Date.now();step();}},150);
+timer=setInterval(()=>{updateCounters();if(view!=='life'||paused||document.hidden||modalKind)return;const duration=({slow:9600,normal:6800,fast:2800}[prefs.pace]||6800)/speed;if(Date.now()-stepTime>=duration){stepTime=Date.now();step();}},150);
