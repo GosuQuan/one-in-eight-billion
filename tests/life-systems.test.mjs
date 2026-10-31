@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { createLife, COUNTRIES, advanceYear, choose } from '../src/engine.js';
 import { financeYear } from '../src/finance.js';
 import { initSystems, systemsYear, systemAction, systemChoice, getHousehold, getSceneState, peopleMilestone } from '../src/life-systems.js';
+import { familyHTML } from '../src/system-ui.js';
+import { avatarSVG } from '../src/art.js';
 const clone = x => JSON.parse(JSON.stringify(x));
 function adult(seed = 'systems') { const l = createLife({ seed, country: 'CN' }); l.age = 28; l.income = 20000; l.money = 500000; initSystems(l); l.systems.residence.with = 'alone'; return l; }
 function select(l, key) { const p = l.pending; assert.equal(p?.kind, 'system'); const i = p.options.findIndex(o => o.key === key); assert.ok(i >= 0, key); assert.equal(systemChoice(l, p, i), true); }
@@ -361,4 +363,54 @@ test('crushing debt names the years left and does not create income', () => {
   assert.equal(calm.stats.health, 76);
   assert.equal(calm.income, 0);
   assert.equal(calm.log.some(e => e.title === '这笔债还能撑一阵'), false);
+});
+
+test('family names never collide and newborn siblings appear in the panel', () => {
+  for (let i = 0; i < 40; i++) {
+    const l = createLife({ seed: 'names-' + i, country: 'IN' });
+    const names = [l.name, l.family.mother.name, l.family.father.name];
+    assert.equal(new Set(names).size, 3, names.join(','));
+  }
+  const l2 = createLife({ seed: 'sib-ui', country: 'CN' }); l2.age = 20;
+  l2.family.siblings.push({ name: '张家禾', sex: '男', age: 1, alive: true });
+  const html = familyHTML(l2);
+  assert.ok(html.includes('张家禾'));
+  assert.ok(html.includes('弟弟'));
+});
+
+test('a skipped injury does not return, and an open thread defers the age-12 milestone', () => {
+  const l = adult('sport-loop'); l.age = 12;
+  peopleMilestone(l, 12);
+  systemChoice(l, l.pending, l.pending.options.findIndex(o => o.key === 'sport'));
+  const f = l.friends.find(x => x.thread);
+  assert.ok(f, 'sport friend has a thread');
+  let title = null;
+  for (let y = 0; y < 40 && !title; y++) {
+    l.age++; l.pending = null; l.systems.lastYear = null; systemsYear(l);
+    if (l.pending && l.pending.title.includes('受伤')) title = l.pending.title;
+    else if (l.pending) systemChoice(l, l.pending, l.pending.options.length - 1);
+  }
+  assert.ok(title, 'injury dialog appeared once');
+  systemChoice(l, l.pending, l.pending.options.length - 1);
+  assert.equal(f.thread.ended, true);
+  for (let y = 0; y < 10; y++) { l.age++; l.pending = null; l.systems.lastYear = null; systemsYear(l, { events: false }); if (l.pending) systemChoice(l, l.pending, l.pending.options.length - 1); }
+  assert.ok(!l.log.some(e => e.title === title));
+
+  const open = adult('milestone-open'); open.age = 11;
+  open.friends.push({ id: 'friend-open', name: '李正文', sex: '男', age: 12, alive: true, thread: { kind: 'science', stage: 2, nextAge: 14, ended: false } });
+  advanceYear(open);
+  assert.notEqual(open.pending?.system, 'thread-start');
+  const fresh = adult('milestone-fresh'); fresh.age = 11;
+  advanceYear(fresh);
+  assert.equal(fresh.pending?.system, 'thread-start');
+});
+
+test('teen and elder avatars differ by sex', () => {
+  const base = { country: { id: 'CN' }, name: '测试' };
+  assert.notEqual(avatarSVG({ ...base, age: 15, sex: '女' }), avatarSVG({ ...base, age: 15, sex: '男' }));
+  const oldF = avatarSVG({ ...base, age: 70, sex: '女' });
+  const oldM = avatarSVG({ ...base, age: 70, sex: '男' });
+  assert.notEqual(oldF, oldM);
+  assert.ok(oldF.includes('x="3" y="12" width="10"'));
+  assert.ok(oldM.includes('x="13" y="9"'));
 });

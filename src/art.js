@@ -68,7 +68,7 @@ export function gachaCard(country,{revealed=false,flip=0}={}){
 }
 
 // 专属像素小人：16×16 逻辑网格 crispEdges 像素画，按 sex/年龄段/国家色板绘制。
-// 0-2 婴儿襁褓巾 · 3-12 儿童矮一截 · 13-17 少年棒球帽 · 18-59 成人 · 60+ 白发驼背拄拐。
+// 0-2 婴儿襁褓巾 · 3-12 儿童矮一截 · 13-17 少年男女分饰 · 18-59 成人男女分饰 · 60+ 男拄拐裤装，女长发裙装。
 export function avatarSVG(life,{size=72}={}){
  const o=typeof life==='object'&&life?life:{};
  const age=Number(o.age)||0;
@@ -92,9 +92,9 @@ export function avatarSVG(life,{size=72}={}){
    +px(4,10,1,3,cloth)+px(11,10,1,3,cloth)+px(4,13,1,1,skin)+px(11,13,1,1,skin)
    +px(6,13,2,2,pants)+px(9,13,2,2,pants)
    +px(6,15,2,1,shoe)+px(9,15,2,1,shoe);
- }else if(age<18){ // 少年：棒球帽
-  s=px(5,2,6,1,cloth)+px(4,3,8,1,cloth)+px(12,3,2,1,cloth)
-   +px(4,4,1,2,hair)+px(11,4,1,2,hair)
+ }else if(age<18){ // 少年：男生棒球帽，女生长发
+  const g=sex==='女';
+  s=(g?px(5,3,6,1,hair)+px(4,4,1,4,hair)+px(11,4,1,4,hair):px(5,2,6,1,cloth)+px(4,3,8,1,cloth)+px(12,3,2,1,cloth)+px(4,4,1,2,hair)+px(11,4,1,2,hair))
    +head(5,4)
    +px(7,9,2,1,skin)
    +px(4,10,8,3,cloth)
@@ -110,15 +110,15 @@ export function avatarSVG(life,{size=72}={}){
    +(sex==='女'
     ?px(3,12,10,2,cloth)+px(5,14,2,1,skin)+px(9,14,2,1,skin)+px(5,15,2,1,shoe)+px(9,15,2,1,shoe)
     :px(5,13,2,2,pants)+px(9,13,2,2,pants)+px(5,15,2,1,shoe)+px(9,15,2,1,shoe));
- }else{ // 老人：白发、驼背、拄拐
-  s=px(6,4,6,1,hair)+px(5,5,1,3,hair)+px(12,5,1,3,hair)
+ }else{ // 老人：男短发拄拐裤装，女长发裙装
+  const g=sex==='女';
+  s=px(6,4,6,1,hair)+px(5,5,1,g?5:3,hair)+px(12,5,1,g?5:3,hair)
    +head(6,5)
    +px(4,9,3,1,cloth)
    +px(4,10,8,3,cloth)
    +px(3,10,1,3,cloth)+px(12,10,1,3,cloth)+px(3,13,1,1,skin)+px(12,13,1,1,skin)
-   +px(13,9,1,7,wood)
-   +px(5,13,2,2,pants)+px(9,13,2,2,pants)
-   +px(5,15,2,1,shoe)+px(9,15,2,1,shoe);
+   +(g?px(3,12,10,2,cloth)+px(5,14,2,1,skin)+px(9,14,2,1,skin)+px(5,15,2,1,shoe)+px(9,15,2,1,shoe)
+     :px(13,9,1,7,wood)+px(5,13,2,2,pants)+px(9,13,2,2,pants)+px(5,15,2,1,shoe)+px(9,15,2,1,shoe));
  }
  const nm=escape(o.name||'无名');
  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="${size}" height="${size}" class="avatar-svg" shape-rendering="crispEdges" data-avatar="${nm}·${age}" role="img" aria-label="${nm}·${age}">${s}</svg>`;

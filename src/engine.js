@@ -103,7 +103,7 @@ const chance=(life,p)=>roll(life)<p;
 const pick=(life,xs)=>xs[Math.floor(roll(life)*xs.length)];
 const pickWeighted=(life,xs,weight=x=>x.weight||1)=>{const total=xs.reduce((s,x)=>s+weight(x),0);let n=roll(life)*total;for(const x of xs){n-=weight(x);if(n<0)return x;}return xs[xs.length-1];};
 const countryFor=(life,mode)=>{const key=mode==='pop'||mode==='population'?'pop':'birth';let n=roll(life)*COUNTRIES.reduce((sum,c)=>sum+c[key],0);return COUNTRIES.find(c=>(n-=c[key])<0)||COUNTRIES.at(-1);};
-const person=(life,c,sex=roll(life)<.5?'男':'女')=>({name:pick(life,c.names.surnames)+pick(life,c.names[sex==='男'?'male':'female']),sex});
+const person=(life,c,sex=roll(life)<.5?'男':'女')=>{const taken=new Set([life.name,life.family?.mother?.name,life.family?.father?.name,life.partner?.name,...(life.family?.siblings||[]).map(x=>x&&x.name),...(life.children||[]).map(x=>x&&x.name)].filter(Boolean));const pool=c.names[sex==='男'?'male':'female'];let nm='';for(let i=0;i<9;i++){nm=pick(life,c.names.surnames)+pick(life,pool);if(!taken.has(nm))return{name:nm,sex};}for(const sur of c.names.surnames)for(const giv of pool)if(!taken.has(sur+giv))return{name:sur+giv,sex};return{name:nm+'·',sex};};
 const log=(life,title,text,type='life')=>life.log.push({age:life.age,year:life.birthYear+life.age,title,text,type});
 const statLabels={health:'健康',happiness:'幸福',knowledge:'学识',social:'人际'};
 const FOCUS_EFFECTS={study:{knowledge:4},work:{knowledge:1,health:-1,happiness:-1},health:{health:3,happiness:1},family:{social:3,happiness:2},joy:{happiness:3,social:1}};
@@ -151,14 +151,14 @@ export function createLife({era='now',mode='birth',seed=Date.now(),country,sex,n
  const s={randomState:hash(seed)};
  const c=COUNTRIES.find(c=>c.id===(typeof country==='object'?country?.id:country))||countryFor(s,mode);
  const birthYear=era==='past'?1970:era==='future'?2050:era==='any'?1950+Math.floor(roll(s)*101):2026;
- const who=person(s,c,sex==='男'||sex==='女'?sex:undefined),wealth=roll(s);
+ const who=person(s,c,sex==='男'||sex==='女'?sex:undefined),wealth=roll(s);s.name=name||who.name;
  Object.assign(s,{id:`life-${hash(seed).toString(36)}-${c.id}`,seed,era,mode,name:name||who.name,sex:who.sex,
   country:JSON.parse(JSON.stringify(c)),birthCountry:JSON.parse(JSON.stringify(c)),birthYear,age:0,
   stats:{health:65+Math.floor(roll(s)*30),happiness:55+Math.floor(roll(s)*30),knowledge:5,social:30+Math.floor(roll(s)*30)},
   money:Math.round(c.gdp*(.015+wealth*.08)),income:0,job:'尚未工作',education:'尚未入学',partner:null,children:[],
-  family:{mother:{...person(s,c,'女'),age:22+Math.floor(roll(s)*15),job:pick(s,['教师','店员','农民','护士','技术员']),alive:true},
-   father:{...person(s,c,'男'),age:24+Math.floor(roll(s)*16),job:pick(s,['司机','工人','农民','工程师','小店经营者']),alive:true},
-   siblings:[],background:wealth<.22?'贫困':wealth<.48?'温饱':wealth<.78?'中产':'富裕',wealth},
+  family:(()=>{const mother={...person(s,c,'女'),age:22+Math.floor(roll(s)*15),job:pick(s,['教师','店员','农民','护士','技术员']),alive:true};s.family={siblings:[],mother};const father={
+    ...person(s,c,'男'),age:24+Math.floor(roll(s)*16),job:pick(s,['司机','工人','农民','工程师','小店经营者']),alive:true};return{mother,father,
+   siblings:[],background:wealth<.22?'贫困':wealth<.48?'温饱':wealth<.78?'中产':'富裕',wealth};})(),
   log:[],pending:null,dead:false,deathCause:null,deathAge:null,focus:'joy',companions:[],
   notes:[],
   longevity:clamp(c.life+(birthYear===1970?-6:birthYear>=2050?5:0)+(roll(s)-.5)*24,45,106),retired:false,
@@ -411,7 +411,7 @@ function prepareEffects(effects,life){
 function setMilestone(life,age){
  if([15,18,22].includes(age)){educationMilestone(life,age);return;}
  if(age===26){if(!life.partner||life.partner.alive===false)systemAction(life,'seek-partner');return;}
- if(age===5||age===12){peopleMilestone(life,age);return;}
+ if(age===5||(age===12&&!(life.systems?.homeThread&&!life.systems.homeThread.ended)&&!(life.friends||[]).some(f=>f&&f.thread&&!f.thread.ended))){peopleMilestone(life,age);return;}
  const m=MILESTONES[age];if(!m)return;
  const options=m.options.map(o=>({label:o.label,description:o.description,effects:prepareEffects(o.effects,life)}));
  life.pending={kind:'milestone',title:m.title,text:m.text,options};
