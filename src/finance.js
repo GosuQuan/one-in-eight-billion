@@ -3,6 +3,7 @@ const clamp=n=>Math.max(0,Math.min(100,n));
 function roll(l){l.randomState=(l.randomState+0x6D2B79F5)>>>0;let t=l.randomState;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296;}
 const record=(l,title,text)=>l.log.push({age:l.age,year:l.birthYear+l.age,title,text,type:'finance'});
 const alive=p=>p&&p.alive!==false&&!p.dead;
+function kinLine(l){const kin=[l.family?.mother,l.family?.father].filter(p=>alive(p)&&p.name);return kin.length?`${kin.map(p=>p.name).join('和')}知道你很难，这一次没有赶到。`:'没有能赶到的家人。';}
 export function initFinance(l){
  const f=l.finance ||= {};
  f.arrears ??= 0; f.lastYear ??= null; f.lastAidAge ??= null; f.repaymentUntil ??= -1; f.austerityUntil ??= -1;
@@ -67,7 +68,7 @@ export function financeYear(l){
   if(f.arrears>=3){
    const n=roll(l);
    if(l.house&&n<.25){l.house=null;record(l,'房子保不住了',`欠着${Math.round(l.debt)}，收入又撑不住账单。房子被处理掉，你失去了这个住处。`);}
-   else if(n<.58){const lost=Math.round(l.money||0);l.money=0;l.stats.health=clamp(l.stats.health-12);record(l,'有人在路上拦住你',`欠着${Math.round(l.debt)}、手里没有稳定收入，你在${l.country.city}被抢走了身上的${lost}。没有家人及时把你接走，也没有新的工作出现。`);}
+   else if(n<.58){const lost=Math.round(l.money||0);l.money=0;l.stats.health=clamp(l.stats.health-12);record(l,'有人在路上拦住你',`欠着${Math.round(l.debt)}、手里没有稳定收入，你在${l.country.city}被抢走了身上的${lost}。${kinLine(l)}也没有新的工作出现。`);}
    else if(l.systems?.residence?.abroadSince!=null&&l.systems.residency!=='permanent'&&l.birthCountry&&l.country.id!==l.birthCountry.id){
     const from=l.country.name,home=JSON.parse(JSON.stringify(l.birthCountry));
     l.country=home;const r=l.systems.residence;r.countryId=home.id;r.city=home.city;r.abroadSince=null;r.familyCountryId=home.id;l.systems.residency='citizen';
@@ -75,7 +76,7 @@ export function financeYear(l){
     if(!l.remote){l.income=0;l.job='待业';l.jobKind=null;}
     l.stats.health=clamp(l.stats.health-8);
     record(l,'居留没有保住',`临时居留因欠款和没有稳定收入被取消。你被要求离开${from}，回到${home.name}。原来的本地工作没有跟回来，开销改按${home.name}计算。`);
-   }else{l.stats.health=clamp(l.stats.health-8);record(l,'夜里没有一个稳妥的地方',`账单压过了房租。你在${l.country.city}辗转借住，健康和心情都往下掉。`);}
+   }else{l.stats.health=clamp(l.stats.health-8);record(l,'夜里没有一个稳妥的地方',`账单压过了房租。你在${l.country.city}辗转借住。${kinLine(l)}健康和心情都往下掉。`);}
    if(l.stats.health<=8&&f.arrears>=5)l.stats.health=0;
   }else record(l,'债压着日子',`还在还，但欠款已经高过当地生活水平，收入又跟不上。心情不会停在满格。`);
  }

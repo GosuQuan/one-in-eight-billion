@@ -523,6 +523,20 @@ function watch(l) {
  if (active.length) stats(l, { happiness: -Math.min(3, active.length) });
 }
 
+export function askChild(l) {
+ const v = l.lived;
+ if (l.age < 24 || l.age > 42 || l.age % 6 !== 0 || v.childAsk === l.age) return false;
+ if (l.systems?.residence?.abroadSince != null) return false;
+ const partner = l.partner;
+ if (!partner || partner.alive === false || partner.dead || !partner.name) return false;
+ const page = partner.age ?? l.age;
+ if (page < 18 || page > 45) return false;
+ if ((l.children || []).some(c => c && c.alive !== false && !c.dead)) return false;
+ v.childAsk = l.age;
+ l.pending = { kind: 'system', system: 'child-plan', title: `要不要和${partner.name}试着要一个孩子`, text: `${partner.name}和你都还在可以商量这件事的年纪。检查要花钱。这一年也可能没有孩子，没有人会凭空把孩子交给你。`, options: [{ key: 'birth', label: '试一次', description: '付检查费。成功才有一个有名字的孩子，失败则今年不能再试。' }, { key: 'wait', label: '今年先不要', description: '不花钱。过几年仍可能再问，也可以一直不要。' }] };
+ log(l, `和${partner.name}谈孩子`, '这件事不会自己完成。试了也可能没有孩子。');
+ return true;
+}
 function tick(l) {
  const v = l.lived;
  watch(l);
@@ -551,7 +565,9 @@ export function livedYear(l, options = {}) {
  initLived(l);
  if (!l || l.dead) return l;
  tick(l);
- if (options.events === false || l.pending || l.age < 18 || l.age > 88 || l.age % 7 !== 0 || l.lived.lastOfferAge === l.age) return l;
+ if (options.events === false || l.pending) return l;
+ if (askChild(l)) return l;
+ if (l.age < 18 || l.age > 88 || l.age % 7 !== 0 || l.lived.lastOfferAge === l.age) return l;
  const choices = LIVED_ACTS.filter(a => l.age >= a.ages[0] && l.age <= a.ages[1] && open(l, a.id));
  if (!choices.length) return l;
  const act = choices[Math.floor(l.age / 7) % choices.length];

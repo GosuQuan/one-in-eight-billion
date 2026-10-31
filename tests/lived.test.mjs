@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createLife, choose } from '../src/engine.js';
 import { systemsYear } from '../src/life-systems.js';
+import { financeYear } from '../src/finance.js';
 import { LIVED_ACTS, initLived, livedAction, livedYear } from '../src/lived.js';
 
 const adult = (seed, age = 30) => {
@@ -202,4 +203,66 @@ test('an accepted internship names a mentor and still is not a job', () => {
     if (l.lived.mentor) { mentored = true; assert.equal(typeof l.lived.mentor.name, 'string'); }
   }
   assert.equal(mentored, true);
+});
+
+test('a partner is asked about a child, and declining creates none', () => {
+  const l = adult('ask-child', 30);
+  l.partner = { name: '林小舟', sex: '女', age: 30, alive: true, bond: 70 };
+  l.pending = null;
+  livedYear(l, { events: true });
+  assert.equal(l.pending && l.pending.system, 'child-plan');
+  assert.ok(`${l.pending.title}${l.pending.text}`.includes('林小舟'));
+  assert.equal(l.pending.options.at(-1).key, 'wait');
+  const money = l.money, job = l.job;
+  choose(l, l.pending.options.length - 1);
+  assert.equal(l.children.length, 0);
+  assert.equal(l.money, money);
+  assert.equal(l.job, job);
+  const quiet = adult('ask-quiet', 30);
+  quiet.partner = { name: '林小舟', sex: '女', age: 30, alive: true };
+  quiet.pending = null;
+  livedYear(quiet, { events: false });
+  assert.equal(quiet.pending, null);
+  const busy = adult('ask-busy', 30);
+  busy.partner = { name: '林小舟', sex: '女', age: 30, alive: true };
+  busy.pending = { kind: 'system', system: 'thread', title: '已有的事', text: '先处理这个', options: [{ key: 'stay', label: '留下' }] };
+  livedYear(busy, { events: true });
+  assert.equal(busy.pending.system, 'thread');
+});
+
+test('trying for a child can fail and never happens without a living partner', () => {
+  let failed = false;
+  for (let i = 0; i < 16; i++) {
+    const l = adult('birth-' + i, 30);
+    l.partner = { name: '周晚', sex: '男', age: 31, alive: true, bond: 60 };
+    l.pending = null;
+    livedYear(l, { events: true });
+    assert.equal(l.pending.system, 'child-plan');
+    choose(l, 0);
+    assert.equal(l.job, '职员');
+    if (!l.children.length) failed = true;
+  }
+  assert.equal(failed, true);
+  const alone = adult('birth-alone', 30);
+  alone.partner = null;
+  alone.pending = null;
+  livedYear(alone, { events: true });
+  assert.notEqual(alone.pending && alone.pending.system, 'child-plan');
+  assert.equal(alone.children.length, 0);
+});
+
+test('a debt crisis names a living parent and does not invent work', () => {
+  let named = false;
+  for (let i = 0; i < 8 && !named; i++) {
+    const l = adult('crisis-' + i, 34);
+    l.income = 0; l.job = '尚未工作'; l.money = 0; l.debt = l.country.gdp * 2;
+    l.finance.arrears = 3; l.finance.lastYear = null; l.house = null;
+    l.family.mother.alive = true; l.family.father.alive = true;
+    financeYear(l);
+    assert.equal(l.job, '尚未工作');
+    assert.equal(l.income, 0);
+    const hit = l.log.find(e => e.title === '有人在路上拦住你' || e.title === '夜里没有一个稳妥的地方');
+    if (hit) named = hit.text.includes(l.family.mother.name) || hit.text.includes(l.family.father.name);
+  }
+  assert.equal(named, true);
 });

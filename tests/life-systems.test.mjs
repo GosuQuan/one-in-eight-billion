@@ -286,3 +286,36 @@ test('a storyline can introduce someone new or fail to', () => {
  assert.ok(met, 'introduction can succeed');
  assert.ok(missed, 'introduction can fail');
 });
+
+test('a single adult is asked again, and a refusal adds no partner', () => {
+  const l = adult('court-again');
+  l.age = 31; l.partner = null; l.pending = null; l.systems.lastYear = null;
+  if (l.systems.homeThread) l.systems.homeThread.ended = true;
+  for (const f of l.friends) if (f.thread) f.thread.ended = true;
+  systemsYear(l);
+  assert.equal(l.pending && l.pending.system, 'courtship');
+  assert.equal(l.pending.options.at(-1).key, 'cancel');
+  select(l, 'cancel');
+  assert.equal(l.partner, null);
+  const quiet = adult('court-quiet');
+  quiet.age = 31; quiet.partner = null; quiet.pending = null; quiet.systems.lastYear = null;
+  systemsYear(quiet, { events: false });
+  assert.notEqual(quiet.pending && quiet.pending.system, 'courtship');
+});
+
+test('telling someone can be turned down and still is not a partner', () => {
+  let refused = false;
+  for (let i = 0; i < 16 && !refused; i++) {
+    const l = adult('court-no-' + i);
+    l.age = 31; l.partner = null; l.pending = null; l.systems.lastYear = null;
+    if (l.systems.homeThread) l.systems.homeThread.ended = true;
+    for (const f of l.friends) if (f.thread) f.thread.ended = true;
+    systemsYear(l);
+    assert.equal(l.pending.system, 'courtship');
+    const choice = l.pending.options.find(o => o.key !== 'cancel');
+    select(l, choice.key);
+    if (!l.partner) refused = true;
+    assert.notEqual(l.job, '伴侣');
+  }
+  assert.equal(refused, true);
+});

@@ -1,7 +1,7 @@
 // Original, serializable life systems. Monetary figures are illustrative PPP units.
 import { COUNTRIES } from './engine.js';
 import { inferKind, localIncome, careerOptions } from './career.js';
-import { initLived, livedYear, livedChoice } from './lived.js';
+import { initLived, livedYear, livedChoice, askChild } from './lived.js';
 
 const clamp = n => Math.max(0, Math.min(100, Number(n) || 0));
 const copy = x => JSON.parse(JSON.stringify(x));
@@ -559,6 +559,11 @@ export function systemsYear(l, options = {}) {
    const separated = !familyHere && (alive(l.partner) || l.children.some(c => alive(c) && c.age < 18 && c.supportPayer !== 'player'));
    offer(l, 'migration-review', `在${l.country.name}的第${years}年`, familyHere ? `你和家人都在${l.country.name}，已经${years}年。身份仍是${s.residency === 'permanent' ? '长期居留' : '临时居留'}，留下不会自动变成永居。回${home?.name || '原居国'}会结束这段居住；非远程工作不会跟回去。` : `你在${l.country.name}，家人在${country(r.familyCountryId)?.name || '原居国'}。分开已经${years}年。团聚要另付搬迁费，也不会自动办成。`, [option('stay', '继续按当前身份住下去', '不会自动获得永居。开销仍按这里计算。'), ...(separated ? [option('reunite', '接家人团聚', '需要搬迁费和生活储备，家人到齐以后才同住。')] : []), ...(s.residency !== 'permanent' && years >= 4 ? [option('pr', '申请长期居留', '申请费不退。可能被拒，被拒后三年不能再申。')] : []), option('home', '回原居国生活', '非远程的工作不会跟回去，收入会先归零，开销改按原居国。')]);
   }
+ if (options.events !== false && !l.pending) askChild(l);
+ if (options.events !== false && !l.pending && l.age >= 28 && l.age <= 44 && l.age % 5 === 1 && !alive(l.partner) && s.lastSoloAsk !== l.age) {
+  s.lastSoloAsk = l.age;
+  systemAction(l, 'seek-partner');
+ }
  if (options.events !== false) { hometownEvents(l); intimateEvents(l); }
  s.world = worldFor(yearOf(l));
  if (['war', 'crisis'].includes(s.world.kind) && l.age >= 18) { spend(l, gdp(l) * .025); stats(l, { happiness: -2, health: -1 }); if (options.events !== false) offer(l, 'world-crisis', s.world.title, s.world.detail, s.world.kind==='war' ? [option('stay', '留守并准备物资'), option('shelter', '暂时避难'), option('migrate', '考虑移民')] : [option('stay', '缩减开支，准备应急物资'), option('shelter', '动用应急预算渡过危机'), option('migrate', '寻找其他地方的机会')]); }
