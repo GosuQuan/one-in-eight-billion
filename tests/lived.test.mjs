@@ -344,3 +344,116 @@ test('language can refuse a new local job and can still allow one', () => {
   assert.equal(heard.job, '待业');
   assert.equal(heard.log.some(e => e.title === '学历挡住了这份本地工作'), true);
 });
+
+test('stopping medicine keeps costing for two more years and restarting can fail', () => {
+  const l = adult('meds', 30);
+  l.systems.conditions = [{ name: '慢性胃炎', severity: 20, resolved: false }];
+  livedAction(l, 'skip-meds');
+  assert.equal(l.systems.conditions[0].severity, 28);
+  assert.equal(l.lived.medLapse.until, 32);
+  assert.equal(l.job, '职员');
+  l.age = 31;
+  livedYear(l, { events: false });
+  assert.equal(l.systems.conditions[0].severity, 32);
+  l.age = 32;
+  livedYear(l, { events: false });
+  assert.equal(l.systems.conditions[0].severity, 36);
+  assert.ok(l.stats.health < 80);
+  assert.ok(l.log.some(e => e.title === '停药还在起作用' && e.text.includes('慢性胃炎')));
+  l.age = 33;
+  const sev = l.systems.conditions[0].severity;
+  const health = l.stats.health;
+  livedYear(l, { events: false });
+  assert.equal(l.systems.conditions[0].severity, sev);
+  assert.equal(l.stats.health, health);
+
+  let failed = false, restarted = false;
+  for (let i = 0; i < 20 && !(failed && restarted); i++) {
+    const a = adult('restart-' + i, 30);
+    a.systems.conditions = [{ name: '慢性胃炎', severity: 28, resolved: false }];
+    initLived(a);
+    a.lived.medLapse = { name: '慢性胃炎', until: 32 };
+    const before = a.money;
+    livedAction(a, 'adhere');
+    assert.ok(a.money < before);
+    if (a.log.some(e => e.title === '药没有续上')) {
+      assert.equal(a.lived.medLapse.until, 32);
+      assert.equal(a.systems.conditions[0].severity, 28);
+      failed = true;
+    }
+    if (a.lived.medLapse == null) {
+      assert.equal(a.systems.conditions[0].severity, 22);
+      restarted = true;
+    }
+  }
+  assert.equal(failed, true);
+  assert.equal(restarted, true);
+});
+
+test('a visit can miss the person, and a letter still has a name years later', () => {
+  let missed = false, seen = false;
+  for (let i = 0; i < 20 && !(missed && seen); i++) {
+    const l = adult('visit-' + i, 40);
+    initLived(l);
+    l.lived.grief = [{ key: '母亲:林母', name: '林母', role: '母亲', since: 40 }];
+    const happy = l.stats.happiness;
+    const money = l.money;
+    livedAction(l, 'grief-visit');
+    assert.ok(l.money < money);
+    assert.ok(l.lived.grief.some(g => g.name === '林母'));
+    if (l.log.some(e => e.title === '没能去成林母那里')) {
+      assert.equal(l.stats.happiness, happy);
+      missed = true;
+    }
+    if (l.log.some(e => e.title === '去看林母')) seen = true;
+  }
+  assert.equal(missed, true);
+  assert.equal(seen, true);
+
+  const late = adult('letter-late', 40);
+  initLived(late);
+  late.lived.grief = [{ key: '母亲:林母', name: '林母', role: '母亲', since: 34 }];
+  livedAction(late, 'letter');
+  assert.ok(late.log.some(e => e.title.includes('林母')));
+  late.age = 43;
+  const letters = late.lived.letters.length;
+  const blocked = livedAction(late, 'letter');
+  assert.equal(blocked.ok, false);
+  assert.equal(late.lived.letters.length, letters);
+});
+
+test('a named classmate keeps the days tight until the talk happens or the years pass', () => {
+  const l = adult('bully-drag', 14);
+  l.job = '尚未工作'; l.income = 0;
+  const happy = l.stats.happiness;
+  const social = l.stats.social;
+  livedAction(l, 'bully');
+  const name = l.lived.bully.name;
+  assert.ok(l.friends.some(f => f.name === name));
+  l.age = 16;
+  livedYear(l, { events: false });
+  assert.ok(l.stats.happiness < happy);
+  assert.ok(l.stats.social < social);
+  assert.equal(l.job, '尚未工作');
+  assert.equal(l.income, 0);
+  l.age = 18;
+  livedYear(l, { events: false });
+  assert.equal(l.lived.bully.ended, false);
+  assert.ok(l.log.some(e => e.title === `${name}不再天天出现`));
+
+  let refused = false;
+  for (let i = 0; i < 16 && !refused; i++) {
+    const a = adult('bully-no-' + i, 14);
+    a.stats.social = 0;
+    livedAction(a, 'bully');
+    const who = a.lived.bully.name;
+    a.age = 15;
+    livedAction(a, 'reconcile');
+    if (a.log.some(e => e.title === '话没有说开')) {
+      assert.equal(a.lived.bully.ended, false);
+      assert.equal(a.lived.bully.name, who);
+      refused = true;
+    }
+  }
+  assert.equal(refused, true);
+});

@@ -36,15 +36,15 @@ export const LIVED_ACTS = [
  { id: 'formalize', title: '试着补上工作保障', ages: [18, 64], cost: '大约当地水平的 4%，花了不一定办成', time: '申请这一年', risk: '大约一半会被退回，钱不退', mark: '办成才重新开始计养老金' },
  { id: 'parental-leave', title: '为幼儿请一段假', ages: [18, 50], cost: '工作还在，但这年和明年收入按七成算', time: '两年', risk: '没有两岁以内、由你这边照料的孩子，或本来就没有收入，请不了', mark: '假结束前不会变成升职' },
  { id: 'childcare-bill', title: '为上学的孩子加一笔辅导', ages: [18, 60], cost: '大约当地水平的 1%，孩子不愿学也已经花掉', time: '这一年', risk: '没有 6 到 17 岁、跟你生活的孩子就无从加', mark: '孩子肯学才多一点成长，否则只是账单' },
- { id: 'bully', title: '正视那个针对你的同学', ages: [8, 16], cost: '不花钱', time: '从这一年记住对方', risk: '已经有这样一个人，就不会再造一个', mark: '对方有名字，以后可以试着和解，也可以一直别扭' },
+ { id: 'bully', title: '正视那个针对你的同学', ages: [8, 16], cost: '不花钱', time: '没说开的话，接下来三年心情和相处都会更紧', risk: '已经有这样一个人，就不会再造一个', mark: '对方有名字。不和解，名字还在，日常会紧几年' },
  { id: 'reconcile', title: '试着和那个同学说开', ages: [8, 20], cost: '不花钱', time: '一次谈话', risk: '对方可以不接受，关系会更僵', mark: '说开了才结束这段针对' },
  { id: 'puberty', title: '承认身体在变', ages: [11, 16], cost: '不花钱', time: '这一年', risk: '只发生一次', mark: '情绪和跟人相处的把握会晃一下，没有别的奖励' },
  { id: 'elder-care', title: '照顾年老的父母', ages: [25, 70], cost: '大约当地水平的 4%', time: '这一年的照护', risk: '父母可能说不用你管，钱仍可能已经垫上', mark: '照护过会留在你们的关系里' },
  { id: 'sibling', title: '和兄弟姐妹谈一次', ages: [12, 70], cost: '不花钱', time: '一次', risk: '对方可能不想谈', mark: '谈崩了，名字还在，隔阂会留下' },
- { id: 'grief-visit', title: '去看望离开的人', ages: [10, 90], cost: '大约当地水平的 1%', time: '一天', risk: '没有正在想念的人，就没有可去的地方', mark: '心情松一点，但想念不会因此提前结束' },
- { id: 'letter', title: '写一封不会寄出的信', ages: [10, 90], cost: '不花钱', time: '一个晚上', risk: '没有可写的对象时写不成', mark: '信留在档案里，年份都在' },
- { id: 'adhere', title: '按医嘱把这一年的药用上', ages: [16, 90], cost: '大约当地水平的 1.2%', time: '这一年', risk: '没有尚未控制的病，药就无从用起', mark: '用了，病情才往下走一点' },
- { id: 'skip-meds', title: '把药停一停', ages: [16, 90], cost: '省下药费', time: '这一年', risk: '没有在治的病，谈不上停', mark: '病情会加重，不是省下就算赚到' },
+ { id: 'grief-visit', title: '去看望离开的人', ages: [10, 90], cost: '大约当地水平的 1%，没去成也不退', time: '一天', risk: '路可能断，没有正在想念的人就没有可去的地方', mark: '看成了心情松一点。没看成，钱也花了。想念都不会提前结束' },
+ { id: 'letter', title: '写一封不会寄出的信', ages: [10, 90], cost: '不花钱', time: '一个晚上', risk: '离开超过八年，或没有这个人，就写不成', mark: '信留在档案里。人离开后的八年里都还写得成' },
+ { id: 'adhere', title: '按医嘱把这一年的药用上', ages: [16, 90], cost: '大约当地水平的 1.2%，续不上也不退', time: '这一年', risk: '停过药再重新用，这一年也可能对不上剂量', mark: '用上了，病情才往下走，停药的拖尾也停' },
+ { id: 'skip-meds', title: '把药停一停', ages: [16, 90], cost: '省下药费', time: '停了之后还会再拖两年', risk: '没有在治的病，谈不上停', mark: '当年加重，后面两年还在加重，除非重新用上' },
  { id: 'smoke', title: '开始抽烟', ages: [16, 50], cost: '以后每年都在损耗身体', time: '直到戒掉，不保证戒得成', risk: '健康已经很低时，身体拒绝这个习惯', mark: '档案里多一项烟龄' },
  { id: 'quit-smoke', title: '试着把烟戒了', ages: [16, 80], cost: '不保证成功', time: '这一次尝试', risk: '大约一半会失败，失败了烟还在，心情更差', mark: '只有戒成才停掉每年的损耗' },
  { id: 'drink', title: '喝成习惯', ages: [18, 55], cost: '以后每年损耗健康和心情', time: '直到戒掉', risk: '已经有这个习惯就不会再“开始”一次', mark: '习惯留下，直到某一次真的停住' },
@@ -222,7 +222,7 @@ function run(l, id) {
    l.friends ||= []; l.systems ||= {};
    const idn = `friend-${(l.systems.friendSequence = (l.systems.friendSequence || 0) + 1)}`;
    const f = { ...who, id: idn, age: l.age, bond: 22, countryId: l.country.id, metThrough: '课间被针对', sharedMemory: '那次没有人把场面揭过去', lastContactAge: l.age, alive: true };
-   l.friends.push(f); v.bully = { id: f.id, name: f.name, ended: false, next: l.age + 1 };
+   l.friends.push(f); v.bully = { id: f.id, name: f.name, ended: false, next: l.age + 1, since: l.age };
    log(l, `${f.name}总在那个时候出现`, `你看清了是${f.name}。可以以后试着说开，也可以一直避开。说开不一定有用。`);
    return { ok: true, message: `记住了${f.name}。` };
   }
@@ -256,8 +256,12 @@ function run(l, id) {
    return { ok: true, message: '谈了一次。' };
   }
   case 'grief-visit': {
-   const g0 = v.grief.find(g1 => l.age - g1.since <= 4); spend(l, g * .01); stats(l, { happiness: 2 });
-   log(l, `去看${g0?.name || '离开的人'}`, '你去了。心情松一点。想念还要按它自己的年份走完，不会因为这一趟提前结束。');
+   const g0 = v.grief.find(g1 => l.age - g1.since <= 4);
+   if (!g0) return { ok: false, message: '没有正在想念的人。' };
+   const fee = Math.round(g * .01); spend(l, fee);
+   if (!chance(l, .6)) { log(l, `没能去成${g0.name}那里`, `路费${fee}花了。路或时间断了，人没有看成。想念仍按它自己的年份走。`); return { ok: true, message: '没去成。' }; }
+   stats(l, { happiness: 2 });
+   log(l, `去看${g0.name}`, '你去了。心情松一点。想念还要按它自己的年份走完，不会因为这一趟提前结束。');
    return { ok: true, message: '去看过了，想念还在。' };
   }
   case 'letter': {
@@ -267,15 +271,18 @@ function run(l, id) {
    return { ok: true, message: '信留下了。' };
   }
   case 'adhere': {
-   const c = condition(l); spend(l, g * .012); if (c) c.severity = Math.max(0, (c.severity || 20) - 6);
-   stats(l, { health: 1 });
-   log(l, '药按这一年用了', `${c?.name || '病'}需要持续的花费。用了，严重程度往下走一点；停了还会回来。`);
+   const c = condition(l); spend(l, g * .012);
+   if (v.medLapse && !chance(l, .55)) { log(l, '药没有续上', `${v.medLapse.name}停过。这一年剂量和日子对不上，费用已经花了。影响还要走到${v.medLapse.until}岁。`); return { ok: true, message: '没有续上。' }; }
+   if (c) c.severity = Math.max(0, (c.severity || 20) - 6);
+   v.medLapse = null; stats(l, { health: 1 });
+   log(l, '药按这一年用了', `${c?.name || '病'}需要持续的花费。用上了，严重程度往下走一点，停药的拖尾也停。`);
    return { ok: true, message: '这一年的药用上了。' };
   }
   case 'skip-meds': {
-   const c = condition(l); if (c) c.severity = (c.severity || 20) + 8; stats(l, { health: -2 });
-   log(l, '药停了', `${c?.name || '病'}没有因为省钱而停住。这一年严重程度往上走。`);
-   return { ok: true, message: '省下了药费，病情更重。' };
+   const c = condition(l); if (c) c.severity = (c.severity || 20) + 8;
+   v.medLapse = { name: c?.name || '病', until: l.age + 2 }; stats(l, { health: -2 });
+   log(l, '药停了', `${v.medLapse.name}没有因为省钱而停住。这一年加重，而且会再拖到${v.medLapse.until}岁，除非重新用上。`);
+   return { ok: true, message: '省下了药费，病情还会再走两年。' };
   }
   case 'smoke': {
    v.smoke = true; stats(l, { health: -1 });
@@ -515,7 +522,7 @@ function watch(l) {
   }
   v.seen[key] = !p.dead;
  }
- v.grief = v.grief.filter(g => l.age - g.since <= 4);
+ v.grief = v.grief.filter(g => l.age - g.since <= 8);
  if (fresh.length) log(l, '想念留了下来', `${fresh.join('、')}离开以后，这种空着的感觉会留几年。不是选一句就能过去。`);
  const fading = (l.lived.grief || []).filter(g => l.age - g.since === 4);
  if (fading.length) log(l, '想念还在，但这一天可以重新安排', `${fading.map(g => g.name).join('、')}离开已经四年。你仍会在普通的下午想起对方。`);
@@ -567,6 +574,17 @@ function tick(l) {
  if (v.smoke) stats(l, { health: -0.45 });
  if (v.drink) stats(l, { health: -0.25 });
  if (v.exercise) { v.exerciseYears += 1; stats(l, { health: 0.3 }); spend(l, gdp(l) * .004); }
+ if (v.medLapse && l.age <= v.medLapse.until && l.age > v.medLapse.until - 2) {
+  const illness = (l.systems?.conditions || []).find(c => c && !c.resolved && c.name === v.medLapse.name);
+  if (illness) illness.severity = (illness.severity || 20) + 4;
+  stats(l, { health: -1 });
+  log(l, '停药还在起作用', `${v.medLapse.name}这一年仍没有按医嘱走。要到${v.medLapse.until}岁，或重新用上，才会停。`);
+ }
+ if (v.bully && !v.bully.ended) {
+  const span = l.age - (v.bully.since ?? l.age);
+  if (span >= 1 && span <= 3) stats(l, { happiness: -1, social: -1 });
+  if (span === 4 && !v.bully.noted) { v.bully.noted = true; log(l, `${v.bully.name}不再天天出现`, '针对慢慢淡了。你们没有把话说开，这个名字还在。'); }
+ }
  if (v.hobby && !v.hobbyTried) v.hobbyYears += 1;
  if ((v.cheapUntil || 0) >= l.age) stats(l, { health: -0.4 });
  if ((v.leaveUntil || 0) >= l.age && (l.income || 0) > 0) l.income = Math.round(l.income * .7);
@@ -621,6 +639,8 @@ export function livedBrief(l) {
  if (v.informal) bits.push('工作无保障');
  if ((v.leaveUntil || 0) >= (l.age || 0)) bits.push('育儿假');
  if (v.grief?.length) bits.push(`想念${v.grief.map(g => g.name).join('、')}`);
+ if (v.medLapse && (l.age || 0) <= v.medLapse.until) bits.push(`停药：${v.medLapse.name}`);
+ if (v.bully && !v.bully.ended) bits.push(`针对：${v.bully.name}`);
  if (v.lease?.landlord && !(v.lease.lapsed > 0 && l.age > v.lease.until)) bits.push(`租约：${v.lease.landlord}`);
  else if (v.lease?.lapsed) bits.push(`${v.lease.landlord}的约过期了`);
  if (v.search?.name) bits.push(`在等${v.search.name}的回音`);
