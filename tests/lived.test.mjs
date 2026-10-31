@@ -1035,3 +1035,54 @@ test('cheap food can fail to save money and the body remembers next year', () =>
   assert.equal(saved, true);
   assert.equal(sick, true);
 });
+
+test('a refused neighbor favor costs money and keeps that name for a year', () => {
+  let helped = false, refused = false;
+  for (let i = 0; i < 30 && !(helped && refused); i++) {
+    const l = adult('near-' + i, 30);
+    livedAction(l, 'neighbor');
+    l.age += 1;
+    const name = l.lived.neighbor.name;
+    const before = l.money;
+    const health = l.stats.health;
+    const happy = l.stats.happiness;
+    const fee = Math.round(l.country.gdp * .012);
+    livedAction(l, 'neighbor-ask');
+    assert.equal(l.job, '职员');
+    assert.equal(l.income, 40000);
+    assert.equal(livedAction(l, 'neighbor-ask').ok, false);
+    if (l.log.some(e => e.title === `${name}帮不了`)) {
+      assert.equal(l.money, before - fee);
+      assert.equal(l.debt, 0);
+      assert.equal(l.stats.health, health - 1);
+      assert.equal(l.stats.happiness, happy - 1);
+      assert.equal(l.lived.neighborCarry.name, name);
+      assert.equal(l.lived.neighborCarry.until, 32);
+      const held = l.money;
+      livedYear(l, { events: false });
+      assert.equal(l.money, held);
+      assert.ok(!l.log.some(e => e.age === 31 && e.title === `${name}没帮的事还在`));
+      l.age = 32;
+      livedYear(l, { events: false });
+      assert.equal(l.money, held);
+      assert.equal(l.stats.happiness, happy - 2);
+      assert.equal(l.job, '职员');
+      assert.equal(l.income, 40000);
+      assert.ok(l.log.some(e => e.age === 32 && e.title === `${name}没帮的事还在`));
+      l.age = 33;
+      livedYear(l, { events: false });
+      assert.equal(l.stats.happiness, happy - 2);
+      assert.ok(!l.log.some(e => e.age === 33 && e.title === `${name}没帮的事还在`));
+      refused = true;
+    }
+    if (l.log.some(e => e.title === `${name}帮了这个忙`)) {
+      assert.equal(l.money, before);
+      assert.equal(l.lived.neighbor.bond, 41);
+      assert.equal(l.lived.neighborCarry, null);
+      assert.equal(l.stats.happiness, happy + 1);
+      helped = true;
+    }
+  }
+  assert.equal(helped, true);
+  assert.equal(refused, true);
+});

@@ -67,7 +67,7 @@ export const LIVED_ACTS = [
  { id: 'service-year', title: '做一年社区服役', ages: [18, 26], cost: '身体累一点', time: '一年，只有微薄补贴', risk: '地方可以不收你。收下了，这一年不能再去应聘', mark: '收下才有补贴。没有职位，这一年的应聘会被服役挡住' },
  { id: 'prepare', title: '为坏年景预备一点', ages: [18, 80], cost: '大约当地水平的 1.5%', time: '预备能撑五年', risk: '钱不够就会记进欠款', mark: '预备在，真遇到紧张年份才少慌一点' },
  { id: 'neighbor', title: '认识隔壁的人', ages: [8, 80], cost: '不花钱', time: '从这一年记住名字', risk: '已经有这位邻居就不再认识一个新的', mark: '以后求助，对方可以拒绝' },
- { id: 'neighbor-ask', title: '请邻居帮一个忙', ages: [8, 85], cost: '不花钱', time: '这一次', risk: '关系浅时更容易被拒绝', mark: '帮成了关系近一点，拒绝了就得自己扛' },
+ { id: 'neighbor-ask', title: '请邻居帮一个忙', ages: [8, 85], cost: '被拒绝以后，大约当地水平的 1.2% 要自己出', time: '这一次，名字再留一年', risk: '关系浅时更容易被拒绝', mark: '拒绝了这笔自己出，名字还会再留一年。帮成了不收钱' },
  { id: 'teacher', title: '记住一位老师', ages: [7, 18], cost: '不花钱', time: '学生年代的一次', risk: '只记一次', mark: '以后写信，可能没有回音' },
  { id: 'write-teacher', title: '给老师写一封信', ages: [10, 40], cost: '不花钱', time: '等一等', risk: '大约一半没有回信', mark: '没有回信，信还是留着' },
  { id: 'exam-wait', title: '等下一次再考', ages: [15, 35], cost: '不花钱，也不获得学历', time: '至少再等一年', risk: '正在顺利在读时，不必用这种方式停下来', mark: '等到那岁之前，新的升学申请会被自己挡下。备考可以继续，文凭不会出现' },
@@ -445,8 +445,13 @@ function run(l, id) {
   }
   case 'neighbor-ask': {
    const n = v.neighbor; n.next = l.age + 1;
-   if (!chance(l, Math.min(.7, .25 + (n.bond || 0) / 180))) { log(l, `${n.name}帮不了`, '邻居拒绝了。这件事还得你自己扛。'); return { ok: true, message: '对方拒绝了。' }; }
-   n.bond = clamp(n.bond + 6); stats(l, { happiness: 1 });
+   if (!chance(l, Math.min(.7, .25 + (n.bond || 0) / 180))) {
+    const fee = Math.round(g * .012); spend(l, fee); stats(l, { happiness: -1, health: -1 });
+    v.neighborCarry = { name: n.name, until: l.age + 1 };
+    log(l, `${n.name}帮不了`, `邻居拒绝了。这件事你自己花了${fee}扛下来。名字会再留一年，职位不会因此变化。`);
+    return { ok: true, message: '对方拒绝了，这笔自己出。' };
+   }
+   v.neighborCarry = null; n.bond = clamp(n.bond + 6); stats(l, { happiness: 1 });
    log(l, `${n.name}帮了这个忙`, '忙帮成了。关系近一点，没有变成一份长期的义务。');
    return { ok: true, message: '帮成了。' };
   }
@@ -647,6 +652,7 @@ function tick(l) {
  }
  if (v.injuryUntil && l.age === v.injuryUntil) { stats(l, { health: -1 }); log(l, '伤还没好利索', `${working(l) ? (l.job || '工作') + '还在。' : ''}去年工作时的伤这一年还在拖。没有人因此给你升职，也没有新的职位。`); }
  if (v.cheapUntil && l.age === v.cheapUntil) { stats(l, { health: -1 }); log(l, '便宜吃食还在身上', '去年省下的那点营养这一年还没补回来。没有人因此给你一份工作。'); }
+ if (v.neighborCarry && l.age === v.neighborCarry.until) { stats(l, { happiness: -1 }); log(l, `${v.neighborCarry.name}没帮的事还在`, '拒绝过的那一次，这一年还得自己收尾。没有人因此给你一份工作。'); }
  if ((v.leaveUntil || 0) >= l.age && v.leaveCut !== l.age && (l.income || 0) > 0) { v.leaveCut = l.age; l.income = Math.round(l.income * .7); }
  if (formal(l)) { v.pensionYears += 1; v.pensionPot += Math.round(gdp(l) * .012); }
  if (abroad(l) && !v.fluent) v.barrierYears += 1;
@@ -701,6 +707,7 @@ export function livedBrief(l) {
   if ((v.sickUntil || 0) >= (l.age || 0)) bits.push('病假这一年');
   if ((v.injuryUntil || 0) >= (l.age || 0)) bits.push('伤还没好');
   if (v.cheapUntil && (l.age || 0) <= v.cheapUntil) bits.push('吃得便宜');
+  if (v.neighborCarry && (v.neighborCarry.until || 0) >= (l.age || 0)) bits.push(`自己扛：${v.neighborCarry.name}`);
  if (v.grief?.length) bits.push(`想念${v.grief.map(g => g.name).join('、')}`);
  if (v.medLapse && (l.age || 0) <= v.medLapse.until) bits.push(`停药：${v.medLapse.name}`);
  if (v.bully && !v.bully.ended) bits.push(`针对：${v.bully.name}`);
