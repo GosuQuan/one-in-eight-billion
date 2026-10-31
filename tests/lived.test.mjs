@@ -1261,3 +1261,42 @@ test('hiding a changing body keeps that person noticing for one more year', () =
   assert.equal(hid, true);
   assert.equal(stood, true);
 });
+
+test('an open adult year shows two or three age-fit acts and can decline them all', () => {
+  const l = adult('year-acts', 34);
+  l.money = 500; l.debt = 0; l.income = 0; l.job = '尚未工作';
+  const health = l.stats.health, happy = l.stats.happiness;
+  livedYear(l, { events: true });
+  assert.equal(l.pending && l.pending.system, 'lived');
+  const keys = l.pending.options.map(o => o.key);
+  assert.equal(keys.at(-1), 'later');
+  const acts = keys.slice(0, -1);
+  assert.ok(acts.length === 2 || acts.length === 3, acts.join(','));
+  assert.equal(new Set(acts).size, acts.length);
+  for (const id of acts) {
+    const act = LIVED_ACTS.find(a => a.id === id);
+    assert.ok(act && l.age >= act.ages[0] && l.age <= act.ages[1]);
+  }
+  choose(l, keys.length - 1);
+  assert.equal(l.pending, null);
+  assert.equal(l.money, 500);
+  assert.equal(l.debt, 0);
+  assert.equal(l.income, 0);
+  assert.equal(l.job, '尚未工作');
+  assert.equal(l.stats.health, health);
+  assert.equal(l.stats.happiness, happy);
+  livedYear(l, { events: true });
+  assert.equal(l.pending, null);
+  const closed = adult('year-shut', 22);
+  livedYear(closed, { events: false });
+  assert.equal(closed.pending, null);
+});
+
+test('a year that is not a multiple of seven still puts the acts on the year', () => {
+  const l = adult('year-22', 22);
+  livedYear(l, { events: true });
+  assert.equal(l.pending && l.pending.system, 'lived');
+  const acts = l.pending.options.slice(0, -1);
+  assert.ok(acts.length === 2 || acts.length === 3);
+  assert.equal(l.pending.options.at(-1).key, 'later');
+});

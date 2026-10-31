@@ -699,15 +699,20 @@ export function livedYear(l, options = {}) {
  if (!l || l.dead) return l;
  tick(l);
  if (options.events === false || l.pending) return l;
- if (askChild(l)) return l;
- if (l.age < 18 || l.age > 88 || l.age % 7 !== 0 || l.lived.lastOfferAge === l.age) return l;
- const choices = LIVED_ACTS.filter(a => l.age >= a.ages[0] && l.age <= a.ages[1] && open(l, a.id));
- if (!choices.length) return l;
- const act = choices[Math.floor(l.age / 7) % choices.length];
- l.lived.lastOfferAge = l.age;
- l.pending = { kind: 'system', system: 'lived', title: act.title, text: `${act.mark}。花费：${act.cost}。时间：${act.time}。不确定：${act.risk}。`, options: [{ key: act.id, label: '试着去做', description: act.mark }, { key: 'later', label: '今年先放下', description: '它不会自动完成。过几年仍可能再出现。' }] };
- log(l, act.title, '一件生活里的事找上门。可以做，也可以先放下。时间不会因此停住太久。');
- return l;
+   if (askChild(l)) return l;
+  if (l.age < 18 || l.age > 88 || l.age % 3 !== 1 || l.lived.lastOfferAge === l.age) return l;
+  const choices = LIVED_ACTS.filter(a => l.age >= a.ages[0] && l.age <= a.ages[1] && open(l, a.id));
+  if (!choices.length) return l;
+  const want = Math.min(choices.length, l.age % 2 === 0 ? 2 : 3);
+  const picked = [];
+  for (let i = 0; i < choices.length && picked.length < want; i++) {
+    const act = choices[(l.age + i) % choices.length];
+    if (!picked.includes(act)) picked.push(act);
+  }
+  l.lived.lastOfferAge = l.age;
+  l.pending = { kind: 'system', system: 'lived', title: '这一年可以做的小事', text: `${picked.map(a => a.title).join('、')}。做一件就够，也可以都放下。不会因此多一份收入、学历或工作。`, options: [...picked.map(a => ({ key: a.id, label: a.title, description: `${a.mark}。花费：${a.cost}。时间：${a.time}。不确定：${a.risk}。` })), { key: 'later', label: '今年先放下', description: '一件都不做。它们不会自动完成，以后的年份仍可能再出现。' }] };
+  log(l, '这一年有几件小事', `${picked.map(a => a.title).join('、')}摆在这一年。可以做一件，也可以先放下。`);
+  return l;
 }
 
 export function livedChoice(l, key) {
@@ -774,5 +779,5 @@ export function livedCatalogHTML(l) {
   return `<button class="choice-btn lived-card" data-lived="${a.id}" ${ok ? '' : 'disabled'}><strong>${e(a.title)} <span>${ok ? '↗' : '—'}</span></strong><small>${a.ages[0]}–${a.ages[1]}岁 · ${e(a.cost)} · ${e(a.time)}</small><small>${e(a.risk)} ${e(a.mark)}</small></button>`;
  }).join('');
  const brief = livedBrief(l);
- return `<div class="dialog-kicker">${l.age} 岁 · 生活的节奏</div><h2 id="dialog-title">五十件不会一下子跳过的事</h2><p>这些事多数时候等你来找。只有少数年份、而且眼前没有别的选择时，才会自己找上门。做成与否都不发放学历、签证、孩子或永久的工作。费用是游戏假设，不是官方统计。</p>${brief ? `<p class="small-note">正在发生：${e(brief)}</p>` : ''}<div class="choice-list lived-list">${cards}</div>`;
+ return `<div class="dialog-kicker">${l.age} 岁 · 生活的节奏</div><h2 id="dialog-title">五十件不会一下子跳过的事</h2><p>成年以后，若这一年没有别的事挡着，会直接摆出两三件适龄的小事。这里仍是全部目录，可以自己来找。做成与否都不发放学历、签证、孩子或永久的工作。费用是游戏假设，不是官方统计。</p>${brief ? `<p class="small-note">正在发生：${e(brief)}</p>` : ''}<div class="choice-list lived-list">${cards}</div>`;
 }
