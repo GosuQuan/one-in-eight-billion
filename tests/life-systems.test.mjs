@@ -337,3 +337,28 @@ test('a business does not open on debt when savings cannot cover it', () => {
  assert.equal(l.systems.business, null); assert.equal(l.debt, 0); assert.equal(l.money, 100);
  assert.ok(l.log.some(e => e.title === '存款不够开张'));
 });
+
+test('crushing debt names the years left and does not create income', () => {
+  const l = adult('runway');
+  l.age = 28; l.income = 0; l.job = '尚未工作'; l.money = 0; l.debt = l.country.gdp * 3;
+  l.stats.health = 22; l.finance.arrears = 1; l.finance.lastYear = null; l.house = null;
+  financeYear(l);
+  assert.equal(l.stats.health, 17);
+  assert.equal(l.income, 0);
+  assert.equal(l.job, '尚未工作');
+  const note = l.log.find(e => e.title === '这笔债还能撑一阵');
+  assert.ok(note);
+  assert.match(note.text, /大约还能再过3年/);
+  assert.match(note.text, /缩减开支/);
+  assert.match(note.text, /一部分/);
+  assert.match(note.text, /找工作/);
+  assert.match(note.text, /不会凭空多出收入/);
+  assert.ok(note.text.includes(l.family.mother.name) || note.text.includes(l.family.father.name));
+  const calm = adult('runway-far');
+  calm.age = 28; calm.income = 0; calm.job = '尚未工作'; calm.money = 0; calm.debt = calm.country.gdp * 3;
+  calm.stats.health = 80; calm.finance.arrears = 0; calm.finance.lastYear = null;
+  financeYear(calm);
+  assert.equal(calm.stats.health, 76);
+  assert.equal(calm.income, 0);
+  assert.equal(calm.log.some(e => e.title === '这笔债还能撑一阵'), false);
+});

@@ -49,6 +49,14 @@ export function financeAction(l,id){
  }
  return {ok:false,message:'没有这项债务安排'};
 }
+function runwayYears(l){
+ const ageDrain=l.age<40?.3:l.age<65?.75:1.6;
+ const arrears=l.finance?.arrears||0;
+ const yearly=4+ageDrain+(arrears>=2?1:0);
+ const health=l.stats?.health||0;
+ if(health<=0||yearly<=0)return 0;
+ return Math.floor(health/yearly);
+}
 export function financeYear(l){
  const f=initFinance(l);if(l.dead||l.age<18||f.lastYear===l.age)return;f.lastYear=l.age;
  if(l.debt<=0){f.arrears=0;f.lastBill=null;return;}
@@ -80,6 +88,12 @@ export function financeYear(l){
    }else{l.stats.health=clamp(l.stats.health-8);record(l,'夜里没有一个稳妥的地方',`账单压过了房租。你在${l.country.city}辗转借住。${kinLine(l)}健康和心情都往下掉。`);}
    if(l.stats.health<=8&&f.arrears>=5)l.stats.health=0;
   }else record(l,'债压着日子',`还在还，但欠款已经高过当地生活水平，收入又跟不上。心情不会停在满格。`);
+  const left=runwayYears(l);
+  if(left>0&&left<=4){
+   const parents=[l.family?.mother,l.family?.father].filter(alive).map(p=>p.name);
+   const kin=parents.length?`${parents.join('和')}最多帮一部分`:'家里若还有人，也只能帮一部分';
+   record(l,'这笔债还能撑一阵',`按现在的账单，大约还能再过${left}年。${f.arrears>=3?'拖欠已经连着，某一年会更快。':''}缩减开支还在。${kin}，不会一次还清。去找工作也不保证有回音，这一年不会凭空多出收入。`);
+  }
  }
 
 }
