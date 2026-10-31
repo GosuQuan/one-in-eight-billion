@@ -385,6 +385,7 @@ export function systemChoice(l, p, index) {
    } else if (kind === 'raise') {
     if ((l.lived?.leaveUntil || 0) >= l.age) { log(l, '假还没结束', `${l.job || '这份工作'}还在，育儿假这一年没有升职。收入维持请假后的数字。`, 'work'); break; }
      if ((l.lived?.sickUntil || 0) >= l.age) { log(l, '病假还没结束', `${l.job || '这份工作'}还在，这一年没有升职。收入维持原样。`, 'work'); break; }
+     if ((l.lived?.injuryUntil || 0) >= l.age) { log(l, '伤还没好', `${l.job || '这份工作'}还在，这一年没有升职。收入维持原样。`, 'work'); break; }
      if (!chance(l, Math.min(.7, .18 + (l.careerYears || 0) * .03 + (l.stats.knowledge || 0) * .002)) || !(l.income > 0)) { log(l, '评估没有通过', `你已有${l.careerYears || 0}年经验，这次名单上没有你。岗位和收入维持原样。`, 'work'); break; }
     l.income = Math.round(l.income * 1.14); l.job = '资深' + String(l.job || '职员').replace(/^资深/, '');
     log(l, '晋升名单上有你', `年收入调整为${l.income}。这是在${l.country.name}的物价上加的，不是一张永远有效的证明。`, 'work');

@@ -73,7 +73,7 @@ export const LIVED_ACTS = [
  { id: 'exam-wait', title: '等下一次再考', ages: [15, 35], cost: '不花钱，也不获得学历', time: '至少再等一年', risk: '正在顺利在读时，不必用这种方式停下来', mark: '等到那岁之前，新的升学申请会被自己挡下。备考可以继续，文凭不会出现' },
  { id: 'gap-year', title: '空出一年', ages: [17, 26], cost: '这一年不产生学历，也没有工资', time: '一年', risk: '已经有工作或正在读一个项目，就不能再空一次', mark: '这一年新的升学申请先不递。空年不会变成学历或工资' },
  { id: 'internship', title: '试一份短期实习', ages: [16, 23], cost: '地方可以不收你', time: '短短一段，不是岗位', risk: '大约四成半被回绝；有正式工作就不必再实习', mark: '带教有名字，补贴不是职业' },
- { id: 'injury', title: '处理工作时的伤', ages: [18, 65], cost: '医药大约当地水平的 2%，再损失一小段收入', time: '停下来处理', risk: '没有工作，或身体还没有报警，就不会走到这一步', mark: '职位还在，身体要时间' },
+ { id: 'injury', title: '处理工作时的伤', ages: [18, 65], cost: '医药大约当地水平的 2%，再损失一小段收入', time: '停下来处理', risk: '没有工作，或身体还没有报警，就不会走到这一步', mark: '职位还在。这一年和下一年伤还没好，也不能升职' },
  { id: 'sick-leave', title: '请病假', ages: [18, 67], cost: '大约三周工资，职位先留着', time: '这一段', risk: '没有工作或身体还撑得住，请不了', mark: '这一年不能升职。假若没批，今年也不能再请' },
  { id: 'birthday', title: '给一个具体的人过生日', ages: [6, 90], cost: '大约当地水平的 0.4%', time: '这一天', risk: '人若在别处，礼物大约四成送不到', mark: '送到了关系近一点，送不到钱也花了' },
  { id: 'pet-night', title: '夜里守着老去的伙伴', ages: [10, 80], cost: '不另收费，但会欠下睡眠', time: '这一夜，睡眠债留下两年', risk: '伙伴不一定因此好起来，离开也不会被拦住', mark: '名字留在这一年，工作不会因此改变' },
@@ -140,7 +140,7 @@ function open(l, id) {
   case 'exam-wait': return !(l.school?.program && !l.school.program.paused);
   case 'gap-year': return !v.gap && !working(l) && !(l.school?.program && !l.school.program.paused);
   case 'internship': return !v.intern && !working(l);
-  case 'injury': return working(l) && (l.stats.health || 0) < 55;
+  case 'injury': return working(l) && (l.stats.health || 0) < 55 && (v.injuryUntil || 0) < l.age;
   case 'sick-leave': return working(l) && (l.stats.health || 0) < 50 && (v.sickUntil || 0) < l.age && (v.sickNext || 0) <= l.age;
   case 'birthday': return !!someone(l);
   case 'pet-night': return !!(l.systems?.pet?.alive && ((l.systems.pet.age || 0) >= 8 || (l.systems.pet.health || 100) < 55) && (v.petNightUntil || 0) < l.age);
@@ -479,8 +479,8 @@ function run(l, id) {
    const sleepy = (v.sleepUntil || 0) >= l.age;
    const bill = Math.round(g * (sleepy ? .035 : .02));
    const lost = Math.round(Math.min((l.income || 0) * (sleepy ? .08 : .05), g * (sleepy ? .06 : .04)));
-   spend(l, bill + lost); stats(l, { health: sleepy ? -5 : -3 });
-   log(l, '工作时的伤', `${sleepy ? '睡眠债还在，' : ''}医药${bill}，少掉的收入大约${lost}。${l.job || '工作'}还在，身体要时间，没有人因此给你升职。`);
+   spend(l, bill + lost); stats(l, { health: sleepy ? -5 : -3 }); v.injuryUntil = l.age + 1;
+   log(l, '工作时的伤', `${sleepy ? '睡眠债还在，' : ''}医药${bill}，少掉的收入大约${lost}。${l.job || '工作'}还在。伤要到${v.injuryUntil}岁才不再挡着，这一年和下一年也不会因此升职。`);
    return { ok: true, message: '伤处理了，职位没变。' };
   }
   case 'sick-leave': {
@@ -638,6 +638,7 @@ function tick(l) {
    log(l, `${who.name}还等你再来`, `照护留到${v.elderKeep.until}岁。这一趟大约${trip}，职位没有因此变化。`);
   }
  }
+ if (v.injuryUntil && l.age === v.injuryUntil) { stats(l, { health: -1 }); log(l, '伤还没好利索', `${working(l) ? (l.job || '工作') + '还在。' : ''}去年工作时的伤这一年还在拖。没有人因此给你升职，也没有新的职位。`); }
  if ((v.cheapUntil || 0) >= l.age) stats(l, { health: -0.4 });
  if ((v.leaveUntil || 0) >= l.age && v.leaveCut !== l.age && (l.income || 0) > 0) { v.leaveCut = l.age; l.income = Math.round(l.income * .7); }
  if (formal(l)) { v.pensionYears += 1; v.pensionPot += Math.round(gdp(l) * .012); }
@@ -691,6 +692,7 @@ export function livedBrief(l) {
  if (v.informal) bits.push('工作无保障');
  if ((v.leaveUntil || 0) >= (l.age || 0)) bits.push('育儿假');
   if ((v.sickUntil || 0) >= (l.age || 0)) bits.push('病假这一年');
+  if ((v.injuryUntil || 0) >= (l.age || 0)) bits.push('伤还没好');
  if (v.grief?.length) bits.push(`想念${v.grief.map(g => g.name).join('、')}`);
  if (v.medLapse && (l.age || 0) <= v.medLapse.until) bits.push(`停药：${v.medLapse.name}`);
  if (v.bully && !v.bully.ended) bits.push(`针对：${v.bully.name}`);

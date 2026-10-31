@@ -946,3 +946,43 @@ test('sick leave keeps the job and blocks a promotion that year', () => {
   }
   assert.equal(refused, true);
 });
+
+test('workplace injury keeps hurting the next year and is not a promotion', () => {
+  const idle = adult('hurt-idle', 34);
+  idle.stats.health = 40; idle.income = 0; idle.job = '待业';
+  assert.equal(livedAction(idle, 'injury').ok, false);
+  assert.equal(idle.income, 0);
+  assert.equal(idle.job, '待业');
+  assert.equal(idle.lived.injuryUntil, undefined);
+
+  const l = adult('hurt-stay', 34);
+  l.stats.health = 40;
+  const before = l.money;
+  assert.equal(livedAction(l, 'injury').ok, true);
+  assert.ok(l.money < before);
+  assert.equal(l.job, '职员');
+  assert.equal(l.income, 40000);
+  assert.equal(l.lived.injuryUntil, 35);
+  assert.equal(l.stats.health, 37);
+  assert.equal(livedAction(l, 'injury').ok, false);
+  assert.match(careerAction(l, 'promotion').message, /伤/);
+  assert.equal(l.job, '职员');
+  assert.equal(l.income, 40000);
+  l.pending = { kind: 'system', system: 'opportunity', offerKind: 'raise', title: '评估', text: '试', options: [{ key: 'try', label: '去', description: '评估' }] };
+  choose(l, 0);
+  assert.ok(l.log.some(e => e.title === '伤还没好'));
+  assert.equal(l.job, '职员');
+  assert.equal(l.income, 40000);
+  l.pending = null;
+  const held = l.money;
+  l.age = 35;
+  livedYear(l, { events: false });
+  assert.equal(l.stats.health, 36);
+  assert.equal(l.money, held);
+  assert.equal(l.job, '职员');
+  assert.equal(l.income, 40000);
+  assert.ok(l.log.some(e => e.age === 35 && e.title === '伤还没好利索'));
+  assert.match(careerAction(l, 'promotion').message, /伤/);
+  l.age = 36;
+  assert.equal(/伤/.test(careerAction(l, 'promotion').message), false);
+});
