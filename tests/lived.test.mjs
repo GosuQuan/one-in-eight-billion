@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createLife, choose } from '../src/engine.js';
+import { createLife, choose, advanceYear } from '../src/engine.js';
 import { systemsYear } from '../src/life-systems.js';
 import { financeYear } from '../src/finance.js';
 import { LIVED_ACTS, initLived, livedAction, livedYear } from '../src/lived.js';
@@ -717,4 +717,50 @@ test('overtime can go unpaid, and sleep debt makes the month cost more', () => {
     }
   }
   assert.equal(sleepyUnpaid, true);
+});
+
+test('parental leave stays at seventy percent for two years and is not a promotion', () => {
+  const parentOf = (seed) => {
+    const l = adult(seed, 30);
+    l.jobKind = 'office';
+    l.children = [{ id: 'lin-tong', name: '林童', sex: '女', age: 0, birthYear: l.birthYear + 30, alive: true, bond: 70 }];
+    l.systems.care = { 'lin-tong': { mode: 'nursery', since: 30 } };
+    l.income = 40000; l.job = '职员';
+    return l;
+  };
+  const none = adult('leave-none', 30);
+  assert.equal(livedAction(none, 'parental-leave').ok, false);
+  assert.equal(none.income, 40000);
+
+  const a = parentOf('leave');
+  const b = parentOf('leave');
+  assert.equal(a.randomState, b.randomState);
+  livedAction(a, 'parental-leave');
+  assert.equal(a.income, 28000);
+  assert.equal(a.job, '职员');
+  assert.equal(a.lived.leaveFull, 40000);
+  assert.equal(a.lived.leaveUntil, 31);
+  livedYear(a, { events: false });
+  assert.equal(a.income, 28000);
+  assert.match(careerAction(a, 'promotion').message, /育儿假/);
+  assert.equal(a.job, '职员');
+  assert.equal(a.income, 28000);
+  a.pending = { kind: 'system', system: 'opportunity', offerKind: 'raise', title: '评估', text: '试', options: [{ key: 'try', label: '去', description: '评估' }] };
+  choose(a, 0);
+  assert.ok(a.log.some(e => e.title === '假还没结束'));
+  assert.equal(a.job, '职员');
+  assert.equal(a.income, 28000);
+
+  advanceYear(a, { events: false });
+  advanceYear(b, { events: false });
+  assert.equal(a.age, 31);
+  assert.equal(a.job, '职员');
+  assert.equal(b.job, '职员');
+  assert.ok(Math.abs(a.income - Math.round(b.income * 0.7)) <= 1);
+  assert.ok(a.income > b.income * 0.6);
+  assert.equal(a.lived.leaveCut, 31);
+  advanceYear(a, { events: false });
+  assert.equal(a.age, 32);
+  assert.equal(a.lived.leaveCut, 31);
+  assert.equal(a.job, '职员');
 });

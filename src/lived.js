@@ -205,10 +205,10 @@ function run(l, id) {
    return { ok: true, message: '从今年重新累计。' };
   }
   case 'parental-leave': {
-   const c = kid(l, 1); v.leaveUntil = l.age + 1;
+   const c = kid(l, 1); v.leaveUntil = l.age + 1; v.leaveFull = l.income || 0; v.leaveCut = l.age;
    if ((l.income || 0) > 0) l.income = Math.round(l.income * .7);
-   log(l, '为孩子请假', `${c?.name || '孩子'}还小。工作先留着，但这年和明年的收入按七成算，不会因此升职。`);
-   return { ok: true, message: '假请了，收入会按两年七成。' };
+   log(l, '为孩子请假', `${c?.name || '孩子'}还小。工作先留着。这年和明年各自按当年工资的七成算，不会在已经压过的数字上再砍一刀，也不会因此升职。`);
+   return { ok: true, message: '假请了。两年各按七成，不是七成再打七成。' };
   }
   case 'childcare-bill': {
    const c = schoolchild(l); const fee = Math.round(g * .01); spend(l, fee); v.tutorAt = l.age;
@@ -616,7 +616,7 @@ function tick(l) {
  }
  if (v.hobby && !v.hobbyTried) v.hobbyYears += 1;
  if ((v.cheapUntil || 0) >= l.age) stats(l, { health: -0.4 });
- if ((v.leaveUntil || 0) >= l.age && (l.income || 0) > 0) l.income = Math.round(l.income * .7);
+ if ((v.leaveUntil || 0) >= l.age && v.leaveCut !== l.age && (l.income || 0) > 0) { v.leaveCut = l.age; l.income = Math.round(l.income * .7); }
  if (formal(l)) { v.pensionYears += 1; v.pensionPot += Math.round(gdp(l) * .012); }
  if (abroad(l) && !v.fluent) v.barrierYears += 1;
  if ((v.preparedUntil || 0) >= l.age && ['war', 'crisis'].includes(l.systems?.world?.kind)) stats(l, { happiness: 1 });

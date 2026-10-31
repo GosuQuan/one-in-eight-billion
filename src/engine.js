@@ -567,7 +567,8 @@ export function advanceYear(life,options={}){
  for(const [k,v] of Object.entries(focus))life.stats[k]=clamp(life.stats[k]+v);
  life.stats.health-=(age<40?.3:age<65?.75:1.6);
  if(age<18)life.stats.knowledge=clamp(life.stats.knowledge+((life.school?.basicProgress>0||life.school?.program)&&!life.school?.program?.paused?2:.4));
- careerYear(life);
+ if((life.lived?.leaveUntil||0)>=age&&life.lived.leaveCut!==age&&life.lived.leaveFull>0)life.income=life.lived.leaveFull;
+  careerYear(life);
   if(age>=18&&!life.retired&&life.income>0)life.income*=1+(life.focus==='work'?.045:.02);
  if(life.retired&&life.income<=0)life.income=Math.round(life.country.gdp*.2);
  marketStep(life);
