@@ -51,7 +51,7 @@ export const LIVED_ACTS = [
  { id: 'quit-drink', title: '试着把酒停了', ages: [18, 80], cost: '不保证成功', time: '这一次尝试', risk: '可能停不住', mark: '停不住就还是习惯' },
  { id: 'exercise', title: '把活动变成习惯', ages: [12, 75], cost: '每年大约当地水平的 0.4%', time: '年年累计，停了就断', risk: '已经在坚持时不用再开始', mark: '健康涨得很慢' },
  { id: 'stop-exercise', title: '停掉锻炼', ages: [12, 80], cost: '省下那笔小钱', time: '从现在起', risk: '本来没有习惯就无事可停', mark: '累计的年数还在，但不再增加' },
- { id: 'cheap-food', title: '把吃的换成更便宜的', ages: [16, 80], cost: '这一年少花大约当地水平的 1.5%', time: '这一年', risk: '身体会记下营养不足', mark: '钱留下一点，健康下一小档' },
+ { id: 'cheap-food', title: '把吃的换成更便宜的', ages: [16, 80], cost: '这一年少花大约当地水平的 1.5%', time: '这一年', risk: '身体可能撑不住，省下的钱会被看病吃掉', mark: '撑住了才留下一点钱。没撑住，账单比省下的多，下一年身体还记着' },
  { id: 'pension-look', title: '看自己的养老累计', ages: [22, 90], cost: '不花钱', time: '看一眼', risk: '没有正式工作的年份不会凭空出现', mark: '不满大约十年正式工作，到龄也领不到这笔' },
  { id: 'pension-draw', title: '到龄领取养老积累', ages: [65, 95], cost: '不另收费', time: '一次', risk: '正式工作不满十年，或已经领过，就领不到', mark: '领到的是这些年扣下的积累，不是新的工作' },
  { id: 'tax-look', title: '看账单里的税和物价', ages: [18, 80], cost: '不另收，生活费已经随当地水平走', time: '看明白这一年', risk: '没有收入时只能看到物价，看不到预扣', mark: '明白账单会随当地水平变，不是固定的旧数字' },
@@ -325,8 +325,15 @@ function run(l, id) {
    return { ok: true, message: '停了。' };
   }
   case 'cheap-food': {
-   const save = Math.round(g * .015); l.money = (l.money || 0) + save; v.cheapUntil = l.age + 1; stats(l, { health: -1 });
-   log(l, '吃得更便宜', `这一年餐食大约省下${save}。营养不足，健康下去一点，省下的钱不会变成体质。`);
+   const save = Math.round(g * .015); v.cheapUntil = l.age + 1;
+   const frail = (l.stats.health || 0) < 45;
+   if (chance(l, frail ? .62 : .35)) {
+    const bill = Math.round(g * (frail ? .03 : .02)); spend(l, bill); stats(l, { health: frail ? -3 : -2 });
+    log(l, '便宜的吃食没撑住', `本来想省下大约${save}。身体记下了营养不足，看病花了${bill}。省下的那点没有留下，职位也不会因此变化。`);
+    return { ok: true, message: '钱没有省下。' };
+   }
+   l.money = (l.money || 0) + save; stats(l, { health: -1 });
+   log(l, '吃得更便宜', `这一年餐食大约省下${save}。营养不足，健康下去一点。省下的钱不会变成体质，也不会变成工作。`);
    return { ok: true, message: '省下了一点，身体记下了。' };
   }
   case 'pension-look': {
@@ -639,7 +646,7 @@ function tick(l) {
   }
  }
  if (v.injuryUntil && l.age === v.injuryUntil) { stats(l, { health: -1 }); log(l, '伤还没好利索', `${working(l) ? (l.job || '工作') + '还在。' : ''}去年工作时的伤这一年还在拖。没有人因此给你升职，也没有新的职位。`); }
- if ((v.cheapUntil || 0) >= l.age) stats(l, { health: -0.4 });
+ if (v.cheapUntil && l.age === v.cheapUntil) { stats(l, { health: -1 }); log(l, '便宜吃食还在身上', '去年省下的那点营养这一年还没补回来。没有人因此给你一份工作。'); }
  if ((v.leaveUntil || 0) >= l.age && v.leaveCut !== l.age && (l.income || 0) > 0) { v.leaveCut = l.age; l.income = Math.round(l.income * .7); }
  if (formal(l)) { v.pensionYears += 1; v.pensionPot += Math.round(gdp(l) * .012); }
  if (abroad(l) && !v.fluent) v.barrierYears += 1;
@@ -693,6 +700,7 @@ export function livedBrief(l) {
  if ((v.leaveUntil || 0) >= (l.age || 0)) bits.push('育儿假');
   if ((v.sickUntil || 0) >= (l.age || 0)) bits.push('病假这一年');
   if ((v.injuryUntil || 0) >= (l.age || 0)) bits.push('伤还没好');
+  if (v.cheapUntil && (l.age || 0) <= v.cheapUntil) bits.push('吃得便宜');
  if (v.grief?.length) bits.push(`想念${v.grief.map(g => g.name).join('、')}`);
  if (v.medLapse && (l.age || 0) <= v.medLapse.until) bits.push(`停药：${v.medLapse.name}`);
  if (v.bully && !v.bully.ended) bits.push(`针对：${v.bully.name}`);

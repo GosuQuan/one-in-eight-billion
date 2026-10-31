@@ -986,3 +986,52 @@ test('workplace injury keeps hurting the next year and is not a promotion', () =
   l.age = 36;
   assert.equal(/伤/.test(careerAction(l, 'promotion').message), false);
 });
+
+test('cheap food can fail to save money and the body remembers next year', () => {
+  let saved = false, sick = false;
+  for (let i = 0; i < 30 && !(saved && sick); i++) {
+    const l = adult('cheap-' + i, 28);
+    l.stats.health = 80;
+    const save = Math.round(l.country.gdp * .015);
+    const bill = Math.round(l.country.gdp * .02);
+    const before = l.money;
+    livedAction(l, 'cheap-food');
+    assert.equal(l.job, '职员');
+    assert.equal(l.income, 40000);
+    assert.equal(l.lived.cheapUntil, 29);
+    assert.equal(livedAction(l, 'cheap-food').ok, false);
+    if (l.log.some(e => e.title === '吃得更便宜')) {
+      assert.equal(l.money, before + save);
+      assert.equal(l.stats.health, 79);
+      const held = l.money;
+      l.age = 29;
+      livedYear(l, { events: false });
+      assert.equal(l.stats.health, 78);
+      assert.equal(l.money, held);
+      assert.equal(l.job, '职员');
+      assert.equal(l.income, 40000);
+      assert.ok(l.log.some(e => e.age === 29 && e.title === '便宜吃食还在身上'));
+      l.age = 30;
+      livedYear(l, { events: false });
+      assert.equal(l.stats.health, 78);
+      assert.ok(!l.log.some(e => e.age === 30 && e.title === '便宜吃食还在身上'));
+      saved = true;
+    }
+    if (l.log.some(e => e.title === '便宜的吃食没撑住')) {
+      assert.equal(l.money, before - bill);
+      assert.equal(l.debt, 0);
+      assert.equal(l.stats.health, 78);
+      const held = l.money;
+      l.age = 29;
+      livedYear(l, { events: false });
+      assert.equal(l.money, held);
+      assert.equal(l.stats.health, 77);
+      assert.equal(l.job, '职员');
+      assert.equal(l.income, 40000);
+      assert.ok(l.log.some(e => e.age === 29 && e.title === '便宜吃食还在身上'));
+      sick = true;
+    }
+  }
+  assert.equal(saved, true);
+  assert.equal(sick, true);
+});
