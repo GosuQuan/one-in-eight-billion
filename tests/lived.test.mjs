@@ -5,6 +5,7 @@ import { systemsYear } from '../src/life-systems.js';
 import { financeYear } from '../src/finance.js';
 import { LIVED_ACTS, initLived, livedAction, livedYear } from '../src/lived.js';
 import { careerAction } from '../src/career.js';
+import { educationAction } from '../src/education.js';
 
 const adult = (seed, age = 30) => {
   const l = createLife({ seed, country: 'CN' });
@@ -456,4 +457,115 @@ test('a named classmate keeps the days tight until the talk happens or the years
     }
   }
   assert.equal(refused, true);
+});
+
+test('a recommendation can sit on the next job and still fail', () => {
+  const named = (seed, age = 34) => {
+    const l = adult(seed, age);
+    l.job = '待业'; l.income = 0; l.pending = null; l.school = { credential: 'none' };
+    l.friends = [{ id: 'f1', name: '林荐', alive: true, bond: 60 }];
+    initLived(l);
+    l.lived.reference = { name: '林荐', until: l.age + 3 };
+    l.stats.knowledge = 10; l.stats.social = 10; l.focus = 'joy';
+    return l;
+  };
+  let refused = false, hired = false;
+  for (let i = 0; i < 24 && !(refused && hired); i++) {
+    const l = named('ref-' + i);
+    careerAction(l, 'apprentice');
+    if (l.log.some(e => e.text.includes('林荐的名字在材料上，这次仍没有录用'))) {
+      assert.equal(l.job, '待业');
+      assert.equal(l.income, 0);
+      assert.equal(l.lived.reference.name, '林荐');
+      refused = true;
+    }
+    if (l.log.some(e => e.text.includes('林荐的名字在材料上，这句推荐到此用掉'))) {
+      assert.equal(l.job, '维修学徒');
+      assert.ok(l.income > 0);
+      assert.equal(l.lived.reference, null);
+      hired = true;
+    }
+  }
+  assert.equal(refused, true);
+  assert.equal(hired, true);
+
+  const dead = named('ref-dead');
+  dead.friends[0].alive = false;
+  careerAction(dead, 'apprentice');
+  assert.equal(dead.log.some(e => e.text.includes('的名字在材料上')), false);
+  assert.equal(dead.lived.reference.name, '林荐');
+
+  const promo = named('ref-promo');
+  promo.income = 40000; promo.job = '职员'; promo.jobKind = 'office'; promo.careerYears = 6;
+  careerAction(promo, 'promotion');
+  assert.equal(promo.log.some(e => e.text.includes('的名字在材料上')), false);
+  assert.equal(promo.lived.reference.name, '林荐');
+
+  let heardNo = false, heardYes = false;
+  for (let i = 0; i < 30 && !(heardNo && heardYes); i++) {
+    const l = named('heard-ref-' + i);
+    l.stats.knowledge = 0; l.careerYears = 0;
+    l.pending = { kind: 'system', system: 'opportunity', offerKind: 'local', jobKind: 'apprentice', title: '本地', text: '试', options: [{ key: 'try', label: '去试试', description: '面试' }] };
+    choose(l, 0);
+    if (l.log.some(e => e.title === '本地的位置没有你' && e.text.includes('林荐'))) {
+      assert.equal(l.job, '待业');
+      assert.equal(l.lived.reference.name, '林荐');
+      heardNo = true;
+    }
+    if (l.log.some(e => e.title === '本地录用了你' && e.text.includes('林荐'))) {
+      assert.equal(l.lived.reference, null);
+      assert.ok(l.income > 0);
+      heardYes = true;
+    }
+  }
+  assert.equal(heardNo, true);
+  assert.equal(heardYes, true);
+});
+
+test('waiting to apply again blocks the next application and does not grant a credential', () => {
+  const l = adult('exam-wait', 30);
+  initLived(l);
+  l.lived.examWait = 31;
+  l.school.credential = 'none'; l.school.program = null; l.stats.knowledge = 80; l.money = 80000;
+  const money = l.money;
+  const blocked = educationAction(l, 'adult-basic');
+  assert.match(blocked.message, /等到31岁/);
+  assert.equal(l.money, money);
+  assert.equal(l.school.credential, 'none');
+  assert.equal(l.school.program, null);
+  l.age = 31;
+  const again = educationAction(l, 'adult-basic');
+  assert.doesNotMatch(again.message, /等到/);
+  assert.ok(l.money < money);
+  assert.equal(l.school.credential, 'none');
+});
+
+test('an unfinished chore argument keeps the partner name for two years', () => {
+  let fought = false, settled = false;
+  for (let i = 0; i < 16 && !(fought && settled); i++) {
+    const l = adult('chore-' + i, 32);
+    l.partner = { name: '林伴', alive: true, bond: 50 };
+    l.job = '职员'; l.income = 40000;
+    livedAction(l, 'chores');
+    if (l.log.some(e => e.title === '家务没有分清')) {
+      assert.equal(l.lived.choreUntil, 34);
+      const bond = l.partner.bond;
+      l.age = 33;
+      livedYear(l, { events: false });
+      assert.ok(l.log.some(e => e.title === '林伴还记着那轮家务'));
+      assert.ok(l.partner.bond < bond);
+      assert.equal(l.job, '职员');
+      assert.equal(l.income, 40000);
+      fought = true;
+    }
+    if (l.log.some(e => e.title === '家务说定了一轮')) {
+      assert.equal(l.lived.choreUntil, 0);
+      l.age = 33;
+      livedYear(l, { events: false });
+      assert.equal(l.log.some(e => e.title === '林伴还记着那轮家务'), false);
+      settled = true;
+    }
+  }
+  assert.equal(fought, true);
+  assert.equal(settled, true);
 });

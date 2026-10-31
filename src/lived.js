@@ -58,11 +58,11 @@ export const LIVED_ACTS = [
  { id: 'hustle', title: '下班后再做一单', ages: [18, 65], cost: '占用休息', time: '这一次，两年内不重复', risk: '大约六成没有入账，只是更累', mark: '入账也只是一笔，不会变成第二份正式工作' },
  { id: 'overtime', title: '这个月加班', ages: [18, 65], cost: '身体和心情', time: '换一笔一次性补贴', risk: '没有工资可加', mark: '补贴进现金，不会把职位改掉' },
  { id: 'job-search', title: '开始一段要等的求职', ages: [18, 64], cost: '不保证有回音', time: '至少再等两年才有回音', risk: '已经有工作时，这不是失业求职', mark: '明年之前不会因此出现新职位' },
- { id: 'reference', title: '请认识的人作推荐', ages: [18, 65], cost: '不花钱', time: '对方若答应，名字保留三年', risk: '对方可以拒绝', mark: '推荐不是录用通知' },
+ { id: 'reference', title: '请认识的人作推荐', ages: [18, 65], cost: '不花钱', time: '对方若答应，名字保留三年', risk: '对方可以拒绝', mark: '名字留三年。下一次求职可以写上，仍可能被拒；录用了，这句推荐就用掉' },
  { id: 'credential', title: '问海外是否承认学历', ages: [22, 60], cost: '问询本身不另收费', time: '不被承认的话，疑虑留下六年', risk: '人在原居国，或学历还停留在基础教育，就没有可认证的更高学历', mark: '不被承认的几年里，要学历的新本地工作会被挡下；学徒、远程和回国后不走这条' },
  { id: 'language', title: '补当地的语言', ages: [18, 70], cost: '大约当地水平的 3%', time: '要累计四次学进去，才不再被当成刚来的人', risk: '大约一半学不进去，钱照花', mark: '没补够之前，新的本地工作可能因此被拒；远程和回国后不走这条' },
  { id: 'remittance', title: '给家里汇一笔', ages: [18, 75], cost: '大约当地水平的 3%，不够就只能汇出手上的', time: '这一笔', risk: '父母都不在了就没有收款的人', mark: '钱不够时，家里会知道这不是足额' },
- { id: 'chores', title: '和伴侣分家务', ages: [18, 80], cost: '不花钱', time: '谈一次', risk: '大约一半谈不拢，别扭会留下两年', mark: '谈拢也只是这一轮，不会永久免谈' },
+ { id: 'chores', title: '和伴侣分家务', ages: [18, 80], cost: '不花钱', time: '谈一次', risk: '大约一半谈不拢，别扭会留下两年', mark: '谈不拢时，接下来两年会点出对方的名字' },
  { id: 'leave-home', title: '从父母家搬出来', ages: [18, 30], cost: '安家大约当地水平的 8%', time: '搬这一次', risk: '不是和父母同住，就无从搬出', mark: '房东有名字，住房份额不再另扣，工作也不会出现' },
  { id: 'service-year', title: '做一年社区服役', ages: [18, 26], cost: '身体累一点', time: '一年，只有微薄补贴', risk: '只做一次，不会变成长期职位', mark: '补贴是一笔现金，档案里记下服役，不是就业' },
  { id: 'prepare', title: '为坏年景预备一点', ages: [18, 80], cost: '大约当地水平的 1.5%', time: '预备能撑五年', risk: '钱不够就会记进欠款', mark: '预备在，真遇到紧张年份才少慌一点' },
@@ -70,7 +70,7 @@ export const LIVED_ACTS = [
  { id: 'neighbor-ask', title: '请邻居帮一个忙', ages: [8, 85], cost: '不花钱', time: '这一次', risk: '关系浅时更容易被拒绝', mark: '帮成了关系近一点，拒绝了就得自己扛' },
  { id: 'teacher', title: '记住一位老师', ages: [7, 18], cost: '不花钱', time: '学生年代的一次', risk: '只记一次', mark: '以后写信，可能没有回音' },
  { id: 'write-teacher', title: '给老师写一封信', ages: [10, 40], cost: '不花钱', time: '等一等', risk: '大约一半没有回信', mark: '没有回信，信还是留着' },
- { id: 'exam-wait', title: '等下一次再考', ages: [15, 35], cost: '不花钱，也不获得学历', time: '至少再等一年', risk: '正在顺利在读时，不必用这种方式停下来', mark: '等待不会变成录取' },
+ { id: 'exam-wait', title: '等下一次再考', ages: [15, 35], cost: '不花钱，也不获得学历', time: '至少再等一年', risk: '正在顺利在读时，不必用这种方式停下来', mark: '等到那岁之前，新的升学申请会被自己挡下。备考可以继续，文凭不会出现' },
  { id: 'gap-year', title: '空出一年', ages: [17, 26], cost: '这一年不产生学历，也没有工资', time: '一年', risk: '已经有工作或正在读一个项目，就不能再空一次', mark: '只多一点见识，档案里记下空年' },
  { id: 'internship', title: '试一份短期实习', ages: [16, 23], cost: '地方可以不收你', time: '短短一段，不是岗位', risk: '大约四成半被回绝；有正式工作就不必再实习', mark: '带教有名字，补贴不是职业' },
  { id: 'injury', title: '处理工作时的伤', ages: [18, 65], cost: '医药大约当地水平的 2%，再损失一小段收入', time: '停下来处理', risk: '没有工作，或身体还没有报警，就不会走到这一步', mark: '职位还在，身体要时间' },
@@ -394,7 +394,7 @@ function run(l, id) {
   case 'chores': {
    const p = l.partner;
    if (!chance(l, .5)) { v.choreUntil = l.age + 2; p.bond = clamp((p.bond || 40) - 4); log(l, '家务没有分清', `${p.name}觉得还是不公平。别扭会留两年。`); return { ok: true, message: '没谈拢。' }; }
-   p.bond = clamp((p.bond || 40) + 3);
+   p.bond = clamp((p.bond || 40) + 3); v.choreUntil = 0;
    log(l, '家务说定了一轮', `${p.name}和你把这一轮说定了。下一轮仍可能再吵。`);
    return { ok: true, message: '这一轮说定了。' };
   }
@@ -545,6 +545,12 @@ export function gateNewLocalJob(l, kind) {
   return { ok: true };
 }
 
+export function activeReference(l) {
+ const ref = l?.lived?.reference;
+ if (!ref || (ref.until || 0) < (l.age || 0)) return null;
+ return (l.friends || []).find(f => f && f.name === ref.name && f.alive !== false && !f.dead) || null;
+}
+
 export function askChild(l) {
  const v = l.lived;
  if (l.age < 24 || l.age > 42 || l.age % 6 !== 0 || v.childAsk === l.age) return false;
@@ -584,6 +590,13 @@ function tick(l) {
   const span = l.age - (v.bully.since ?? l.age);
   if (span >= 1 && span <= 3) stats(l, { happiness: -1, social: -1 });
   if (span === 4 && !v.bully.noted) { v.bully.noted = true; log(l, `${v.bully.name}不再天天出现`, '针对慢慢淡了。你们没有把话说开，这个名字还在。'); }
+ }
+ if ((v.choreUntil || 0) >= l.age && l.age > v.choreUntil - 2) {
+  const partner = l.partner;
+  if (partner && partner.alive !== false && !partner.dead && partner.name) {
+   partner.bond = clamp((partner.bond || 40) - 1); stats(l, { happiness: -1 });
+   log(l, `${partner.name}还记着那轮家务`, `别扭留到${v.choreUntil}岁。这一年没有重新说定，工作也不会因此出现。`);
+  }
  }
  if (v.hobby && !v.hobbyTried) v.hobbyYears += 1;
  if ((v.cheapUntil || 0) >= l.age) stats(l, { health: -0.4 });
@@ -647,6 +660,8 @@ export function livedBrief(l) {
  if (v.foreman) bits.push(`无保障：${v.foreman}`);
  if (v.mentor?.name) bits.push(`带教 ${v.mentor.name}`);
  if (v.reference?.until >= (l.age || 0)) bits.push(`${v.reference.name}的推荐还在`);
+ if ((v.examWait || 0) > (l.age || 0)) bits.push(`等到${v.examWait}岁再申请`);
+ if ((v.choreUntil || 0) >= (l.age || 0) && l.partner?.name) bits.push(`家务别扭：${l.partner.name}`);
  if (abroad(l) && !v.fluent) bits.push(`当地语言还生疏（${v.barrierYears}年）`);
  if ((v.pensionYears || 0) > 0) bits.push(`养老累计 ${v.pensionYears} 年`);
  return bits.join(' · ');

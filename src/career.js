@@ -1,4 +1,4 @@
-import { gateNewLocalJob } from './lived.js';
+import { gateNewLocalJob, activeReference } from './lived.js';
 const record = (l, title, text) => l.log.push({ age: l.age, year: l.birthYear + l.age, title, text, type: 'work' });
 function roll(l) { l.randomState = (l.randomState + 0x6D2B79F5) >>> 0; let t = l.randomState; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; }
 const rank = { none: 0, primary: 1, basic: 2, high: 3, vocational: 3, university: 4, masters: 5 };
@@ -52,9 +52,10 @@ export function careerAction(l, id) {
    return { ok: true, message: gate.title };
   }
  }
- const probability = Math.min(.86, o.chance + (l.stats.knowledge || 0) * .002 + (l.stats.social || 0) * .001 + (l.focus === 'work' ? .08 : 0) + (id === 'promotion' ? Math.min(.28, (l.careerYears || 0) * .02) : 0));
+ const ref = id === 'promotion' ? null : activeReference(l);
+  const probability = Math.min(.86, o.chance + (l.stats.knowledge || 0) * .002 + (l.stats.social || 0) * .001 + (l.focus === 'work' ? .08 : 0) + (id === 'promotion' ? Math.min(.28, (l.careerYears || 0) * .02) : 0) + (ref ? .12 : 0));
  if (roll(l) >= probability) {
-  record(l, '没有等到那份录用通知', `${o.label}之后，对方选了更贴近岗位的人。${id === 'matched' ? '学历写在简历上，空位却要你还没有的项目经历。' : ''}${id === 'promotion' ? `你已有${l.careerYears || 0}年经验，这次评估仍没通过。` : ''}你仍是${l.job}。这样的消息以后还会再出现。`);
+  record(l, '没有等到那份录用通知', `${o.label}之后，对方选了更贴近岗位的人。${id === 'matched' ? '学历写在简历上，空位却要你还没有的项目经历。' : ''}${id === 'promotion' ? `你已有${l.careerYears || 0}年经验，这次评估仍没通过。` : ''}${ref ? `${ref.name}的名字在材料上，这次仍没有录用。推荐留到${l.lived.reference.until}岁，不是一张录用通知。` : ''}你仍是${l.job}。这样的消息以后还会再出现。`);
   l.stats.happiness = Math.max(0, l.stats.happiness - 2);
   return { ok: true, message: '这次没有通过' };
  }
@@ -65,7 +66,8 @@ export function careerAction(l, id) {
   else { l.employerGdp = null; l.employerCountryId = l.country.id; }
   l.income = localIncome(l, id, l.remote ? { gdp: l.employerGdp } : l.country);
  }
- record(l, id === 'promotion' ? '名字出现在晋升名单上' : '收到录用通知', `你现在是${l.job}，年收入${l.income}，按${l.remote ? '雇主所在地' : l.country.name}的物价、你的学历和${l.careerYears || 0}年经验计算。以后仍可能失业，换地方时收入和开销会重算。`);
+ record(l, id === 'promotion' ? '名字出现在晋升名单上' : '收到录用通知', `你现在是${l.job}，年收入${l.income}，按${l.remote ? '雇主所在地' : l.country.name}的物价、你的学历和${l.careerYears || 0}年经验计算。${ref ? `${ref.name}的名字在材料上，这句推荐到此用掉。` : ''}以后仍可能失业，换地方时收入和开销会重算。`);
+  if (ref) l.lived.reference = null;
  return { ok: true, message: `成为${l.job}，年收入${l.income}` };
 }
 export function careerYear(l) {

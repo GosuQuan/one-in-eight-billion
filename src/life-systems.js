@@ -1,7 +1,7 @@
 // Original, serializable life systems. Monetary figures are illustrative PPP units.
 import { COUNTRIES } from './engine.js';
 import { inferKind, localIncome, careerOptions } from './career.js';
-import { initLived, livedYear, livedChoice, askChild, gateNewLocalJob } from './lived.js';
+import { initLived, livedYear, livedChoice, askChild, gateNewLocalJob, activeReference } from './lived.js';
 
 const clamp = n => Math.max(0, Math.min(100, Number(n) || 0));
 const copy = x => JSON.parse(JSON.stringify(x));
@@ -375,11 +375,12 @@ export function systemChoice(l, p, index) {
     const gate = gateNewLocalJob(l, p.jobKind);
     if (!gate.ok) { stats(l, { happiness: -2 }); log(l, gate.title, `${gate.text}你仍是${l.job}。`, 'work'); break; }
     const preview = localIncome(l, p.jobKind);
-    const pass = chance(l, .28 + (l.stats.knowledge || 0) * .002 + Math.min(.2, (l.careerYears || 0) * .02));
-    if (!pass) { stats(l, { happiness: -2 }); log(l, '本地的位置没有你', `面试结束了。以你现在的学历和${l.careerYears || 0}年经验，对方选了别人。你仍是${l.job}。`, 'work'); break; }
+    const ref = activeReference(l);
+    const pass = chance(l, Math.min(.86, .28 + (l.stats.knowledge || 0) * .002 + Math.min(.2, (l.careerYears || 0) * .02) + (ref ? .12 : 0)));
+    if (!pass) { stats(l, { happiness: -2 }); log(l, '本地的位置没有你', `面试结束了。以你现在的学历和${l.careerYears || 0}年经验，对方选了别人。${ref ? `${ref.name}的名字在材料上，这次仍没有录用。推荐留到${l.lived.reference.until}岁。` : ''}你仍是${l.job}。`, 'work'); break; }
     l.jobKind = p.jobKind; l.remote = false; l.employerGdp = null; l.employerCountryId = l.country.id; l.retired = false;
     l.job = { apprentice: '维修学徒', office: '行政职员', technical: '技术人员', matched: '专业对口岗位' }[p.jobKind] || '本地职员';
-    l.income = preview; log(l, '本地录用了你', `年收入${l.income}，按${l.country.name}的物价、学历和经验计算。以后仍可能失业。`, 'work');
+    l.income = preview; if (ref) l.lived.reference = null; log(l, '本地录用了你', `年收入${l.income}，按${l.country.name}的物价、学历和经验计算。${ref ? `${ref.name}的名字在材料上，这句推荐到此用掉。` : ''}以后仍可能失业。`, 'work');
    } else if (kind === 'raise') {
     if (!chance(l, Math.min(.7, .18 + (l.careerYears || 0) * .03 + (l.stats.knowledge || 0) * .002)) || !(l.income > 0)) { log(l, '评估没有通过', `你已有${l.careerYears || 0}年经验，这次名单上没有你。岗位和收入维持原样。`, 'work'); break; }
     l.income = Math.round(l.income * 1.14); l.job = '资深' + String(l.job || '职员').replace(/^资深/, '');
