@@ -4,6 +4,7 @@ import { createLife, choose } from '../src/engine.js';
 import { systemsYear } from '../src/life-systems.js';
 import { financeYear } from '../src/finance.js';
 import { LIVED_ACTS, initLived, livedAction, livedYear } from '../src/lived.js';
+import { careerAction } from '../src/career.js';
 
 const adult = (seed, age = 30) => {
   const l = createLife({ seed, country: 'CN' });
@@ -265,4 +266,81 @@ test('a debt crisis names a living parent and does not invent work', () => {
     if (hit) named = hit.text.includes(l.family.mother.name) || hit.text.includes(l.family.father.name);
   }
   assert.equal(named, true);
+});
+
+test('an unrecognized credential blocks a new local job, not a remote one or a job at home', () => {
+  const blocked = adult('cred-block', 34);
+  blocked.systems.residence.abroadSince = 30;
+  blocked.school = { credential: 'university' };
+  initLived(blocked);
+  blocked.lived.fluent = true;
+  blocked.lived.unrecognizedUntil = blocked.age + 4;
+  blocked.job = '待业'; blocked.income = 0; blocked.pending = null;
+  const state = blocked.randomState;
+  const result = careerAction(blocked, 'office');
+  assert.equal(result.ok, true);
+  assert.match(result.message, /学历/);
+  assert.equal(blocked.job, '待业');
+  assert.equal(blocked.income, 0);
+  assert.equal(blocked.randomState, state);
+
+  const home = adult('cred-home', 34);
+  home.systems.residence.abroadSince = null;
+  home.school = { credential: 'university' };
+  initLived(home);
+  home.lived.fluent = false;
+  home.lived.unrecognizedUntil = home.age + 5;
+  home.job = '待业'; home.income = 0; home.pending = null;
+  careerAction(home, 'office');
+  assert.equal(home.log.some(e => e.title === '学历挡住了这份本地工作' || e.title === '面试停在语言上'), false);
+
+  let remote = false;
+  for (let i = 0; i < 20 && !remote; i++) {
+    const l = adult('cred-remote-' + i, 34);
+    l.systems.residence.abroadSince = 30;
+    l.school = { credential: 'university' };
+    initLived(l);
+    l.lived.fluent = false;
+    l.lived.unrecognizedUntil = l.age + 4;
+    l.job = '待业'; l.income = 0; l.pending = null;
+    l.stats.knowledge = 90; l.focus = 'work';
+    careerAction(l, 'remote');
+    assert.equal(l.log.some(e => e.title === '面试停在语言上' || e.title === '学历挡住了这份本地工作'), false);
+    if (l.remote && l.income > 0) remote = true;
+  }
+  assert.equal(remote, true);
+});
+
+test('language can refuse a new local job and can still allow one', () => {
+  let refused = false, hired = false;
+  for (let i = 0; i < 28 && !(refused && hired); i++) {
+    const l = adult('lang-job-' + i, 34);
+    l.systems.residence.abroadSince = 30;
+    initLived(l);
+    l.lived.fluent = false;
+    l.lived.unrecognizedUntil = 0;
+    l.job = '待业'; l.income = 0; l.pending = null;
+    l.stats.knowledge = 80; l.stats.social = 80; l.focus = 'work';
+    careerAction(l, 'apprentice');
+    if (l.log.some(e => e.title === '面试停在语言上')) {
+      assert.equal(l.job, '待业');
+      assert.equal(l.income, 0);
+      refused = true;
+    }
+    if (l.job === '维修学徒' && l.income > 0) hired = true;
+  }
+  assert.equal(refused, true);
+  assert.equal(hired, true);
+
+  const heard = adult('heard-cred', 34);
+  heard.systems.residence.abroadSince = 30;
+  initLived(heard);
+  heard.lived.fluent = true;
+  heard.lived.unrecognizedUntil = 40;
+  heard.job = '待业'; heard.income = 0;
+  heard.pending = { kind: 'system', system: 'opportunity', offerKind: 'local', jobKind: 'office', title: '本地', text: '试', options: [{ key: 'try', label: '去试试', description: '面试' }] };
+  choose(heard, 0);
+  assert.equal(heard.income, 0);
+  assert.equal(heard.job, '待业');
+  assert.equal(heard.log.some(e => e.title === '学历挡住了这份本地工作'), true);
 });

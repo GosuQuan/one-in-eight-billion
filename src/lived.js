@@ -59,8 +59,8 @@ export const LIVED_ACTS = [
  { id: 'overtime', title: '这个月加班', ages: [18, 65], cost: '身体和心情', time: '换一笔一次性补贴', risk: '没有工资可加', mark: '补贴进现金，不会把职位改掉' },
  { id: 'job-search', title: '开始一段要等的求职', ages: [18, 64], cost: '不保证有回音', time: '至少再等两年才有回音', risk: '已经有工作时，这不是失业求职', mark: '明年之前不会因此出现新职位' },
  { id: 'reference', title: '请认识的人作推荐', ages: [18, 65], cost: '不花钱', time: '对方若答应，名字保留三年', risk: '对方可以拒绝', mark: '推荐不是录用通知' },
- { id: 'credential', title: '问海外是否承认学历', ages: [22, 60], cost: '问询本身不另收费', time: '不被承认的话，疑虑留下六年', risk: '人在原居国，或学历还停留在基础教育，就没有可认证的更高学历', mark: '承认与否都不发放新工作' },
- { id: 'language', title: '补当地的语言', ages: [18, 70], cost: '大约当地水平的 3%', time: '要累计四次学进去，才不再被当成刚来的人', risk: '大约一半学不进去，钱照花', mark: '没补够之前，当地机会仍把你当新人' },
+ { id: 'credential', title: '问海外是否承认学历', ages: [22, 60], cost: '问询本身不另收费', time: '不被承认的话，疑虑留下六年', risk: '人在原居国，或学历还停留在基础教育，就没有可认证的更高学历', mark: '不被承认的几年里，要学历的新本地工作会被挡下；学徒、远程和回国后不走这条' },
+ { id: 'language', title: '补当地的语言', ages: [18, 70], cost: '大约当地水平的 3%', time: '要累计四次学进去，才不再被当成刚来的人', risk: '大约一半学不进去，钱照花', mark: '没补够之前，新的本地工作可能因此被拒；远程和回国后不走这条' },
  { id: 'remittance', title: '给家里汇一笔', ages: [18, 75], cost: '大约当地水平的 3%，不够就只能汇出手上的', time: '这一笔', risk: '父母都不在了就没有收款的人', mark: '钱不够时，家里会知道这不是足额' },
  { id: 'chores', title: '和伴侣分家务', ages: [18, 80], cost: '不花钱', time: '谈一次', risk: '大约一半谈不拢，别扭会留下两年', mark: '谈拢也只是这一轮，不会永久免谈' },
  { id: 'leave-home', title: '从父母家搬出来', ages: [18, 30], cost: '安家大约当地水平的 8%', time: '搬这一次', risk: '不是和父母同住，就无从搬出', mark: '房东有名字，住房份额不再另扣，工作也不会出现' },
@@ -521,6 +521,21 @@ function watch(l) {
  if (fading.length) log(l, '想念还在，但这一天可以重新安排', `${fading.map(g => g.name).join('、')}离开已经四年。你仍会在普通的下午想起对方。`);
  const active = v.grief.filter(g => l.age - g.since <= 4 && l.age !== g.since);
  if (active.length) stats(l, { happiness: -Math.min(3, active.length) });
+}
+
+export function gateNewLocalJob(l, kind) {
+  initLived(l);
+  if (kind === 'remote' || kind === 'promotion' || kind === 'raise') return { ok: true };
+  if (l.systems?.residence?.abroadSince == null) return { ok: true };
+  const v = l.lived;
+  if ((v.unrecognizedUntil || 0) >= l.age && kind !== 'apprentice') {
+    return { ok: false, title: '学历挡住了这份本地工作', text: `在${l.country.name}，你的学历要到${v.unrecognizedUntil}岁才不再被卡住。这份要学历的本地职位没有录用你。学徒和远程不受这条限制。` };
+  }
+  if (!v.fluent && !chance(l, .38)) {
+    const who = named(l);
+    return { ok: false, title: '面试停在语言上', text: `${who.name}在${l.country.name}问了几个只有本地才答得顺的问题。你没接上。这份新的本地工作没有给你，原来的${l.job || '状态'}还在。远程工作不走这条。` };
+  }
+  return { ok: true };
 }
 
 export function askChild(l) {

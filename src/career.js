@@ -1,3 +1,4 @@
+import { gateNewLocalJob } from './lived.js';
 const record = (l, title, text) => l.log.push({ age: l.age, year: l.birthYear + l.age, title, text, type: 'work' });
 function roll(l) { l.randomState = (l.randomState + 0x6D2B79F5) >>> 0; let t = l.randomState; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; }
 const rank = { none: 0, primary: 1, basic: 2, high: 3, vocational: 3, university: 4, masters: 5 };
@@ -43,6 +44,14 @@ export function careerAction(l, id) {
  if (!o || l.pending) return { ok: false, message: '请先处理当前选择' };
  if (o.disabled) return { ok: false, message: o.reason || '当前不能申请' };
  l.careerLastAge = l.age;
+ if (id !== 'promotion') {
+  const gate = gateNewLocalJob(l, id);
+  if (!gate.ok) {
+   record(l, gate.title, `${gate.text}你仍是${l.job}。`);
+   l.stats.happiness = Math.max(0, l.stats.happiness - 2);
+   return { ok: true, message: gate.title };
+  }
+ }
  const probability = Math.min(.86, o.chance + (l.stats.knowledge || 0) * .002 + (l.stats.social || 0) * .001 + (l.focus === 'work' ? .08 : 0) + (id === 'promotion' ? Math.min(.28, (l.careerYears || 0) * .02) : 0));
  if (roll(l) >= probability) {
   record(l, '没有等到那份录用通知', `${o.label}之后，对方选了更贴近岗位的人。${id === 'matched' ? '学历写在简历上，空位却要你还没有的项目经历。' : ''}${id === 'promotion' ? `你已有${l.careerYears || 0}年经验，这次评估仍没通过。` : ''}你仍是${l.job}。这样的消息以后还会再出现。`);

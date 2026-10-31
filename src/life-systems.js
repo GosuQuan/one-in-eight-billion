@@ -1,7 +1,7 @@
 // Original, serializable life systems. Monetary figures are illustrative PPP units.
 import { COUNTRIES } from './engine.js';
 import { inferKind, localIncome, careerOptions } from './career.js';
-import { initLived, livedYear, livedChoice, askChild } from './lived.js';
+import { initLived, livedYear, livedChoice, askChild, gateNewLocalJob } from './lived.js';
 
 const clamp = n => Math.max(0, Math.min(100, Number(n) || 0));
 const copy = x => JSON.parse(JSON.stringify(x));
@@ -80,6 +80,12 @@ function fertilityBlock(l) {
 function arriveWork(l, destination, originGdp, mode) {
  if (mode === 'transfer') {
   const kind = l.jobKind || inferKind(l.job);
+  const gate = gateNewLocalJob(l, kind);
+  if (!gate.ok) {
+   l.income = 0; l.job = '待业'; l.jobKind = null; l.remote = false; l.employerGdp = null; l.employerCountryId = destination.id;
+   log(l, gate.title, `${gate.text}人已经在${destination.name}，开销按这里算。`, 'work');
+   return;
+  }
   l.remote = false; l.employerGdp = null; l.employerCountryId = destination.id; l.jobKind = kind;
   if (!l.job || ['待业', '尚未工作', '学生'].includes(l.job)) l.job = '本地职员';
   l.income = localIncome(l, kind, destination);
@@ -366,6 +372,8 @@ export function systemChoice(l, p, index) {
    if (key === 'skip' || key === 'cancel') { log(l, '让这个消息过去', '你听见了，但没有去追。机会不会在原地等你。'); break; }
    const kind = p.offerKind;
    if (kind === 'local') {
+    const gate = gateNewLocalJob(l, p.jobKind);
+    if (!gate.ok) { stats(l, { happiness: -2 }); log(l, gate.title, `${gate.text}你仍是${l.job}。`, 'work'); break; }
     const preview = localIncome(l, p.jobKind);
     const pass = chance(l, .28 + (l.stats.knowledge || 0) * .002 + Math.min(.2, (l.careerYears || 0) * .02));
     if (!pass) { stats(l, { happiness: -2 }); log(l, '本地的位置没有你', `面试结束了。以你现在的学历和${l.careerYears || 0}年经验，对方选了别人。你仍是${l.job}。`, 'work'); break; }
@@ -605,7 +613,12 @@ function hearOpportunity(l) {
  if (kind === 'local') {
   const jobKind = pick(l, localJobs).id;
   const preview = localIncome(l, jobKind);
-  pending(l, 'opportunity', '有人提起一个本地的位置', `在${l.country.name}，以你的学历和${l.careerYears || 0}年经验，这份工作不一定录用。若做成，年收入大约${preview}，按这里的物价计算。`, [option('try', '去试试', '花时间面试，可能没有回音。'), option('skip', '先不接', '消息会过去，你留在现在的状态。')], { offerKind: 'local', jobKind });
+  const livedNow = l.lived || {};
+  const abroadNow = r.abroadSince != null;
+  const notes = [];
+  if (abroadNow && !livedNow.fluent) notes.push('当地语言还不熟，面试可能因此停住');
+  if (abroadNow && (livedNow.unrecognizedUntil || 0) >= l.age && jobKind !== 'apprentice') notes.push('学历在这里还没被承认，要学历的职位会直接被挡下');
+  pending(l, 'opportunity', '有人提起一个本地的位置', `在${l.country.name}，以你的学历和${l.careerYears || 0}年经验，这份工作不一定录用。若做成，年收入大约${preview}，按这里的物价计算。${notes.length ? notes.join('。') + '。' : ''}`, [option('try', '去试试', '花时间面试，可能没有回音。'), option('skip', '先不接', '消息会过去，你留在现在的状态。')], { offerKind: 'local', jobKind });
  } else if (kind === 'raise') {
   pending(l, 'opportunity', '主管提起你的名字', `你在这里做了${l.careerYears || 0}年。晋升不看你想不想，看他们认不认。没通过就留在原岗位。`, [option('try', '参加评估', '可能被拒绝。'), option('skip', '当作没听见', '岗位维持原样。')], { offerKind: 'raise' });
  } else if (kind === 'remote') {
