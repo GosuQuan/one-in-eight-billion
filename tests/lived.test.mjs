@@ -1197,3 +1197,67 @@ test('unused supplies expire after five years and the money is not returned', ()
   assert.equal(l.log.filter(e => e.title === '预备过了期').length, 1);
   assert.equal(l.money, held);
 });
+
+test('hiding a changing body keeps that person noticing for one more year', () => {
+  let hid = false, stood = false;
+  for (let i = 0; i < 40 && !(hid && stood); i++) {
+    const l = createLife({ seed: 'body-' + i, country: 'CN' });
+    l.age = 13; l.money = 100; l.debt = 0; l.income = 0; l.job = '学生'; l.pending = null;
+    l.family.mother.alive = true; l.family.mother.bond = 50;
+    const name = l.family.mother.name;
+    const education = l.education;
+    const children = l.children.length;
+    const happy = l.stats.happiness;
+    const social = l.stats.social;
+    assert.equal(livedAction(l, 'puberty').ok, true);
+    assert.equal(livedAction(l, 'puberty').ok, false);
+    assert.equal(l.money, 100);
+    assert.equal(l.debt, 0);
+    assert.equal(l.job, '学生');
+    assert.equal(l.income, 0);
+    assert.equal(l.education, education);
+    assert.equal(l.children.length, children);
+    if (l.log.some(e => e.title === '身体在变' && e.text.includes('不想被看出来'))) {
+      assert.equal(l.family.mother.bond, 48);
+      assert.equal(l.lived.puberty.name, name);
+      assert.equal(l.lived.puberty.until, 14);
+      assert.equal(l.stats.happiness, happy - 1);
+      assert.equal(l.stats.social, social - 2);
+      livedYear(l, { events: false });
+      assert.equal(l.money, 100);
+      assert.ok(!l.log.some(e => e.age === 13 && e.title === `${name}还注意到你在躲`));
+      l.age = 14;
+      livedYear(l, { events: false });
+      assert.equal(l.money, 100);
+      assert.equal(l.debt, 0);
+      assert.equal(l.job, '学生');
+      assert.equal(l.income, 0);
+      assert.equal(l.education, education);
+      assert.equal(l.stats.happiness, happy - 2);
+      assert.equal(l.stats.social, social - 3);
+      assert.ok(l.log.some(e => e.age === 14 && e.title === `${name}还注意到你在躲`));
+      l.age = 15;
+      livedYear(l, { events: false });
+      assert.equal(l.stats.happiness, happy - 2);
+      assert.equal(l.stats.social, social - 3);
+      assert.equal(l.money, 100);
+      assert.ok(!l.log.some(e => e.age === 15 && e.title === `${name}还注意到你在躲`));
+      hid = true;
+    }
+    if (l.log.some(e => e.title === '身体在变' && e.text.includes('慢慢知道'))) {
+      assert.equal(l.family.mother.bond, 50);
+      assert.equal(l.lived.puberty.hid ?? false, false);
+      assert.equal(l.stats.happiness, happy - 1);
+      assert.equal(l.stats.social, social + 1);
+      l.age = 14;
+      livedYear(l, { events: false });
+      assert.equal(l.money, 100);
+      assert.equal(l.job, '学生');
+      assert.equal(l.income, 0);
+      assert.ok(!l.log.some(e => e.title === `${name}还注意到你在躲`));
+      stood = true;
+    }
+  }
+  assert.equal(hid, true);
+  assert.equal(stood, true);
+});

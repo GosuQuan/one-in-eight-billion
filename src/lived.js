@@ -38,7 +38,7 @@ export const LIVED_ACTS = [
  { id: 'childcare-bill', title: '为上学的孩子加一笔辅导', ages: [18, 60], cost: '大约当地水平的 1%，孩子不愿学也已经花掉', time: '这一年', risk: '没有 6 到 17 岁、跟你生活的孩子就无从加', mark: '孩子肯学才多一点成长，否则只是账单' },
  { id: 'bully', title: '正视那个针对你的同学', ages: [8, 16], cost: '不花钱', time: '没说开的话，接下来三年心情和相处都会更紧', risk: '已经有这样一个人，就不会再造一个', mark: '对方有名字。不和解，名字还在，日常会紧几年' },
  { id: 'reconcile', title: '试着和那个同学说开', ages: [8, 20], cost: '不花钱', time: '一次谈话', risk: '对方可以不接受，关系会更僵', mark: '说开了才结束这段针对' },
- { id: 'puberty', title: '承认身体在变', ages: [11, 16], cost: '不花钱', time: '这一年', risk: '只发生一次', mark: '情绪和跟人相处的把握会晃一下，没有别的奖励' },
+ { id: 'puberty', title: '承认身体在变', ages: [11, 16], cost: '不花钱', time: '这一年，躲开的话名字再留一年', risk: '只发生一次', mark: '躲开的话，家里或身边那个人还会再注意一年。没有奖励，也不会变成升学或工作' },
  { id: 'elder-care', title: '照顾年老的父母', ages: [25, 70], cost: '大约当地水平的 4%，后来两年还有更小的来回', time: '这一年，再加上后来两年', risk: '父母可能说不用你管，钱仍可能已经垫上', mark: '照护会再走两年。人若不在了就停，也不会变成工作' },
  { id: 'sibling', title: '和兄弟姐妹谈一次', ages: [12, 70], cost: '不花钱', time: '一次', risk: '对方可能不想谈', mark: '谈崩了，接下来两年会点出对方的名字。谈成了，这段别扭就停' },
  { id: 'grief-visit', title: '去看望离开的人', ages: [10, 90], cost: '大约当地水平的 1%，没去成也不退', time: '一天', risk: '路可能断，没有正在想念的人就没有可去的地方', mark: '看成了心情松一点。没看成，钱也花了。想念都不会提前结束' },
@@ -236,9 +236,23 @@ function run(l, id) {
    return { ok: true, message: '说开了。' };
   }
   case 'puberty': {
-   v.puberty = true; const up = chance(l, .5); stats(l, { social: up ? 1 : -2, happiness: -1 });
-   log(l, '身体在变', `衣服和情绪都有点跟不上。${up ? '你慢慢知道怎么跟别人站在一起。' : '你更不想被看出来。'}没有奖励，也没有人替你跳过这一年。`);
-   return { ok: true, message: '这一年就这样过去。' };
+   const up = chance(l, .5); stats(l, { social: up ? 1 : -2, happiness: -1 });
+   if (up) {
+    v.puberty = { done: true };
+    log(l, '身体在变', '衣服和情绪都有点跟不上。你慢慢知道怎么跟别人站在一起。没有奖励，也没有人替你跳过这一年。升学和工作都不会因此出现。');
+    return { ok: true, message: '这一年就这样过去。' };
+   }
+   let person = parents(l)[0] || (l.friends || []).find(f => f && f.alive !== false && !f.dead);
+   if (!person) {
+    const who = named(l); l.friends ||= []; l.systems ||= {};
+    const idn = `friend-${(l.systems.friendSequence = (l.systems.friendSequence || 0) + 1)}`;
+    person = { ...who, id: idn, age: l.age, bond: 30, countryId: l.country?.id, metThrough: '身体在变的那一年', sharedMemory: '你躲开的那一次', lastContactAge: l.age, alive: true };
+    l.friends.push(person);
+   }
+   person.bond = clamp((person.bond || 40) - 2);
+   v.puberty = { done: true, hid: true, name: person.name, until: l.age + 1 };
+   log(l, '身体在变', `衣服和情绪都有点跟不上。你更不想被看出来。${person.name}看出来了，明年还会再注意到。没有奖励，升学和工作都不会因此出现。`);
+   return { ok: true, message: `${person.name}看出来了。` };
   }
   case 'elder-care': {
    const p = elder(l); const fee = Math.round(g * .04); spend(l, fee); v.elderAt = l.age;
@@ -625,6 +639,11 @@ function tick(l) {
   if (span >= 1 && span <= 3) stats(l, { happiness: -1, social: -1 });
   if (span === 4 && !v.bully.noted) { v.bully.noted = true; log(l, `${v.bully.name}不再天天出现`, '针对慢慢淡了。你们没有把话说开，这个名字还在。'); }
  }
+ if (v.puberty?.hid && l.age === v.puberty.until) {
+  const who = [...parents(l), ...(l.friends || [])].find(p => p && p.name === v.puberty.name && p.alive !== false && !p.dead);
+  if (!who) v.puberty.hid = false;
+  else { stats(l, { happiness: -1, social: -1 }); log(l, `${who.name}还注意到你在躲`, '身体还在变。这一年不再另花钱，也不会因此多出升学或工作。'); }
+ }
  if ((v.choreUntil || 0) >= l.age && l.age > v.choreUntil - 2) {
   const partner = l.partner;
   if (partner && partner.alive !== false && !partner.dead && partner.name) {
@@ -728,6 +747,7 @@ export function livedBrief(l) {
  if (v.grief?.length) bits.push(`想念${v.grief.map(g => g.name).join('、')}`);
  if (v.medLapse && (l.age || 0) <= v.medLapse.until) bits.push(`停药：${v.medLapse.name}`);
  if (v.bully && !v.bully.ended) bits.push(`针对：${v.bully.name}`);
+  if (v.puberty?.hid && (v.puberty.until || 0) >= (l.age || 0)) bits.push(`身体：${v.puberty.name}还看在眼里`);
  if (v.lease?.landlord && !(v.lease.lapsed > 0 && l.age > v.lease.until)) bits.push(`租约：${v.lease.landlord}`);
  else if (v.lease?.lapsed) bits.push(`${v.lease.landlord}的约过期了`);
  if (v.search?.name) bits.push(`在等${v.search.name}的回音`);
