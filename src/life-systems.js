@@ -590,7 +590,7 @@ export function systemsYear(l, options = {}) {
  }
  if (options.events !== false) { hometownEvents(l); intimateEvents(l); }
  s.world = worldFor(yearOf(l));
- if (['war', 'crisis'].includes(s.world.kind) && l.age >= 18) { spend(l, gdp(l) * .025); stats(l, { happiness: -2, health: -1 }); if (options.events !== false) offer(l, 'world-crisis', s.world.title, s.world.detail, s.world.kind==='war' ? [option('stay', '留守并准备物资'), option('shelter', '暂时避难'), option('migrate', '考虑移民')] : [option('stay', '缩减开支，准备应急物资'), option('shelter', '动用应急预算渡过危机'), option('migrate', '寻找其他地方的机会')]); }
+ if (['war', 'crisis'].includes(s.world.kind) && l.age >= 18) { const levy = Math.round(gdp(l) * .025); const stock = l.lived?.prepared; let covered = 0; if (stock && l.age <= (stock.until || 0) && (stock.cover || 0) > 0) { covered = Math.min(stock.cover, levy); stock.cover -= covered; stock.usedAge = l.age; } spend(l, levy - covered); stats(l, { happiness: covered ? -1 : -2, health: -1 }); if (covered) log(l, '预备顶上了这一年', `先前留的${covered}顶上了应急开支。紧张的年份还在，灾害没有取消，工作也不会因此出现。`, 'world'); if (options.events !== false) offer(l, 'world-crisis', s.world.title, s.world.detail, s.world.kind==='war' ? [option('stay', '留守并准备物资'), option('shelter', '暂时避难'), option('migrate', '考虑移民')] : [option('stay', '缩减开支，准备应急物资'), option('shelter', '动用应急预算渡过危机'), option('migrate', '寻找其他地方的机会')]); }
  else if (s.world.kind === 'science') stats(l, { health: .5 });
  if (options.events !== false && !l.pending) hearOpportunity(l);
  livedYear(l, options);

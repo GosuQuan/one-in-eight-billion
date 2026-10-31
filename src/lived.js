@@ -65,7 +65,7 @@ export const LIVED_ACTS = [
  { id: 'chores', title: '和伴侣分家务', ages: [18, 80], cost: '不花钱', time: '谈一次', risk: '大约一半谈不拢，别扭会留下两年', mark: '谈不拢时，接下来两年会点出对方的名字' },
  { id: 'leave-home', title: '从父母家搬出来', ages: [18, 30], cost: '安家大约当地水平的 8%', time: '搬这一次', risk: '不是和父母同住，就无从搬出', mark: '房东有名字，住房份额不再另扣，工作也不会出现' },
  { id: 'service-year', title: '做一年社区服役', ages: [18, 26], cost: '身体累一点', time: '一年，只有微薄补贴', risk: '地方可以不收你。收下了，这一年不能再去应聘', mark: '收下才有补贴。没有职位，这一年的应聘会被服役挡住' },
- { id: 'prepare', title: '为坏年景预备一点', ages: [18, 80], cost: '大约当地水平的 1.5%', time: '预备能撑五年', risk: '钱不够就会记进欠款', mark: '预备在，真遇到紧张年份才少慌一点' },
+ { id: 'prepare', title: '为坏年景预备一点', ages: [18, 80], cost: '大约当地水平的 1.5%', time: '预备能撑五年', risk: '钱不够就会记进欠款', mark: '真遇到紧张年份，这笔会顶上一回应急开支，心情少掉得轻一点。用掉或五年没用上就没了，不能取消灾害' },
  { id: 'neighbor', title: '认识隔壁的人', ages: [8, 80], cost: '不花钱', time: '从这一年记住名字', risk: '已经有这位邻居就不再认识一个新的', mark: '以后求助，对方可以拒绝' },
  { id: 'neighbor-ask', title: '请邻居帮一个忙', ages: [8, 85], cost: '被拒绝以后，大约当地水平的 1.2% 要自己出', time: '这一次，名字再留一年', risk: '关系浅时更容易被拒绝', mark: '拒绝了这笔自己出，名字还会再留一年。帮成了不收钱' },
  { id: 'teacher', title: '记住一位老师', ages: [7, 18], cost: '不花钱', time: '学生年代的一次', risk: '只记一次', mark: '以后写信，可能没有回音' },
@@ -435,8 +435,9 @@ function run(l, id) {
   }
   case 'prepare': {
    const fee = Math.round(g * .015); spend(l, fee); v.preparedUntil = l.age + 5;
-   log(l, '为坏年景留了一点', `你拿出${fee}。到${v.preparedUntil}岁之前，真遇到紧张的年份，会少慌一点。它不能取消灾害。`);
-   return { ok: true, message: '预备留了五年。' };
+   v.prepared = { until: v.preparedUntil, cover: fee };
+   log(l, '为坏年景留了一点', `你拿出${fee}。到${v.preparedUntil}岁之前，若遇到紧张的年份，这笔会顶上一部分应急开支。用掉就没了，五年没遇上也不能要回来。它不能取消灾害。`);
+   return { ok: true, message: '预备留了五年，用掉就没了。' };
   }
   case 'neighbor': {
    const who = named(l); v.neighbor = { ...who, bond: 35, next: l.age + 1 };
@@ -667,7 +668,10 @@ function tick(l) {
  if ((v.leaveUntil || 0) >= l.age && v.leaveCut !== l.age && (l.income || 0) > 0) { v.leaveCut = l.age; l.income = Math.round(l.income * .7); }
  if (formal(l)) { v.pensionYears += 1; v.pensionPot += Math.round(gdp(l) * .012); }
  if (abroad(l) && !v.fluent) v.barrierYears += 1;
- if ((v.preparedUntil || 0) >= l.age && ['war', 'crisis'].includes(l.systems?.world?.kind)) stats(l, { happiness: 1 });
+ if (v.prepared && !v.prepared.usedAge && l.age > (v.prepared.until || 0)) {
+  const until = v.prepared.until; v.prepared = null;
+  log(l, '预备过了期', `留到${until}岁的东西没有派上用场。钱已经花过，不能要回来。灾害也没有因此被取消。`);
+ }
 }
 function formal(l) { return working(l) && !l.lived?.informal && l.age >= 18 && l.age < 65; }
 
@@ -720,6 +724,7 @@ export function livedBrief(l) {
   if (v.cheapUntil && (l.age || 0) <= v.cheapUntil) bits.push('吃得便宜');
   if (v.neighborCarry && (v.neighborCarry.until || 0) >= (l.age || 0)) bits.push(`自己扛：${v.neighborCarry.name}`);
   if (v.giftMiss && (v.giftMiss.until || 0) >= (l.age || 0)) bits.push(`礼物没到：${v.giftMiss.name}`);
+  if (v.prepared && (v.prepared.cover || 0) > 0 && (v.prepared.until || 0) >= (l.age || 0)) bits.push(`预备到${v.prepared.until}岁`);
  if (v.grief?.length) bits.push(`想念${v.grief.map(g => g.name).join('、')}`);
  if (v.medLapse && (l.age || 0) <= v.medLapse.until) bits.push(`停药：${v.medLapse.name}`);
  if (v.bully && !v.bully.ended) bits.push(`针对：${v.bully.name}`);
