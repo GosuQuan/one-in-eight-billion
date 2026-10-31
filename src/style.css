@@ -124,3 +124,13 @@
 .year-track i{transition:width .8s cubic-bezier(.2,.7,.2,1)}
 .lived-list{max-height:62vh;overflow:auto;padding-right:4px}
 .lived-card small{display:block}
+
+.ending-walk{margin:8px 0 28px;animation:line-in .9s cubic-bezier(.2,.7,.2,1)}
+.ending-age{font:42px var(--serif);letter-spacing:-1px;margin:0 0 18px}
+.ending-marks{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.ending-mark{border-top:2px solid var(--wine);padding:10px 12px 4px;background:color-mix(in srgb,var(--paper) 86%,var(--gold))}
+.ending-mark small{display:block;color:var(--wine);letter-spacing:.12em;font-size:11px}
+.ending-mark p{margin:6px 0 0;font:18px var(--serif);line-height:1.55}
+.ending-philosophy{font:28px var(--serif);margin:22px 0 8px}
+.ending-question{margin:8px 0;color:var(--muted);font-size:15px}
+@media(max-width:760px){.ending-marks{grid-template-columns:1fr}.ending-age{font-size:32px}}

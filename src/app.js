@@ -14,6 +14,7 @@ import { systemAction, getHousehold, getSceneState } from './life-systems.js';
 import { livedAction, livedCatalogHTML } from './lived.js';
 import { worldHTML as worldPanel, choiceResultHTML as resultPanel, familyHTML as familyPanel, systemsDialogHTML } from './system-ui.js';
 import { gachaCard, avatarSVG } from './art.js';
+import { memorialOf } from './memorial.js';
 const $ = s => document.querySelector(s);
 const KEY = 'one-in-eight-demo:v1';
 const app = $('#app'), overlay = $('#overlay');
@@ -34,7 +35,8 @@ const money = n => `${Number(n) < 0 ? '-' : ''}$${num(Math.abs(Number(n) || 0))}
 const pct = n => `${n >= 0 ? '+' : ''}${(n * 100).toFixed(1)}%`;
 const countryOf = c => typeof c === 'object' ? c : COUNTRIES.find(x => x.id === c) || COUNTRIES[0];
 const nameOf = n => typeof n === 'object' ? n.full || n.name || '' : n || '';
-const save = () => { store = { ...store, prefs, current: archived ? store.current : life, history }; try { localStorage.setItem(KEY, JSON.stringify(store)); } catch { toast('浏览器暂时无法保存，请导出人生记录。'); } };
+function touchPlay(){if(!life)return;const now=Date.now();const mark=life.playMark||0;const gap=mark?now-mark:0;const counting=life.playView&&life.playView!=='home'&&!document.hidden;if(gap>0&&gap<30000&&counting)life.playMs=(life.playMs||0)+gap;life.playMark=now;life.playView=view;}
+const save = () => { touchPlay(); store = { ...store, prefs, current: archived ? store.current : life, history }; try { localStorage.setItem(KEY, JSON.stringify(store)); } catch { toast('浏览器暂时无法保存，请导出人生记录。'); } };
 const homeLink = `<button class="wordmark" data-action="home" aria-label="返回首页">80亿分之<em>1</em></button>`;
 const footer = () => `<footer class="footer section-rule"><span>80亿分之1 <span style="display:inline">© ${new Date().getFullYear()}</span></span><span>灵感来自 <a href="https://1in8b.life/zh-hans/" target="_blank" rel="noopener">1in8b.life ↗</a> · <button class="plain" data-action="about">关于</button> · <a href="https://github.com/GosuQuan/one-in-eight-billion" target="_blank" rel="noopener">GitHub ↗</a></span></footer>`;
 const nav = () => `<nav class="site-nav">${homeLink}<div class="nav-links"><button class="plain" data-action="history">前世纪录 <span style="font:10px monospace">${history.length ? String(history.length).padStart(2,'0') : ''}</span></button><button class="plain nav-extra" data-action="about">关于人生</button><span class="tiny">简体中文</span><button class="plain theme" data-action="theme" aria-label="切换深色模式">◐</button></div></nav>`;
@@ -122,7 +124,7 @@ function finish(){
 }
 function renderEnding(){
  view='ending';const c=life.country;const mood=life.stats.happiness>=60?'还稳得住':life.stats.happiness>=35?'平平常常':'往下走了';const important=life.log.filter(l=>l.type!=='market'&&(l.type==='consequence'||l.type==='travel'||l.type==='family'||l.type==='life'||l.type==='health'||l.age===0||l.type==='death'||(l.age>=65&&/身体|陪|家人|伴侣/.test(l.title+l.text))));const chosen=important.length>2?important:life.log.filter(l=>l.type!=='market');
- app.innerHTML=`<div class="wrap">${nav()}<main class="ending paper"><header class="ending-header"><div class="eyebrow"><span class="dot"></span> A LIFE, ONCE LIVED</div><h1>${e(life.name)}</h1><div class="years">${life.birthYear} — ${life.birthYear+life.age}</div><p class="epitaph">从${e((life.birthCountry||c).name)}出发，一个生命用 ${life.age} 年写完了自己的故事。<br>${e(life.deathCause || '生命最终自然走到了终点')}。<br>没有哪一生是标准答案，而这一生，曾经真实地属于你。</p></header>${scene(life,{ending:true})}<section class="ending-metrics six"><div><strong>${life.age}</strong><span>走过的年岁</span></div><div><strong>${life.log.filter(l=>l.type==='consequence').length}</strong><span>做过的重要选择</span></div><div><strong>${life.travels.length}</strong><span>次出发旅行</span></div><div><strong>${money(netWorth(life))}</strong><span>最后的净资产</span></div><div><strong>${life.children?.length || 0}</strong><span>下一代的生命</span></div><div><strong>${mood}</strong><span>晚年的心情</span></div></section><div class="ending-body"><div class="section-heading"><h2>这一生，值得记住的片刻</h2><span class="tiny">${e(c.flag)} ${e(c.name)}</span></div><div class="record-list">${chosen.filter((_,i,a)=>i===0||i===a.length-1||i%Math.max(1,Math.floor(a.length/8))===0).slice(0,10).map(l=>`<article class="record"><small>${l.age} 岁 · ${life.birthYear+l.age}</small><strong>${e(l.title)}</strong><p>${e(l.text)}</p></article>`).join('')}</div>${life.travels.length?`<div class="ending-travels"><span class="label">去过的地方</span><div>${life.travels.map(t=>`<span class="travel-pill">${e(t.flag)} ${e(t.place||t.name)}</span>`).join('')}</div></div>`:''}<div class="ending-note">${life.farewell?e(life.farewell):'“如果能对这一生的自己说一句话，你想说什么？”'}</div><button class="text-link" data-action="farewell">${life.farewell?'修改留给自己的话':'✎ 留给这一生一句话'} →</button><p class="tiny" style="margin-top:22px">人生记录已保存在此浏览器。你可以导出完整记录，或下载一张人生纪念卡。</p></div><div class="ending-actions"><button class="cta" data-action="new">再活一次 <span>↗</span></button><button class="ghost" data-action="card">↓ 人生纪念卡</button><button class="ghost" data-action="export">↓ 完整记录</button><button class="ghost" data-action="home">回到世界</button></div></main>${footer()}</div>`;
+ app.innerHTML=`<div class="wrap">${nav()}<main class="ending paper"><header class="ending-header"><div class="eyebrow"><span class="dot"></span> A LIFE, ONCE LIVED</div><h1>${e(life.name)}</h1><div class="years">${life.birthYear} — ${life.birthYear+life.age}</div><p class="epitaph">从${e((life.birthCountry||c).name)}出发，一个生命用 ${life.age} 年写完了自己的故事。<br>${e(life.deathCause || '生命最终自然走到了终点')}。<br>没有哪一生是标准答案，而这一生，曾经真实地属于你。</p></header>${scene(life,{ending:true})}${memorialBlock(life)}<section class="ending-metrics six"><div><strong>${life.age}</strong><span>走过的年岁</span></div><div><strong>${life.log.filter(l=>l.type==='consequence').length}</strong><span>做过的重要选择</span></div><div><strong>${life.travels.length}</strong><span>次出发旅行</span></div><div><strong>${money(netWorth(life))}</strong><span>最后的净资产</span></div><div><strong>${life.children?.length || 0}</strong><span>下一代的生命</span></div><div><strong>${mood}</strong><span>晚年的心情</span></div></section><div class="ending-body"><div class="section-heading"><h2>这一生，值得记住的片刻</h2><span class="tiny">${e(c.flag)} ${e(c.name)}</span></div><div class="record-list">${chosen.filter((_,i,a)=>i===0||i===a.length-1||i%Math.max(1,Math.floor(a.length/8))===0).slice(0,10).map(l=>`<article class="record"><small>${l.age} 岁 · ${life.birthYear+l.age}</small><strong>${e(l.title)}</strong><p>${e(l.text)}</p></article>`).join('')}</div>${life.travels.length?`<div class="ending-travels"><span class="label">去过的地方</span><div>${life.travels.map(t=>`<span class="travel-pill">${e(t.flag)} ${e(t.place||t.name)}</span>`).join('')}</div></div>`:''}<div class="ending-note">${life.farewell?e(life.farewell):'“如果能对这一生的自己说一句话，你想说什么？”'}</div><button class="text-link" data-action="farewell">${life.farewell?'修改留给自己的话':'✎ 留给这一生一句话'} →</button><p class="tiny" style="margin-top:22px">人生记录已保存在此浏览器。你可以导出完整记录，或下载一张人生纪念卡。</p></div><div class="ending-actions"><button class="cta" data-action="new">再活一次 <span>↗</span></button><button class="ghost" data-action="card">↓ 人生纪念卡</button><button class="ghost" data-action="export">↓ 完整记录</button><button class="ghost" data-action="home">回到世界</button></div></main>${footer()}</div>`;
 }
 
 function showModal(html,kind='info',wide=false){
@@ -161,15 +163,41 @@ function renderGacha(){
 }
 function exportLife(){download(new Blob([JSON.stringify(life,null,2)],{type:'application/json'}),`人生记录-${life.name}.json`);toast('完整人生记录已导出');}
 function download(blob,name){const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);}
-function downloadCard(){
- const canvas=document.createElement('canvas');canvas.width=1000;canvas.height=1280;const ctx=canvas.getContext('2d');
- ctx.fillStyle='#edf1eb';ctx.fillRect(0,0,1000,1280);ctx.strokeStyle='#cbd4c9';ctx.strokeRect(48,48,904,1184);ctx.fillStyle='#8c2946';ctx.fillRect(48,48,904,12);
- ctx.textAlign='center';ctx.fillStyle='#8c2946';ctx.font='20px Georgia';ctx.fillText('ONE IN EIGHT BILLION',500,145);ctx.fillStyle='#263a3b';ctx.font='64px "Microsoft YaHei", sans-serif';ctx.fillText(life.name,500,280,850);
- ctx.font='32px Georgia';ctx.fillStyle='#74817b';ctx.fillText(`${life.birthYear} — ${life.birthYear+life.age}`,500,345);ctx.font='24px "Microsoft YaHei"';ctx.fillText(`${(life.birthCountry||life.country).name}出生 · ${life.sex} · ${life.age} 岁`,500,415);
- ctx.strokeStyle='#cbd4c9';ctx.beginPath();ctx.moveTo(130,475);ctx.lineTo(870,475);ctx.stroke();ctx.fillStyle='#263a3b';ctx.font='28px "Microsoft YaHei"';ctx.fillText(`走过 ${life.age} 年，成为独一无二的自己。`,500,565);ctx.font='22px "Microsoft YaHei"';ctx.fillStyle='#74817b';ctx.fillText(`最后的职业：${life.job || '生活的探索者'}`,500,630);ctx.fillText(`幸福 ${Math.round(life.stats.happiness)} / 100 · ${life.children.length} 个孩子 · ${life.travels.length} 次旅行`,500,680);
- const quote=life.farewell||'每一段普通的人生，都有自己的微光。';ctx.fillStyle='#8c2946';ctx.font='30px "Microsoft YaHei"';const chars=[...quote];let line='',lines=[];for(const ch of chars){if(ctx.measureText(line+ch).width>720){lines.push(line);line=ch;}else line+=ch;}if(line)lines.push(line);lines.slice(0,4).forEach((l,i)=>ctx.fillText(l,500,830+i*50));ctx.fillStyle='#74817b';ctx.font='18px "Microsoft YaHei"';ctx.fillText('80亿分之1 · 人生模拟',500,1140);ctx.font='16px Georgia';ctx.fillText('github.com/GosuQuan/one-in-eight-billion',500,1180);canvas.toBlob(blob=>blob&&download(blob,`人生纪念卡-${life.name}.png`));
+function memorialBlock(life){
+ touchPlay();
+ const card=memorialOf(life);
+ const mark=(k,v)=>`<article class="ending-mark"><small>${e(k)}</small><p>${e(v)}</p></article>`;
+ return `<section class="ending-walk" aria-label="这一生的纪念"><p class="ending-age">${life.age} 岁，你走完了这一生</p><div class="ending-marks">${mark(card.playTitle,card.playBody)}${mark(card.pathTitle,card.pathBody)}${mark(card.sceneTitle,card.sceneBody)}${mark(card.regionTitle,card.regionBody)}${mark('生育',card.fertility)}${mark('社会地位',card.status)}${mark('社会贡献',card.contribution)}${mark(card.peopleTitle,card.peopleBody)}</div><p class="ending-philosophy">${e(card.philosophy)}</p>${card.questions.map(q=>`<p class="ending-question">${e(q)}</p>`).join('')}</section>`;
 }
-
+function wrapText(ctx,text,width){const out=[];let line='';for(const ch of [...String(text||'')]){if(line&&ctx.measureText(line+ch).width>width){out.push(line);line=ch;}else line+=ch;}if(line)out.push(line);return out;}
+function downloadCard(){
+ touchPlay();
+ const card=memorialOf(life);
+ const canvas=document.createElement('canvas');canvas.width=1080;canvas.height=2480;const ctx=canvas.getContext('2d');
+ ctx.fillStyle='#f3efe4';ctx.fillRect(0,0,1080,2480);ctx.fillStyle='#8c2946';ctx.fillRect(0,0,1080,16);
+ ctx.fillStyle='#8c2946';ctx.font='22px Georgia';ctx.textAlign='left';ctx.fillText('ONE IN EIGHT BILLION',72,78);
+ ctx.fillStyle='#263a3b';ctx.font='64px "Microsoft YaHei"';ctx.fillText(life.name,72,156,936);
+ ctx.fillStyle='#74817b';ctx.font='28px Georgia';ctx.fillText(`${life.birthYear} — ${life.birthYear+life.age}`,72,204);
+ ctx.font='22px "Microsoft YaHei"';ctx.fillText(`${(life.birthCountry||life.country).name} · ${life.sex} · ${life.age} 岁走完`,72,244);
+ let y=300;
+ const head=label=>{ctx.fillStyle='#8c2946';ctx.font='18px "Microsoft YaHei"';ctx.fillText(label,72,y);y+=36;};
+ const body=text=>{ctx.fillStyle='#263a3b';ctx.font='26px "Microsoft YaHei"';for(const line of wrapText(ctx,text,936).slice(0,4)){ctx.fillText(line,72,y);y+=38;}y+=18;};
+ head(card.playTitle);body(card.playBody);
+ head(card.pathTitle);body(card.pathBody);
+ head(card.sceneTitle);body(card.sceneBody);
+ head(card.regionTitle);body(card.regionBody);
+ head('人物的轨迹');body(card.peopleBody);
+ head('生育');body(card.fertility);
+ head('社会地位');body(card.status);
+ head('社会贡献');body(card.contribution);
+ y+=8;ctx.fillStyle='#8c2946';ctx.font='30px "Microsoft YaHei"';
+ for(const line of wrapText(ctx,card.philosophy,936).slice(0,3)){ctx.fillText(line,72,y);y+=44;}
+ y+=12;ctx.fillStyle='#3e534e';ctx.font='24px "Microsoft YaHei"';
+ for(const q of card.questions){for(const line of wrapText(ctx,q,936).slice(0,3)){ctx.fillText(line,72,y);y+=36;}y+=16;}
+ y+=20;ctx.fillStyle='#74817b';ctx.font='18px "Microsoft YaHei"';ctx.fillText('80亿分之1 · 这一张只属于这场游玩',72,y);
+ ctx.font='16px Georgia';ctx.fillText('github.com/GosuQuan/one-in-eight-billion',72,y+32);
+ canvas.toBlob(blob=>blob&&download(blob,`人生纪念卡-${life.name}.png`));
+}
 function toggleMusic(){
  music=!music;
  if(music){try{audio ||= new (window.AudioContext||window.webkitAudioContext)();audio.resume();const notes=[261.63,329.63,392,523.25,440,392,329.63,293.66];let i=0;const play=()=>{if(!music)return;const osc=audio.createOscillator(),gain=audio.createGain();osc.type='sine';osc.frequency.value=notes[i++%notes.length]/2;gain.gain.setValueAtTime(0,audio.currentTime);gain.gain.linearRampToValueAtTime(.035,audio.currentTime+.2);gain.gain.exponentialRampToValueAtTime(.001,audio.currentTime+2.7);osc.connect(gain);gain.connect(audio.destination);osc.start();osc.stop(audio.currentTime+3);};play();audioTimer=setInterval(play,1400);}catch{music=false;toast('当前浏览器无法播放音乐');}}
@@ -296,4 +324,4 @@ document.addEventListener('visibilitychange',()=>{stepTime=Date.now();if(documen
 window.addEventListener('beforeunload',save);
 document.body.classList.toggle('dark',!!store.dark);
 renderHome();
-timer=setInterval(()=>{updateCounters();if(view!=='life'||paused||document.hidden||modalKind)return;const duration=({slow:9600,normal:6800,fast:2800}[prefs.pace]||6800)/speed;if(Date.now()-stepTime>=duration){stepTime=Date.now();step();}},150);
+timer=setInterval(()=>{touchPlay();updateCounters();if(view!=='life'||paused||document.hidden||modalKind)return;const duration=({slow:9600,normal:6800,fast:2800}[prefs.pace]||6800)/speed;if(Date.now()-stepTime>=duration){stepTime=Date.now();step();}},150);

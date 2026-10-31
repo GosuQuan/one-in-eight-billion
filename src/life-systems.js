@@ -16,7 +16,7 @@ const log = (l, title, text, type = 'family') => l.log.push({ age: l.age, year: 
 function stats(l, effects) { for (const [k, v] of Object.entries(effects)) l.stats[k] = clamp(l.stats[k] + v); }
 function spend(l, n) { n = Math.max(0, Math.round(n)); const paid = Math.min(l.money, n); l.money -= paid; l.debt = (l.debt || 0) + n - paid; return n; }
 function medicalBill(l, amount) { return spend(l, amount * (l.insurance ? .3 : 1)); }
-function action(l, type, text, from = '', to = '') { l.systems.actionSequence++; l.sceneAction = { id: `scene-${l.age}-${l.systems.actionSequence}`, type, age: l.age, text, from, to }; }
+function action(l, type, text, from = '', to = '') { l.systems.actionSequence++; l.sceneAction = { id: `scene-${l.age}-${l.systems.actionSequence}`, type, age: l.age, text, from, to }; l.systems.scenes ||= []; l.systems.scenes.push({ age: l.age, type, text, from, to, place: l.country?.name || '', city: l.systems.residence?.city || '' }); if (l.systems.scenes.length > 16) l.systems.scenes.shift(); }
 const option = (key, label, description = '') => ({ key, label, description });
 function pending(l, system, title, text, options, context = {}) { l.pending = { kind: 'system', system, title, text, options, ...context }; }
 function offer(l, ...args) { if (!l.pending) pending(l, ...args); }

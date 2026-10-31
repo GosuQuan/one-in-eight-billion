@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node scripts/serve.mjs",
     "start": "node scripts/serve.mjs",
-    "test": "node --test tests/engine.test.mjs tests/economy.test.mjs tests/life-systems.test.mjs tests/education.test.mjs tests/depth.test.mjs tests/lived.test.mjs",
+    "test": "node --test tests/engine.test.mjs tests/economy.test.mjs tests/life-systems.test.mjs tests/education.test.mjs tests/depth.test.mjs tests/lived.test.mjs tests/memorial.test.mjs",
     "test:browser": "node tests/browser.mjs",
     "test:features": "node tests/features.mjs",
     "test:scene": "node tests/dynamic-scene.mjs"
