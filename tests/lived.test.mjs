@@ -669,3 +669,52 @@ test('a gap year blocks the next application and does not create a wage or a cre
   assert.equal(l.school.credential, 'none');
   assert.equal(l.income, 0);
 });
+
+test('overtime can go unpaid, and sleep debt makes the month cost more', () => {
+  let unpaid = false, paid = false;
+  for (let i = 0; i < 24 && !(unpaid && paid); i++) {
+    const l = adult('ot-' + i, 33);
+    const money = l.money;
+    const health = l.stats.health;
+    livedAction(l, 'overtime');
+    assert.equal(l.job, '职员');
+    assert.equal(l.income, 40000);
+    assert.equal(l.lived.overtimeUntil, 34);
+    assert.equal(livedAction(l, 'overtime').ok, false);
+    assert.equal(l.stats.health, health - 2);
+    if (l.log.some(e => e.title === '加班没有补贴')) {
+      assert.equal(l.money, money);
+      unpaid = true;
+    }
+    if (l.log.some(e => e.title === '加班换了一笔')) {
+      assert.ok(l.money > money);
+      paid = true;
+    }
+  }
+  assert.equal(unpaid, true);
+  assert.equal(paid, true);
+
+  const sleepy = adult('ot-sleep', 33);
+  initLived(sleepy);
+  sleepy.lived.sleepUntil = 40;
+  const health = sleepy.stats.health;
+  livedAction(sleepy, 'overtime');
+  assert.equal(sleepy.stats.health, health - 3);
+  assert.equal(sleepy.job, '职员');
+  assert.equal(sleepy.income, 40000);
+  let sleepyUnpaid = sleepy.log.some(e => e.title === '加班没有补贴' && e.text.includes('睡眠债'));
+  for (let i = 0; i < 20 && !sleepyUnpaid; i++) {
+    const l = adult('ot-sleep-' + i, 33);
+    initLived(l);
+    l.lived.sleepUntil = 40;
+    const money = l.money;
+    livedAction(l, 'overtime');
+    if (l.log.some(e => e.title === '加班没有补贴' && e.text.includes('睡眠债'))) {
+      assert.equal(l.money, money);
+      assert.equal(l.income, 40000);
+      assert.equal(l.job, '职员');
+      sleepyUnpaid = true;
+    }
+  }
+  assert.equal(sleepyUnpaid, true);
+});

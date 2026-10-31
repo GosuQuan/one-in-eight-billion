@@ -56,7 +56,7 @@ export const LIVED_ACTS = [
  { id: 'pension-draw', title: '到龄领取养老积累', ages: [65, 95], cost: '不另收费', time: '一次', risk: '正式工作不满十年，或已经领过，就领不到', mark: '领到的是这些年扣下的积累，不是新的工作' },
  { id: 'tax-look', title: '看账单里的税和物价', ages: [18, 80], cost: '不另收，生活费已经随当地水平走', time: '看明白这一年', risk: '没有收入时只能看到物价，看不到预扣', mark: '明白账单会随当地水平变，不是固定的旧数字' },
  { id: 'hustle', title: '下班后再做一单', ages: [18, 65], cost: '占用休息', time: '这一次，两年内不重复', risk: '大约六成没有入账，只是更累', mark: '入账也只是一笔，不会变成第二份正式工作' },
- { id: 'overtime', title: '这个月加班', ages: [18, 65], cost: '身体和心情', time: '换一笔一次性补贴', risk: '没有工资可加', mark: '补贴进现金，不会把职位改掉' },
+ { id: 'overtime', title: '这个月加班', ages: [18, 65], cost: '身体和心情，补贴可能不来', time: '这一年只能加一次', risk: '大约一半没有补贴；睡眠债还在时更不容易入账，身体也掉得更多', mark: '有补贴也只是一笔现金，职位不变' },
  { id: 'job-search', title: '开始一段要等的求职', ages: [18, 64], cost: '不保证有回音', time: '至少再等两年才有回音', risk: '已经有工作时，这不是失业求职', mark: '明年之前不会因此出现新职位' },
  { id: 'reference', title: '请认识的人作推荐', ages: [18, 65], cost: '不花钱', time: '对方若答应，名字保留三年', risk: '对方可以拒绝', mark: '名字留三年。下一次求职可以写上，仍可能被拒；录用了，这句推荐就用掉' },
  { id: 'credential', title: '问海外是否承认学历', ages: [22, 60], cost: '问询本身不另收费', time: '不被承认的话，疑虑留下六年', risk: '人在原居国，或学历还停留在基础教育，就没有可认证的更高学历', mark: '不被承认的几年里，要学历的新本地工作会被挡下；学徒、远程和回国后不走这条' },
@@ -123,7 +123,7 @@ function open(l, id) {
   case 'pension-draw': return !v.pensionDrawn;
   case 'tax-look': return l.age - (v.taxAt || -10) >= 5;
   case 'hustle': return working(l) && (v.hustleUntil || 0) <= l.age;
-  case 'overtime': return working(l);
+  case 'overtime': return working(l) && (v.overtimeUntil || 0) <= l.age;
   case 'job-search': return !working(l) && (v.searchUntil || 0) <= l.age;
   case 'reference': return !!friend(l) && (v.reference?.until || 0) < l.age;
   case 'credential': return abroad(l) && higherEd(l) && (v.unrecognizedUntil || 0) < l.age;
@@ -345,8 +345,12 @@ function run(l, id) {
    return { ok: true, message: `入账 ${gain}。` };
   }
   case 'overtime': {
-   const bonus = Math.round((l.income || 0) * .04); l.money = (l.money || 0) + bonus; stats(l, { health: -2, happiness: -2 });
-   log(l, '加班换了一笔', `补贴${bonus}进了现金。身体和心情都下去。职位还是${l.job || '原来的'}。`);
+   v.overtimeUntil = l.age + 1;
+   const sleepy = (v.sleepUntil || 0) >= l.age;
+   stats(l, { health: sleepy ? -3 : -2, happiness: -2 });
+   if (!chance(l, sleepy ? .35 : .55)) { log(l, '加班没有补贴', `${sleepy ? '睡眠债还在，' : ''}这个月的额外时间没有换成钱。职位还是${l.job || '原来的'}。明年才能再加一次。`); return { ok: true, message: '没有补贴。' }; }
+   const bonus = Math.round((l.income || 0) * .04); l.money = (l.money || 0) + bonus;
+   log(l, '加班换了一笔', `补贴${bonus}进了现金。身体和心情都下去。职位还是${l.job || '原来的'}。明年才能再加一次。`);
    return { ok: true, message: '补贴进了现金，职位没变。' };
   }
   case 'job-search': {
@@ -675,6 +679,7 @@ export function livedBrief(l) {
  if (v.commuteOn) bits.push(`通勤 ${v.commuteYears} 年`);
  if ((v.serviceUntil || 0) >= (l.age || 0)) bits.push('服役这一年');
  if ((v.gapUntil || 0) > (l.age || 0)) bits.push('空年');
+ if ((v.overtimeUntil || 0) > (l.age || 0)) bits.push('今年加过班');
  if ((v.examWait || 0) > (l.age || 0)) bits.push(`等到${v.examWait}岁再申请`);
  if ((v.choreUntil || 0) >= (l.age || 0) && l.partner?.name) bits.push(`家务别扭：${l.partner.name}`);
  if (abroad(l) && !v.fluent) bits.push(`当地语言还生疏（${v.barrierYears}年）`);
