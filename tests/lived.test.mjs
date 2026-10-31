@@ -904,3 +904,45 @@ test('elder care keeps visiting for two years and stops if the parent is gone', 
   assert.equal(gone.income, 40000);
   assert.ok(!gone.log.some(e => e.title === '林母还等你再来'));
 });
+
+test('sick leave keeps the job and blocks a promotion that year', () => {
+  const l = adult('sick-ok', 36);
+  l.stats.health = 40;
+  const before = l.money;
+  const lost = Math.round(l.income * .06);
+  assert.equal(livedAction(l, 'sick-leave').ok, true);
+  assert.equal(l.job, '职员');
+  assert.equal(l.income, 40000);
+  assert.equal(l.money, before - lost);
+  assert.equal(l.lived.sickUntil, 36);
+  assert.equal(livedAction(l, 'sick-leave').ok, false);
+  assert.match(careerAction(l, 'promotion').message, /病假/);
+  assert.equal(l.job, '职员');
+  assert.equal(l.income, 40000);
+  l.pending = { kind: 'system', system: 'opportunity', offerKind: 'raise', title: '评估', text: '试', options: [{ key: 'try', label: '去', description: '评估' }] };
+  choose(l, 0);
+  assert.ok(l.log.some(e => e.title === '病假还没结束'));
+  assert.equal(l.job, '职员');
+  assert.equal(l.income, 40000);
+  l.pending = null;
+  l.age = 37;
+  assert.equal(/病假/.test(careerAction(l, 'promotion').message), false);
+
+  let refused = false;
+  for (let i = 0; i < 20 && !refused; i++) {
+    const x = adult('sick-no-' + i, 36);
+    x.stats.health = 40;
+    livedAction(x, 'short-sleep');
+    const cash = x.money;
+    livedAction(x, 'sick-leave');
+    if (x.log.some(e => e.title === '病假没有批下来')) {
+      assert.equal(x.money, cash);
+      assert.equal(x.income, 40000);
+      assert.equal(x.job, '职员');
+      assert.equal(x.lived.sickUntil, undefined);
+      assert.equal(livedAction(x, 'sick-leave').ok, false);
+      refused = true;
+    }
+  }
+  assert.equal(refused, true);
+});

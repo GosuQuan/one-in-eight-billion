@@ -74,7 +74,7 @@ export const LIVED_ACTS = [
  { id: 'gap-year', title: '空出一年', ages: [17, 26], cost: '这一年不产生学历，也没有工资', time: '一年', risk: '已经有工作或正在读一个项目，就不能再空一次', mark: '这一年新的升学申请先不递。空年不会变成学历或工资' },
  { id: 'internship', title: '试一份短期实习', ages: [16, 23], cost: '地方可以不收你', time: '短短一段，不是岗位', risk: '大约四成半被回绝；有正式工作就不必再实习', mark: '带教有名字，补贴不是职业' },
  { id: 'injury', title: '处理工作时的伤', ages: [18, 65], cost: '医药大约当地水平的 2%，再损失一小段收入', time: '停下来处理', risk: '没有工作，或身体还没有报警，就不会走到这一步', mark: '职位还在，身体要时间' },
- { id: 'sick-leave', title: '请病假', ages: [18, 67], cost: '大约三周工资，职位先留着', time: '这一段', risk: '没有工作或身体还撑得住，请不了', mark: '回来仍是原来的工作，不是晋升' },
+ { id: 'sick-leave', title: '请病假', ages: [18, 67], cost: '大约三周工资，职位先留着', time: '这一段', risk: '没有工作或身体还撑得住，请不了', mark: '这一年不能升职。假若没批，今年也不能再请' },
  { id: 'birthday', title: '给一个具体的人过生日', ages: [6, 90], cost: '大约当地水平的 0.4%', time: '这一天', risk: '人若在别处，礼物大约四成送不到', mark: '送到了关系近一点，送不到钱也花了' },
  { id: 'pet-night', title: '夜里守着老去的伙伴', ages: [10, 80], cost: '不另收费，但会欠下睡眠', time: '这一夜，睡眠债留下两年', risk: '伙伴不一定因此好起来，离开也不会被拦住', mark: '名字留在这一年，工作不会因此改变' },
  { id: 'hobby', title: '把爱好再做一年', ages: [10, 70], cost: '每年一点点时间', time: '做满八年才可能换到一笔钱', risk: '那一次也大约只有四分之一能入账，而且只试一次', mark: '入账也不是职业' }
@@ -141,7 +141,7 @@ function open(l, id) {
   case 'gap-year': return !v.gap && !working(l) && !(l.school?.program && !l.school.program.paused);
   case 'internship': return !v.intern && !working(l);
   case 'injury': return working(l) && (l.stats.health || 0) < 55;
-  case 'sick-leave': return working(l) && (l.stats.health || 0) < 50;
+  case 'sick-leave': return working(l) && (l.stats.health || 0) < 50 && (v.sickUntil || 0) < l.age && (v.sickNext || 0) <= l.age;
   case 'birthday': return !!someone(l);
   case 'pet-night': return !!(l.systems?.pet?.alive && ((l.systems.pet.age || 0) >= 8 || (l.systems.pet.health || 100) < 55) && (v.petNightUntil || 0) < l.age);
   case 'hobby': return !v.hobbyTried;
@@ -485,9 +485,9 @@ function run(l, id) {
   }
   case 'sick-leave': {
    const sleepy = (v.sleepUntil || 0) >= l.age;
-   if (sleepy && !chance(l, .55)) { stats(l, { health: -2 }); log(l, '病假没有批下来', `你已经连着缺觉。单位没有批。职位还是${l.job || '原来的工作'}，人却更累。`); return { ok: true, message: '假没有批。' }; }
-   const lost = Math.round((l.income || 0) * .06); spend(l, lost); stats(l, { health: 2 });
-   log(l, '病假', `大约三周工资${lost}。回来仍是${l.job || '原来的工作'}，不是晋升。`);
+   if (sleepy && !chance(l, .55)) { v.sickNext = l.age + 1; stats(l, { health: -2 }); log(l, '病假没有批下来', `你已经连着缺觉。单位没有批。职位还是${l.job || '原来的工作'}，今年也不能再请。`); return { ok: true, message: '假没有批。' }; }
+   v.sickUntil = l.age; const lost = Math.round((l.income || 0) * .06); spend(l, lost); stats(l, { health: 2 });
+   log(l, '病假', `大约三周工资${lost}。回来仍是${l.job || '原来的工作'}。这一年的评估也不会变成升职。`);
    return { ok: true, message: '假请了，职位还是原来的。' };
   }
   case 'birthday': {
@@ -690,6 +690,7 @@ export function livedBrief(l) {
  if (v.exercise) bits.push(`活动 ${v.exerciseYears} 年`);
  if (v.informal) bits.push('工作无保障');
  if ((v.leaveUntil || 0) >= (l.age || 0)) bits.push('育儿假');
+  if ((v.sickUntil || 0) >= (l.age || 0)) bits.push('病假这一年');
  if (v.grief?.length) bits.push(`想念${v.grief.map(g => g.name).join('、')}`);
  if (v.medLapse && (l.age || 0) <= v.medLapse.until) bits.push(`停药：${v.medLapse.name}`);
  if (v.bully && !v.bully.ended) bits.push(`针对：${v.bully.name}`);
