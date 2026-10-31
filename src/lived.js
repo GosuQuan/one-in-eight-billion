@@ -57,13 +57,13 @@ export const LIVED_ACTS = [
  { id: 'tax-look', title: '看账单里的税和物价', ages: [18, 80], cost: '不另收，生活费已经随当地水平走', time: '看明白这一年', risk: '没有收入时只能看到物价，看不到预扣', mark: '明白账单会随当地水平变，不是固定的旧数字' },
  { id: 'hustle', title: '下班后再做一单', ages: [18, 65], cost: '占用休息', time: '这一次，两年内不重复', risk: '大约六成没有入账，只是更累', mark: '入账也只是一笔，不会变成第二份正式工作' },
  { id: 'overtime', title: '这个月加班', ages: [18, 65], cost: '身体和心情', time: '换一笔一次性补贴', risk: '没有工资可加', mark: '补贴进现金，不会把职位改掉' },
- { id: 'job-search', title: '开始一段要等的求职', ages: [18, 64], cost: '不保证有回音', time: '至少拖到明年', risk: '已经有工作时，这不是失业求职', mark: '明年之前不会因此出现新职位' },
+ { id: 'job-search', title: '开始一段要等的求职', ages: [18, 64], cost: '不保证有回音', time: '至少再等两年才有回音', risk: '已经有工作时，这不是失业求职', mark: '明年之前不会因此出现新职位' },
  { id: 'reference', title: '请认识的人作推荐', ages: [18, 65], cost: '不花钱', time: '对方若答应，名字保留三年', risk: '对方可以拒绝', mark: '推荐不是录用通知' },
  { id: 'credential', title: '问海外是否承认学历', ages: [22, 60], cost: '问询本身不另收费', time: '不被承认的话，疑虑留下六年', risk: '人在原居国，或学历还停留在基础教育，就没有可认证的更高学历', mark: '承认与否都不发放新工作' },
  { id: 'language', title: '补当地的语言', ages: [18, 70], cost: '大约当地水平的 3%', time: '要累计四次学进去，才不再被当成刚来的人', risk: '大约一半学不进去，钱照花', mark: '没补够之前，当地机会仍把你当新人' },
  { id: 'remittance', title: '给家里汇一笔', ages: [18, 75], cost: '大约当地水平的 3%，不够就只能汇出手上的', time: '这一笔', risk: '父母都不在了就没有收款的人', mark: '钱不够时，家里会知道这不是足额' },
  { id: 'chores', title: '和伴侣分家务', ages: [18, 80], cost: '不花钱', time: '谈一次', risk: '大约一半谈不拢，别扭会留下两年', mark: '谈拢也只是这一轮，不会永久免谈' },
- { id: 'leave-home', title: '从父母家搬出来', ages: [18, 30], cost: '安家大约当地水平的 8%', time: '搬这一次', risk: '不是和父母同住，就无从搬出', mark: '住处改成独自生活，工作不会因此出现' },
+ { id: 'leave-home', title: '从父母家搬出来', ages: [18, 30], cost: '安家大约当地水平的 8%', time: '搬这一次', risk: '不是和父母同住，就无从搬出', mark: '房东有名字，住房份额不再另扣，工作也不会出现' },
  { id: 'service-year', title: '做一年社区服役', ages: [18, 26], cost: '身体累一点', time: '一年，只有微薄补贴', risk: '只做一次，不会变成长期职位', mark: '补贴是一笔现金，档案里记下服役，不是就业' },
  { id: 'prepare', title: '为坏年景预备一点', ages: [18, 80], cost: '大约当地水平的 1.5%', time: '预备能撑五年', risk: '钱不够就会记进欠款', mark: '预备在，真遇到紧张年份才少慌一点' },
  { id: 'neighbor', title: '认识隔壁的人', ages: [8, 80], cost: '不花钱', time: '从这一年记住名字', risk: '已经有这位邻居就不再认识一个新的', mark: '以后求助，对方可以拒绝' },
@@ -72,7 +72,7 @@ export const LIVED_ACTS = [
  { id: 'write-teacher', title: '给老师写一封信', ages: [10, 40], cost: '不花钱', time: '等一等', risk: '大约一半没有回信', mark: '没有回信，信还是留着' },
  { id: 'exam-wait', title: '等下一次再考', ages: [15, 35], cost: '不花钱，也不获得学历', time: '至少再等一年', risk: '正在顺利在读时，不必用这种方式停下来', mark: '等待不会变成录取' },
  { id: 'gap-year', title: '空出一年', ages: [17, 26], cost: '这一年不产生学历，也没有工资', time: '一年', risk: '已经有工作或正在读一个项目，就不能再空一次', mark: '只多一点见识，档案里记下空年' },
- { id: 'internship', title: '试一份短期实习', ages: [16, 23], cost: '地方可以不收你', time: '短短一段，不是岗位', risk: '大约四成半被回绝；有正式工作就不必再实习', mark: '收下也只是一笔补贴，不会写成职业' },
+ { id: 'internship', title: '试一份短期实习', ages: [16, 23], cost: '地方可以不收你', time: '短短一段，不是岗位', risk: '大约四成半被回绝；有正式工作就不必再实习', mark: '带教有名字，补贴不是职业' },
  { id: 'injury', title: '处理工作时的伤', ages: [18, 65], cost: '医药大约当地水平的 2%，再损失一小段收入', time: '停下来处理', risk: '没有工作，或身体还没有报警，就不会走到这一步', mark: '职位还在，身体要时间' },
  { id: 'sick-leave', title: '请病假', ages: [18, 67], cost: '大约三周工资，职位先留着', time: '这一段', risk: '没有工作或身体还撑得住，请不了', mark: '回来仍是原来的工作，不是晋升' },
  { id: 'birthday', title: '给一个具体的人过生日', ages: [6, 90], cost: '大约当地水平的 0.4%', time: '这一天', risk: '人若在别处，礼物大约四成送不到', mark: '送到了关系近一点，送不到钱也花了' },
@@ -99,7 +99,7 @@ function open(l, id) {
   case 'short-sleep': return (v.sleepUntil || 0) < l.age && (l.stats.health || 0) >= 25;
   case 'catch-sleep': return (v.sleepUntil || 0) >= l.age;
   case 'commute': return working(l) && !l.remote;
-  case 'rent-look': return !l.house && l.systems?.residence?.with !== 'parents' && l.age - (v.rentAt || -10) >= 5;
+  case 'rent-look': return !!(v.lease && l.age > v.lease.until) || (!l.house && l.systems?.residence?.with !== 'parents' && l.age - (v.rentAt || -10) >= 5);
   case 'informal': return working(l) && !v.informal;
   case 'formalize': return !!v.informal;
   case 'parental-leave': return !!kid(l, 1) && working(l);
@@ -169,17 +169,33 @@ function run(l, id) {
    return { ok: true, message: '通勤记进了这一年。' };
   }
   case 'rent-look': {
-   v.rentAt = l.age;
    const housing = Math.round(g * .06);
    const base = Math.max(l.income || 0, Math.round(g * .2));
    const ratio = Math.round(housing / base * 100);
-   log(l, '住处在账单里', `你没有自己的房子，也不是和父母同住。生活费里住房大约${housing}，相当于收入口径的 ${ratio}% 上下。这是游戏里的住房份额，不是官方租金统计。`);
+   if (v.lease && l.age <= v.lease.until) {
+    log(l, `${v.lease.landlord}的租约还在`, `约到${v.lease.until}岁。住房大约占收入口径的 ${ratio}%，已经含在生活费里，这一年不再另扣。`);
+    return { ok: true, message: '租约还在，没有另收费。' };
+   }
+   if (v.lease && l.age > v.lease.until) {
+    const fee = Math.round(g * .01); spend(l, fee);
+    if (!chance(l, .55)) {
+     v.lease.lapsed = l.age;
+     log(l, `${v.lease.landlord}没有续约`, `你又付了${fee}去谈。对方不续。人还住着，但这份约已经过期，工作也不会因此出现。`);
+     return { ok: true, message: '续约被拒绝了。' };
+    }
+    v.lease.until = l.age + 2; v.lease.lapsed = 0;
+    log(l, `${v.lease.landlord}把约续了两年`, `谈话花了${fee}。新的到期是${v.lease.until}岁。住房份额仍在原来的生活费里，不重复扣。`);
+    return { ok: true, message: '续了两年。' };
+   }
+   v.rentAt = l.age;
+   log(l, '住处在账单里', `你没有自己的房子，也不是和父母同住。生活费里住房大约${housing}，相当于收入口径的 ${ratio}% 上下。还没有单独的租约。这是游戏里的住房份额，不是官方租金统计。`);
    return { ok: true, message: `住房大约是收入口径的 ${ratio}%。` };
   }
   case 'informal': {
    v.informal = true;
-   log(l, '这份活没有保障', `收入还在，但${l.job || '这份工作'}不再往养老累计里记。生病、空窗和以后的领取，都要另算。`);
-   return { ok: true, message: '从此不再累计养老金，直到办成保障。' };
+   const who = named(l); v.foreman = who.name;
+   log(l, '这份活没有保障', `${who.name}说先这么干。收入还在，但${l.job || '这份工作'}不再往养老累计里记。生病、空窗和以后的领取，都要另算。`);
+   return { ok: true, message: `${who.name}这边没有保障。` };
   }
   case 'formalize': {
    const fee = Math.round(g * .04); spend(l, fee);
@@ -327,9 +343,11 @@ function run(l, id) {
    return { ok: true, message: '补贴进了现金，职位没变。' };
   }
   case 'job-search': {
-   v.searchUntil = l.age + 1;
-   log(l, '求职要等', '你开始投。回音最早明年才知道，而且这次行动本身不产生职位。');
-   return { ok: true, message: '要等到明年，也不保证有职位。' };
+   const who = named(l);
+   v.search = { name: who.name, since: l.age, until: l.age + 2 };
+   v.searchUntil = l.age + 2;
+   log(l, '求职要等', `${who.name}收下了材料。最早${v.search.until}岁才有回音。这期间没有工资，也不会先写上一个职位。`);
+   return { ok: true, message: `${who.name}说再等两年。` };
   }
   case 'reference': {
    const f = friend(l);
@@ -376,8 +394,10 @@ function run(l, id) {
   case 'leave-home': {
    const fee = Math.round(g * .08); spend(l, fee);
    l.systems.residence.with = 'alone';
-   log(l, '从父母家搬出来', `安家花了${fee}。住处改成独自生活。工作不会因此出现，账单从现在按一个人算。`);
-   return { ok: true, message: '搬出来了。' };
+   const who = named(l);
+   v.lease = { landlord: who.name, since: l.age, until: l.age + 2, lapsed: 0 };
+   log(l, '从父母家搬出来', `${who.name}把钥匙给了你，安家花了${fee}。约到${v.lease.until}岁。生活费里原来的住房份额不再另扣一遍。工作不会因此出现。`);
+   return { ok: true, message: `搬出来了，房东是${who.name}。` };
   }
   case 'service-year': {
    v.served = true; const stipend = Math.round(g * .04); l.money = (l.money || 0) + stipend; stats(l, { health: -1, knowledge: 2 });
@@ -426,18 +446,24 @@ function run(l, id) {
   }
   case 'internship': {
    v.intern = true;
-   if (!chance(l, .55)) { log(l, '实习没有收下你', '地方回绝了。没有补贴，也没有职位。'); return { ok: true, message: '没被收下。' }; }
+   const who = named(l);
+   if (!chance(l, .55)) { log(l, '实习没有收下你', `${who.name}看了材料，地方回绝了。没有补贴，也没有职位。`); return { ok: true, message: '没被收下。' }; }
+   v.mentor = { name: who.name, age: l.age };
    const stipend = Math.round(g * .02); l.money = (l.money || 0) + stipend;
-   log(l, '短短一段实习', `补贴${stipend}。结束以后你仍没有一份职业，档案里只写着试过。`);
-   return { ok: true, message: '实习结束了，不是职业。' };
+   log(l, '短短一段实习', `${who.name}带了你这一段。补贴${stipend}。结束以后你仍没有一份职业，档案里只写着试过。`);
+   return { ok: true, message: `${who.name}带过你，这不是职业。` };
   }
   case 'injury': {
-   const bill = Math.round(g * .02); const lost = Math.round(Math.min((l.income || 0) * .05, g * .04));
-   spend(l, bill + lost); stats(l, { health: -3 });
-   log(l, '工作时的伤', `医药${bill}，少掉的收入大约${lost}。${l.job || '工作'}还在，身体要时间，没有人因此给你升职。`);
+   const sleepy = (v.sleepUntil || 0) >= l.age;
+   const bill = Math.round(g * (sleepy ? .035 : .02));
+   const lost = Math.round(Math.min((l.income || 0) * (sleepy ? .08 : .05), g * (sleepy ? .06 : .04)));
+   spend(l, bill + lost); stats(l, { health: sleepy ? -5 : -3 });
+   log(l, '工作时的伤', `${sleepy ? '睡眠债还在，' : ''}医药${bill}，少掉的收入大约${lost}。${l.job || '工作'}还在，身体要时间，没有人因此给你升职。`);
    return { ok: true, message: '伤处理了，职位没变。' };
   }
   case 'sick-leave': {
+   const sleepy = (v.sleepUntil || 0) >= l.age;
+   if (sleepy && !chance(l, .55)) { stats(l, { health: -2 }); log(l, '病假没有批下来', `你已经连着缺觉。单位没有批。职位还是${l.job || '原来的工作'}，人却更累。`); return { ok: true, message: '假没有批。' }; }
    const lost = Math.round((l.income || 0) * .06); spend(l, lost); stats(l, { health: 2 });
    log(l, '病假', `大约三周工资${lost}。回来仍是${l.job || '原来的工作'}，不是晋升。`);
    return { ok: true, message: '假请了，职位还是原来的。' };
@@ -501,6 +527,14 @@ function tick(l) {
  const v = l.lived;
  watch(l);
  if ((v.sleepUntil || 0) >= l.age) stats(l, { health: -0.5 });
+ if (v.search && l.age >= v.search.until) {
+  const who = v.search.name;
+  const hard = (v.unrecognizedUntil || 0) >= l.age || (abroad(l) && !v.fluent);
+  const replied = chance(l, hard ? .18 : .34);
+  v.search = null; v.searchUntil = l.age + 1;
+  if (!replied) log(l, `${who}没有回音`, '材料石沉大海。你仍没有职位，也没有工资。');
+  else log(l, `${who}回了一封信`, '信里说这次没有空位。这不是录用，职位和收入都没有变。');
+ }
  if (v.smoke) stats(l, { health: -0.45 });
  if (v.drink) stats(l, { health: -0.25 });
  if (v.exercise) { v.exerciseYears += 1; stats(l, { health: 0.3 }); spend(l, gdp(l) * .004); }
@@ -556,6 +590,11 @@ export function livedBrief(l) {
  if (v.informal) bits.push('工作无保障');
  if ((v.leaveUntil || 0) >= (l.age || 0)) bits.push('育儿假');
  if (v.grief?.length) bits.push(`想念${v.grief.map(g => g.name).join('、')}`);
+ if (v.lease?.landlord && !(v.lease.lapsed > 0 && l.age > v.lease.until)) bits.push(`租约：${v.lease.landlord}`);
+ else if (v.lease?.lapsed) bits.push(`${v.lease.landlord}的约过期了`);
+ if (v.search?.name) bits.push(`在等${v.search.name}的回音`);
+ if (v.foreman) bits.push(`无保障：${v.foreman}`);
+ if (v.mentor?.name) bits.push(`带教 ${v.mentor.name}`);
  if (v.reference?.until >= (l.age || 0)) bits.push(`${v.reference.name}的推荐还在`);
  if (abroad(l) && !v.fluent) bits.push(`当地语言还生疏（${v.barrierYears}年）`);
  if ((v.pensionYears || 0) > 0) bits.push(`养老累计 ${v.pensionYears} 年`);

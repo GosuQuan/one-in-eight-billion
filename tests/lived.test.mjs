@@ -102,3 +102,104 @@ test('childhood years do not gain a lived bill or a banned log', () => {
     assert.equal(l.log.some(e => /养老|下班|搬来和你同住|屋顶要翻修/.test(`${e.title}${e.text}`)), false);
   }
 });
+
+test('leaving home names a landlord and does not charge rent again next year', () => {
+  const l = adult('lease', 22);
+  l.systems.residence.with = 'parents';
+  const job = l.job;
+  livedAction(l, 'leave-home');
+  assert.equal(l.systems.residence.with, 'alone');
+  assert.equal(l.job, job);
+  assert.equal(typeof l.lived.lease.landlord, 'string');
+  const after = l.money;
+  l.age += 1;
+  livedYear(l, { events: false });
+  assert.equal(l.money, after);
+  assert.equal(l.job, job);
+  l.age = l.lived.lease.until + 1;
+  let refused = false;
+  for (let i = 0; i < 16 && !refused; i++) {
+    const c = adult('renew-' + i, 24);
+    c.systems.residence.with = 'parents';
+    livedAction(c, 'leave-home');
+    const landlord = c.lived.lease.landlord;
+    c.age = c.lived.lease.until + 1;
+    livedAction(c, 'rent-look');
+    assert.equal(c.job, '职员');
+    if (c.lived.lease.lapsed) { refused = true; assert.ok((c.log.at(-1).title + c.log.at(-1).text).includes(landlord)); }
+  }
+  assert.equal(refused, true);
+});
+
+test('a job search waits two years and never writes a job', () => {
+  let silent = false;
+  for (let i = 0; i < 18; i++) {
+    const l = adult('search-' + i, 30);
+    l.income = 0; l.job = '待业';
+    livedAction(l, 'job-search');
+    assert.equal(l.job, '待业');
+    assert.equal(l.income, 0);
+    assert.equal(typeof l.lived.search.name, 'string');
+    l.age += 1;
+    livedYear(l, { events: false });
+    assert.equal(l.job, '待业');
+    assert.equal(l.lived.search && l.lived.search.name, l.lived.search.name);
+    l.age += 1;
+    livedYear(l, { events: false });
+    assert.equal(l.job, '待业');
+    assert.equal(l.income, 0);
+    assert.equal(l.lived.search, null);
+    const blob = l.log.map(e => e.title + e.text).join('\n');
+    if (blob.includes('没有回音') || blob.includes('不是录用')) silent = true;
+  }
+  assert.equal(silent, true);
+});
+
+test('sleep debt raises the cost of an injury and can block sick leave', () => {
+  const tired = adult('hurt-tired', 34);
+  const rested = adult('hurt-rested', 34);
+  livedAction(tired, 'short-sleep');
+  tired.stats.health = 40; rested.stats.health = 40;
+  const tiredJob = tired.job, restedJob = rested.job;
+  const tiredCash = tired.money, restedCash = rested.money;
+  livedAction(tired, 'injury');
+  livedAction(rested, 'injury');
+  assert.equal(tired.job, tiredJob);
+  assert.equal(rested.job, restedJob);
+  assert.ok(tiredCash - tired.money > restedCash - rested.money);
+  let refused = false;
+  for (let i = 0; i < 16 && !refused; i++) {
+    const l = adult('leave-' + i, 36);
+    l.stats.health = 40;
+    livedAction(l, 'short-sleep');
+    const job = l.job;
+    livedAction(l, 'sick-leave');
+    assert.equal(l.job, job);
+    if (l.log.some(e => e.title === '病假没有批下来')) refused = true;
+  }
+  assert.equal(refused, true);
+});
+
+test('informal work names a foreman and stops pension years without changing the job', () => {
+  const a = adult('gig-a', 33);
+  const b = adult('gig-b', 33);
+  livedAction(a, 'informal');
+  assert.equal(typeof a.lived.foreman, 'string');
+  a.age += 1; b.age += 1;
+  livedYear(a, { events: false });
+  livedYear(b, { events: false });
+  assert.ok(b.lived.pensionYears > a.lived.pensionYears);
+  assert.equal(a.job, b.job);
+});
+
+test('an accepted internship names a mentor and still is not a job', () => {
+  let mentored = false;
+  for (let i = 0; i < 20 && !mentored; i++) {
+    const l = adult('mentor-' + i, 20);
+    l.income = 0; l.job = '尚未工作';
+    livedAction(l, 'internship');
+    assert.equal(l.job, '尚未工作');
+    if (l.lived.mentor) { mentored = true; assert.equal(typeof l.lived.mentor.name, 'string'); }
+  }
+  assert.equal(mentored, true);
+});
