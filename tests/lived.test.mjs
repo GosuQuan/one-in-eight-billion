@@ -569,3 +569,103 @@ test('an unfinished chore argument keeps the partner name for two years', () => 
   assert.equal(fought, true);
   assert.equal(settled, true);
 });
+
+test('commute keeps charging while the job stays local and stops when it does not', () => {
+  const l = adult('commute', 34);
+  l.remote = false;
+  const happy = l.stats.happiness;
+  const money = l.money;
+  livedAction(l, 'commute');
+  assert.equal(l.lived.commuteOn, true);
+  assert.equal(l.lived.commuteYears, 1);
+  assert.ok(l.money < money);
+  assert.equal(l.job, '职员');
+  const once = l.money;
+  const again = livedAction(l, 'commute');
+  assert.equal(again.ok, false);
+  assert.equal(l.money, once);
+  l.age = 35;
+  livedYear(l, { events: false });
+  assert.equal(l.lived.commuteYears, 2);
+  assert.ok(l.money < once);
+  assert.ok(l.stats.happiness < happy);
+  assert.equal(l.job, '职员');
+  assert.equal(l.income, 40000);
+  assert.ok(l.log.some(e => e.title === '路上的时间还在'));
+  l.remote = true;
+  l.age = 36;
+  const income = l.income;
+  livedYear(l, { events: false });
+  assert.equal(l.lived.commuteOn, false);
+  assert.equal(l.income, income);
+  assert.ok(l.log.some(e => e.title === '路上的时间停了'));
+});
+
+test('a service year can be refused, and an accepted one is not a job', () => {
+  const idle = (seed) => {
+    const l = adult(seed, 22);
+    l.job = '待业'; l.income = 0; l.remote = false;
+    return l;
+  };
+  const busy = idle('service-busy');
+  busy.job = '职员'; busy.income = 40000;
+  assert.equal(livedAction(busy, 'service-year').ok, false);
+  assert.equal(busy.income, 40000);
+
+  let refused = false, accepted = false;
+  for (let i = 0; i < 24 && !(refused && accepted); i++) {
+    const l = idle('service-' + i);
+    const money = l.money;
+    livedAction(l, 'service-year');
+    if (l.log.some(e => e.title.endsWith('没有收下服役'))) {
+      assert.equal(l.money, money);
+      assert.equal(l.income, 0);
+      assert.equal(l.job, '待业');
+      assert.equal(l.lived.served, undefined);
+      assert.equal(l.lived.serviceNext, 23);
+      assert.equal(livedAction(l, 'service-year').ok, false);
+      refused = true;
+    }
+    if (l.log.some(e => e.title === '社区服役的一年')) {
+      assert.ok(l.money > money);
+      assert.equal(l.income, 0);
+      assert.equal(l.job, '待业');
+      assert.equal(l.lived.served, true);
+      assert.equal(l.lived.serviceUntil, 22);
+      const blocked = careerAction(l, 'apprentice');
+      assert.match(blocked.message, /服役/);
+      assert.equal(l.job, '待业');
+      assert.equal(l.income, 0);
+      l.pending = { kind: 'system', system: 'opportunity', offerKind: 'local', jobKind: 'apprentice', title: '本地', text: '试', options: [{ key: 'try', label: '去试试', description: '面试' }] };
+      choose(l, 0);
+      assert.ok(l.log.some(e => e.title === '服役还没结束'));
+      assert.equal(l.job, '待业');
+      assert.equal(l.income, 0);
+      accepted = true;
+    }
+  }
+  assert.equal(refused, true);
+  assert.equal(accepted, true);
+});
+
+test('a gap year blocks the next application and does not create a wage or a credential', () => {
+  const l = adult('gap', 22);
+  l.job = '待业'; l.income = 0;
+  l.school = { credential: 'none', program: null, preparation: 0, attempts: {}, randomState: 1, milestones: [], basicProgress: 0 };
+  l.stats.knowledge = 80; l.money = 80000;
+  livedAction(l, 'gap-year');
+  assert.equal(l.lived.gapUntil, 23);
+  assert.equal(l.income, 0);
+  const money = l.money;
+  const blocked = educationAction(l, 'adult-basic');
+  assert.match(blocked.message, /空着/);
+  assert.equal(l.money, money);
+  assert.equal(l.school.credential, 'none');
+  assert.equal(l.school.program, null);
+  l.age = 23;
+  const again = educationAction(l, 'adult-basic');
+  assert.doesNotMatch(again.message, /空着/);
+  assert.ok(l.money < money);
+  assert.equal(l.school.credential, 'none');
+  assert.equal(l.income, 0);
+});

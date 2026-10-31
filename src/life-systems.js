@@ -370,6 +370,7 @@ export function systemChoice(l, p, index) {
   spend(l, gdp(l) * .015); stats(l, { health: -2, happiness: -2 }); log(l, '危机中的选择', `面对年度情境，你选择了${o.label}。钱已经花出去，安全并不因此确定。`, 'world'); break;
  case 'opportunity': {
    if (key === 'skip' || key === 'cancel') { log(l, '让这个消息过去', '你听见了，但没有去追。机会不会在原地等你。'); break; }
+   if ((l.lived?.serviceUntil || 0) >= l.age) { log(l, '服役还没结束', '这一年在社区服役，这份工作没有开始。职位和收入都不变。', 'work'); break; }
    const kind = p.offerKind;
    if (kind === 'local') {
     const gate = gateNewLocalJob(l, p.jobKind);
