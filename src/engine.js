@@ -357,14 +357,14 @@ const MILESTONES={
  5:{title:'还没上学的那个下午',text:'母亲把一本旧绘本放在桌边，门外传来邻居孩子的笑声。今天下午，你想怎样度过？',options:[
   {label:'认真听故事',description:'从阅读里发现更大的世界。',effects:{knowledge:10,happiness:3}},
   {label:'认识新朋友',description:'和邻座一起画一张想象中的地图。',effects:{social:12,happiness:7}},
-  {label:'帮家里做事',description:'分担一点生活，也更早理解父母。',effects:{social:5,happiness:2,cash:200}}]},
+  {label:'帮家里做事',description:'分担一点生活，也更早理解父母。',effects:{social:5,happiness:2,cash:'gdp:.012'}}]},
  12:{title:'自己的课余时间',text:'课业变多了，你开始决定下午怎么过。',options:[
   {label:'加入科学小组',description:'花几个月完成一个小实验。',effects:{knowledge:12,happiness:-2}},
   {label:'参加运动队',description:'在操场上学会合作，也把身体练好。',effects:{health:9,social:8}},
-  {label:'帮家里做事',description:'分担家务，也攒下一点零用钱。',effects:{social:5,money:0,cash:400,happiness:3}}]},
+  {label:'帮家里做事',description:'分担家务，也攒下一点零用钱。',effects:{social:5,money:0,cash:'gdp:.025',happiness:3}}]},
  30:{title:'家的形状',text:'你开始想象未来的家，会是什么样子。',options:[
   {label:'和伴侣尝试要一个孩子',description:'没有适龄伴侣就不会出生。即使尝试，这一年也可能没有孩子。',effects:{conception:true}},
-  {label:'先照顾自己',description:'把时间留给自己的生活与兴趣。',effects:{health:5,happiness:7,cash:1200}}]},
+  {label:'先照顾自己',description:'把时间留给自己的生活与兴趣。',effects:{health:5,happiness:7,cash:'gdp:.08'}}]},
  35:{title:'另一座城市',text:'外地的一次机会，让你想到搬家。',options:[
   {label:'去问那个外地机会',description:'只是开始申请。签证可能失败；去成后收入和开销都按目的地重算。',effects:{relocate:'__random__'}},
   {label:'留下扎根',description:'继续经营熟悉的人际关系。',effects:{social:10,happiness:6}}]},
@@ -431,9 +431,9 @@ const EVENTS=[
  {id:'family_move',age:[6,16],weight:.5,cond:()=>true,build:l=>({title:'家搬到了另一边',text:'父母换了工作，你跟着搬去城市另一头。旧朋友还在原来的学校，新房间的窗朝北。',type:'event',effects:{social:-3,knowledge:4,happiness:-2}})},
  {id:'found_wallet',age:[8,16],weight:.5,cond:()=>true,build:l=>({title:'长椅上的钱包',text:'一只旧钱包躺在长椅上，里面有一张身份证和几张纸币。',type:'event',options:[
   {key:'return',label:'交给附近的店员',description:'也许失主会回来找。',effects:{social:5,happiness:3}},
-  {key:'keep',label:'先收起来',description:'没有人看见。',effects:{cash:600,happiness:-3}}]})},
+  {key:'keep',label:'先收起来',description:'没有人看见。',effects:{cash:'gdp:.06',happiness:-3}}]})},
  {id:'sibling_try',age:[1,14],weight:.55,cond:l=>{const m=l.family?.mother,f=l.family?.father;if(!m||m.alive===false||!f||f.alive===false)return false;if((m.age??99)<20||(m.age??0)>45||(f.age??0)>62)return false;if((l.family.siblings||[]).length>=3)return false;return (l.family.lastSiblingTry??-9)+4<=l.age;},build:l=>{l.family.siblings||=[];l.family.lastSiblingTry=l.age;const mature=Math.max(0,(l.family.mother.age||40)-34)*.015+Math.max(0,(l.family.father.age||40)-50)*.01;if(!chance(l,Math.max(.12,.58-mature)))return{title:'家里没有添人',text:`${l.family.mother.name}和${l.family.father.name}都还在，也提过再要一个孩子。母亲${l.family.mother.age}岁，父亲${l.family.father.age}岁。这一年没有迎来新生儿。`,type:'family',effects:{happiness:-1}};const sex=chance(l,.5)?'男':'女';const sib={...person(l,l.country,sex),id:`sibling-${l.birthYear+l.age}-${l.family.siblings.length}`,age:0,birthYear:l.birthYear+l.age,alive:true,bond:55};l.family.siblings.push(sib);return{title:`${sib.name}出生了`,text:`${l.family.mother.name}生下了${sex==='男'?'弟弟':'妹妹'}${sib.name}。这是一个会和你一起长大的人。`,type:'warm',effects:{social:3,happiness:2}};}},
- {id:'child_illness',age:[1,10],weight:.5,cond:()=>true,build:l=>({title:'半夜的发烧',text:'你烧到三十九度，父母抱着你去了医院。走廊的灯很白。',type:'bad',effects:{medical:true,health:-4,cash:-600,happiness:-2}})},
+ {id:'child_illness',age:[1,10],weight:.5,cond:()=>true,build:l=>({title:'半夜的发烧',text:'你烧到三十九度，父母抱着你去了医院。走廊的灯很白。',type:'bad',effects:{medical:true,health:-4,cash:'-gdp:.05',happiness:-2}})},
  {id:'exam_pressure',age:[12,18],weight:1,cond:()=>true,build:l=>({title:'一场重要的考试',text:'成绩会决定下一步能去哪里。书桌上的台灯亮到很晚。',type:'event',options:[
   {key:'cram',label:'熬夜复习',description:'把能记住的都记住。',effects:{knowledge:8,health:-3}},
   {key:'normal',label:'按平常节奏复习',description:'睡够，也留一点空白。',effects:{knowledge:4,happiness:1}},
@@ -442,7 +442,7 @@ const EVENTS=[
   {key:'confess',label:'找个机会说出来',description:'不管结果如何，至少不再猜。',effects:{happiness:6,social:3}},
   {key:'friend',label:'先做朋友',description:'把喜欢放在心里，慢慢相处。',effects:{happiness:2,social:2}}]})},
  {id:'part_time',age:[15,19],weight:.6,cond:()=>true,build:l=>({title:'周末的零工',text:'一家店愿意让你周末去帮忙，工资不高，但够买自己想要的东西。',type:'event',options:[
-  {key:'work',label:'去做兼职',description:'攒一点钱，也见识真实的工作。',effects:{cash:1200,social:3,knowledge:-2}},
+  {key:'work',label:'去做兼职',description:'攒一点钱，也见识真实的工作。',effects:{cash:'gdp:.12',social:3,knowledge:-2}},
   {key:'study',label:'把周末留给学习',description:'准备考试，暂时不打工。',effects:{knowledge:5}}]})},
  {id:'online_link',age:[12,30],weight:.5,cond:()=>true,build:l=>({title:'一条陌生的链接',text:'屏幕上弹出一条消息：点开就能领取一份礼物。你盯着那个陌生的网址。',type:'bad',options:[
   {key:'click',label:'点开看看',description:'也许是真的。',effects:{cash:'-gdp:.05',happiness:-3}},
@@ -451,11 +451,11 @@ const EVENTS=[
   {key:'accept',label:'接下来',description:'收入和压力一起变多。',effects:{incomePct:.15,health:-4,happiness:3,social:2}},
   {key:'decline',label:'把手上的事做好',description:'不急着证明自己。',effects:{happiness:2,social:2}}]})},
  {id:'layoff',age:[25,60],weight:.5,cond:l=>!l.retired&&l.income>0,build:l=>({title:'一封信',text:'公司调整了业务，你的岗位被列进了名单。桌上的东西不多，一个纸箱就装完了。',type:'bad',options:[
-  {key:'hunt',label:'马上找工作',description:'把简历投出去，也问问旧同事。',effects:{job:'求职中',income:-1,happiness:-5,cash:-1000}},
-  {key:'reskill',label:'先学一门新技能',description:'用几个月补上缺口。',effects:{job:'求职中',income:0,cash:-2500,knowledge:8,happiness:-2}},
-  {key:'rest',label:'休息一段时间',description:'允许自己停一停。',effects:{job:'待业',income:0,happiness:2,cash:-2000}}]})},
+  {key:'hunt',label:'马上找工作',description:'把简历投出去，也问问旧同事。',effects:{job:'求职中',income:-1,happiness:-5,cash:'-gdp:.065'}},
+  {key:'reskill',label:'先学一门新技能',description:'用几个月补上缺口。',effects:{job:'求职中',income:0,cash:'-gdp:.16',knowledge:8,happiness:-2}},
+  {key:'rest',label:'休息一段时间',description:'允许自己停一停。',effects:{job:'待业',income:0,happiness:2,cash:'-gdp:.13'}}]})},
  {id:'side_hustle',age:[22,55],weight:.7,cond:l=>!l.retired&&l.income>0,build:l=>({title:'下班后的副业',text:'朋友拉你一起做一个小项目：周末拍视频，或者接一点设计活。',type:'event',options:[
-  {key:'join',label:'试着做起来',description:'少睡一点，多一份可能。',effects:{cash:-800,incomePct:.08,health:-3,knowledge:4}},
+  {key:'join',label:'试着做起来',description:'少睡一点，多一份可能。',effects:{cash:'-gdp:.08',incomePct:.08,health:-3,knowledge:4}},
   {key:'pass',label:'先顾好主业',description:'把精力留给已经选择的生活。',effects:{happiness:1}}]})},
  {id:'stock_tip',age:[22,65],weight:.7,cond:l=>l.money>800,build:l=>({title:'行情软件的深夜推送',text:'群里有人晒出收益截图，劝你在市场里下一注。你决定先想清楚自己能承受多大亏损，再由系统配置标的。这次投入四分之一现金，按一段持有期的行情结算。',type:'event',options:[
    ...STOCK_RISKS.map(risk=>({key:risk.id,label:`${risk.name}投入`,description:`${risk.description} 本次模拟收益范围 ${Math.round(risk.minReturn*100)}% 至 +${Math.round(risk.maxReturn*100)}%。`,resolve:l=>{
@@ -470,31 +470,31 @@ const EVENTS=[
   {key:'hold',label:'什么都不做',description:'相信时间，也接受波动。',effects:{happiness:-2,knowledge:3}},
   {key:'buy',label:'再买一点',description:'用一成现金加仓。',resolve:l=>({text:'你又买了一些。没有人知道这是底部，还是半山腰。',effects:{invest:{index:.1},happiness:-1,knowledge:2}})}]})},
  {id:'lottery',age:[18,80],weight:.5,cond:l=>l.money>500,build:l=>({title:'街角的彩票店',text:'一张彩票只要很少的钱，海报上写着“改变命运”。',type:'event',options:[
-  {key:'buy',label:'买一张',description:'当作一个很便宜的梦。',resolve:l=>{const win=chance(l,.03);return{text:win?'你中了一个小奖。金额不算多，但足够请朋友吃一顿。':'没有中。你把彩票夹进书里，当作今年的一枚书签。',effects:{cash:win?8000:-200,happiness:win?6:0}}}},
+  {key:'buy',label:'买一张',description:'当作一个很便宜的梦。',resolve:l=>{const win=chance(l,.03);return{text:win?'你中了一个小奖。金额不算多，但足够请朋友吃一顿。':'没有中。你把彩票夹进书里，当作今年的一枚书签。',effects:{cash:win?'gdp:.5':'-gdp:.012',happiness:win?6:0}}}},
   {key:'pass',label:'走过去',description:'把这点钱留给更确定的事。',effects:{knowledge:1}}]})},
  {id:'scam_call',age:[20,80],weight:.7,cond:()=>true,build:l=>({title:'自称客服的电话',text:'对方说你的账户出了问题，需要马上把钱转到“安全账户”。背景音里有人在敲键盘。',type:'bad',options:[
-  {key:'transfer',label:'按对方说的做',description:'你很担心账户真的出事。',effects:{cash:-Math.min(5000,Math.max(800,Math.round(l.money*.25))),happiness:-6}},
+  {key:'transfer',label:'按对方说的做',description:'你很担心账户真的出事。',effects:{cash:-Math.min(Math.round(l.country.gdp*.35),Math.max(Math.round(l.country.gdp*.05),Math.round(l.money*.25))),happiness:-6}},
   {key:'hangup',label:'挂断并打官方电话',description:'先核实，再决定。',effects:{knowledge:2,happiness:1}},
   {key:'report',label:'报警并提醒家人',description:'让这件事停在今天。',effects:{social:2,happiness:2}}]})},
  {id:'wedding',age:[20,50],weight:.7,cond:l=>l.age>=20,build:l=>({title:'一张婚礼请柬',text:'老朋友要结婚了。请柬上写着你的名字，地点在另一座城市。',type:'event',options:[
   {key:'go',label:'去参加，随一份礼',description:'见见旧朋友，也送上祝福。',effects:{cash:'-gdp:.08',social:5,happiness:4}},
-  {key:'decline',label:'礼到人不到',description:'最近实在走不开。',effects:{cash:-500,social:-1}}]})},
+  {key:'decline',label:'礼到人不到',description:'最近实在走不开。',effects:{cash:'-gdp:.03',social:-1}}]})},
  {id:'rent_rise',age:[22,60],weight:.5,cond:l=>!l.house,build:l=>({title:'房东发来的消息',text:'房租下个月要涨。房东说附近都这个价，你可以考虑，也可以搬。',type:'event',options:[
-  {key:'accept',label:'接受涨租',description:'不用折腾，但每月更紧。',effects:{cash:-1800,happiness:-2}},
-  {key:'move',label:'找更便宜的房子',description:'搬家很累，但能省下一点。',effects:{cash:-2500,social:-2,happiness:-1,knowledge:1}},
-  {key:'negotiate',label:'和房东谈谈',description:'说明自己的情况，争取一个折中。',effects:{cash:-700,happiness:1,social:1}}]})},
+  {key:'accept',label:'接受涨租',description:'不用折腾，但每月更紧。',effects:{cash:'-gdp:.12',happiness:-2}},
+  {key:'move',label:'找更便宜的房子',description:'搬家很累，但能省下一点。',effects:{cash:'-gdp:.16',social:-2,happiness:-1,knowledge:1}},
+  {key:'negotiate',label:'和房东谈谈',description:'说明自己的情况，争取一个折中。',effects:{cash:'-gdp:.045',happiness:1,social:1}}]})},
  {id:'health_scare',age:[30,75],weight:.7,cond:()=>true,build:l=>({title:'身体发出的信号',text:'持续几周的疲惫和疼痛，让你开始想：要不要去医院查一查？',type:'bad',options:[
-  {key:'check',label:'做一次全面检查',description:'花钱买一个确定的答案。',effects:{medical:true,cash:-2500,health:5,knowledge:2}},
+  {key:'check',label:'做一次全面检查',description:'花钱买一个确定的答案。',effects:{medical:true,cash:'-gdp:.16',health:5,knowledge:2}},
   {key:'wait',label:'再观察一阵',description:'也许只是最近太累了。',effects:{health:-3,happiness:-1}}]})},
  {id:'burnout',age:[25,55],weight:.6,cond:l=>!l.retired&&l.income>0,build:l=>({title:'提不起劲的早晨',text:'闹钟响了三遍，你还是不想起床。工作没有出错，但你已经很久没有期待过周一。',type:'bad',options:[
-  {key:'rest',label:'请一段假',description:'把时间还给自己。',effects:{cash:-2000,health:6,happiness:5}},
+  {key:'rest',label:'请一段假',description:'把时间还给自己。',effects:{cash:'-gdp:.13',health:6,happiness:5}},
   {key:'push',label:'再撑一阵',description:'项目结束就好了。',effects:{health:-5,incomePct:.03,happiness:-2}}]})},
  {id:'parent_illness',age:[25,60],weight:.6,cond:l=>l.family.mother?.alive||l.family.father?.alive,build:l=>{const p=l.family.mother?.alive?l.family.mother:l.family.father;return{title:'医院走廊',text:`${p.name}住院了。医生说需要有人照顾，也需要一笔不算小的费用。`,type:'bad',options:[
-  {key:'pay',label:'承担治疗费用',description:'把积蓄拿出来，换一个安心。',effects:{medical:true,cash:-6000,social:5,happiness:2}},
+  {key:'pay',label:'承担治疗费用',description:'把积蓄拿出来，换一个安心。',effects:{medical:true,cash:'-gdp:.4',social:5,happiness:2}},
   {key:'company',label:'请几天假去陪伴',description:'钱可以再挣，时间不能。',effects:{cash:'-gdp:.08',social:6,happiness:3,health:-1}},
   {key:'busy',label:'先忙完手上的事',description:'你知道自己会为此难过很久。',effects:{happiness:-6,social:-3}}]}}},
  {id:'child_school',age:[30,55],weight:.8,cond:l=>l.children.some(c=>c.age>=5&&c.age<=17),build:l=>{const c=l.children.find(c=>c.age>=5&&c.age<=17);return{title:'孩子的学校',text:`${c.name}到了要选学校的年纪。公立学校近，私立学校资源更多，也更贵。`,type:'event',options:[
-  {key:'public',label:'就近上公立学校',description:'把省下的钱留给生活。',effects:{cash:-1000,knowledge:2,happiness:2}},
+  {key:'public',label:'就近上公立学校',description:'把省下的钱留给生活。',effects:{cash:'-gdp:.065',knowledge:2,happiness:2}},
   {key:'private',label:'咬牙送私立',description:'希望孩子有更多选择。',effects:{cash:'-gdp:.3',knowledge:6,happiness:3}},
   {key:'home',label:'多花时间陪他学',description:'学校之外，家庭也是课堂。',effects:{social:5,knowledge:3,happiness:3}}]}}},
  {id:'reunion',age:[30,70],weight:.8,cond:()=>true,build:l=>({title:'多年后的重逢',text:'你在街上遇见一个很久没见的人。你们站在路边，从近况聊到从前。',type:'warm',effects:{happiness:5,social:4}})},
@@ -502,13 +502,13 @@ const EVENTS=[
  {id:'business_idea',age:[28,60],weight:.5,cond:l=>!l.retired&&l.money>3000,build:l=>({title:'一个开店的机会',text:'朋友要转让一家小店。位置不错，但要先投入一笔钱，也不保证能赚回来。',type:'event',options:[
   {key:'invest',label:'把钱投进去',description:'自己当一次老板。',resolve:l=>{const win=chance(l,.52);const gain=round(l.money*.5*(win?.8:-.5));return{text:win?'小店慢慢有了回头客。你第一次体会到“为自己工作”的重量。':'生意没有撑过一年。你关掉店门，把剩下的货折价处理。',effects:{cash:gain,incomePct:win?.12:0,happiness:win?6:-5,knowledge:3}}}},
   {key:'pass',label:'继续现在的工作',description:'不做没有把握的冒险。',effects:{happiness:1}}]})},
- {id:'home_repair',age:[30,80],weight:.4,cond:l=>!!l.house,build:l=>({title:'屋顶漏水了',text:'一场大雨之后，天花板出现了一块水渍。维修师傅说，最好尽快处理。',type:'event',effects:{cash:-3500,happiness:-2}})},
+ {id:'home_repair',age:[30,80],weight:.4,cond:l=>!!l.house,build:l=>({title:'屋顶漏水了',text:'一场大雨之后，天花板出现了一块水渍。维修师傅说，最好尽快处理。',type:'event',effects:{cash:'-gdp:.22',happiness:-2}})},
  {id:'travel_deal',age:[25,70],weight:.6,cond:l=>l.money>1500,build:l=>{const d=pick(l,DESTINATIONS.slice(1));return{title:'一张便宜的机票',text:`朋友发来一张去${d.name}的折扣机票，只比他去年买的价格贵一点。`,type:'event',options:[
   {key:'book',label:`订票去${d.place}`,description:`大约 ${Math.round(d.minCost*.8)} 的机票和住宿。`,resolve:l=>{const r=travel(l,d.id,'solo',{discount:.8});return{text:r.ok?`你去了${d.place}。回来之后，手机里多了几百张照片。`:'你翻了翻账户，最后还是把页面关掉了。',effects:{happiness:r.ok?3:0}}}},
   {key:'skip',label:'把假期留到以后',description:'以后也许会有更合适的时候。',effects:{knowledge:1}}]}}},
  {id:'volunteer',age:[25,80],weight:.5,cond:()=>true,build:l=>({title:'社区在招志愿者',text:'社区中心贴出通知，周末需要人帮忙整理旧书、陪老人聊天。',type:'warm',options:[
   {key:'join',label:'去帮一天忙',description:'做一些不赚钱但有用的事。',effects:{social:6,happiness:4}},
-  {key:'donate',label:'捐一点钱',description:'用另一种方式参与。',effects:{cash:-500,social:2,happiness:2}}]})},
+  {key:'donate',label:'捐一点钱',description:'用另一种方式参与。',effects:{cash:'-gdp:.03',social:2,happiness:2}}]})},
  {id:'insurance_offer',age:[25,60],weight:.5,cond:l=>!l.insurance,build:l=>({title:'一份医疗保险',text:'保险代理人打来电话，说一场大病可能让一个家庭很多年缓不过来。',type:'event',options:[
   {key:'buy',label:'给自己买一份',description:'每年交一笔保费，生病时少一点压力。',effects:{insurance:true,cash:'-gdp:.05',happiness:2}},
   {key:'skip',label:'暂时不需要',description:'先把钱用在眼前。',effects:{knowledge:1}}]})},
@@ -517,9 +517,9 @@ const EVENTS=[
  {id:'late_learning',age:[50,82],weight:.5,cond:()=>true,build:l=>({title:'一直想学的事',text:'社区大学开了一门课，是你年轻时一直想学、却总没有时间学的东西。',type:'event',options:[
   {key:'enroll',label:'报名去上课',description:'和比自己年轻很多的人坐进同一间教室。',effects:{cash:'-gdp:.08',knowledge:8,happiness:4}},
   {key:'self',label:'自己找书看',description:'按自己的节奏慢慢学。',effects:{knowledge:4,happiness:2}}]})},
- {id:'natural_disaster',age:[10,85],weight:.3,cond:()=>true,build:l=>({title:'天气变得陌生',text:'一场罕见的暴雨打乱了城市。你家的窗户进了水，附近的道路也断了。',type:'bad',effects:{cash:-4200,health:-2,happiness:-4}})},
+ {id:'natural_disaster',age:[10,85],weight:.3,cond:()=>true,build:l=>({title:'天气变得陌生',text:'一场罕见的暴雨打乱了城市。你家的窗户进了水，附近的道路也断了。',type:'bad',effects:{cash:'-gdp:.27',health:-2,happiness:-4}})},
  {id:'windfall',age:[20,80],weight:.3,cond:()=>true,build:l=>({title:'一笔意外的钱',text:'你整理旧物时，发现一张多年前的存单，金额比记忆里多了一点。',type:'warm',effects:{cash:Math.round(l.country.gdp*.25),happiness:4}})},
- {id:'theft',age:[20,75],weight:.3,cond:()=>true,build:l=>({title:'空掉的口袋',text:'在拥挤的车站，你的钱包不见了。补办证件比丢钱更让人疲惫。',type:'bad',effects:{cash:-Math.min(2000,Math.round(l.money*.08)),happiness:-4}})},
+ {id:'theft',age:[20,75],weight:.3,cond:()=>true,build:l=>({title:'空掉的口袋',text:'在拥挤的车站，你的钱包不见了。补办证件比丢钱更让人疲惫。',type:'bad',effects:{cash:-Math.min(Math.round(l.country.gdp*.12),Math.round(l.money*.08)),happiness:-4}})},
  {id:'mentor',age:[20,40],weight:.5,cond:l=>!l.retired,build:l=>({title:'愿意带你的人',text:'一位前辈说，愿意花时间教你做事，也会把一些机会交给你。',type:'event',options:[
   {key:'follow',label:'认真跟着学',description:'多做一些，也多学一些。',effects:{knowledge:6,incomePct:.05,health:-1}},
   {key:'distance',label:'保持自己的节奏',description:'不想把生活全部交给工作。',effects:{happiness:2}}]})},

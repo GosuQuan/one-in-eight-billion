@@ -132,6 +132,34 @@ test('seed reproduces the complete life and rng stays in [0,1)',()=>{
   assert.notDeepEqual(createLife({seed:'same'}),createLife({seed:'different'}));
 });
 
+test('event cash scales with the local economy instead of staying fixed', () => {
+  const step = (l, v = 0) => l.pending ? choose(l, v % l.pending.options.length) : advanceYear(l);
+  function collect(tag, country) {
+    const found = {};
+    for (let s = 0; s < 30 && Object.keys(found).length < 3; s++) {
+      const life = createLife({ seed: tag + s, country });
+      for (let n = 0; n < 220 && !life.dead; n++) {
+        step(life, n);
+        for (const e of life.log) {
+          const m = e.text.match(/现金([+-]\d+)/);
+          if (m && !found[e.title]) found[e.title] = Number(m[1]);
+        }
+        if (life.dead) break;
+      }
+    }
+    return found;
+  }
+  const poor = collect('poor2-', 'CD');
+  const rich = collect('rich2-', 'US');
+  const shared = Object.keys(poor).filter(k => rich[k] != null && poor[k] !== 0);
+  assert.ok(shared.length >= 1, 'at least one shared event appears in both countries');
+  for (const k of shared) {
+    const ratio = rich[k] / poor[k];
+    const gdpRatio = 80000 / 1500;
+    assert.ok(ratio > gdpRatio * .3 && ratio < gdpRatio * 3, `${k}: ratio ${ratio.toFixed(1)} tracks gdp ${gdpRatio}`);
+  }
+});
+
 test('companions keep a decade log and never outlive their years', () => {
   const life = createLife({ seed: 'comp-mirror', country: 'US' });
   const step = (l, v = 0) => l.pending ? choose(l, v % l.pending.options.length) : advanceYear(l);
