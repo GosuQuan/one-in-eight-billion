@@ -168,8 +168,9 @@ export function createLife({era='now',mode='birth',seed=Date.now(),country,sex,n
   recentEvents:[],lastEventAge:null,lastTravelYear:null,netWorthHistory:[],achievements:[]});
  for(let i=0;i<4;i++){
   const cc=countryFor(s,mode);const lifeLen=Math.round(clamp(cc.life+(roll(s)-.5)*30,35,108));
-  s.companions.push({...person(s,cc),id:`companion-${i}`,country:JSON.parse(JSON.stringify(cc)),birthYear,
-   life:lifeLen,age:0,dead:false,job:'尚未工作',path:pick(s,['在自己的城市安了家','换了几个城市，最后留了下来','一直留在出生的地方','去了很远的城市，很少回来']),milestoneAge:10});
+  const band=roll(s);const bandWord=band<.22?'贫困':band<.48?'温饱':band<.78?'中产':'富裕';
+   s.companions.push({...person(s,cc),id:`companion-${i}`,country:JSON.parse(JSON.stringify(cc)),birthYear,
+   life:lifeLen,age:0,dead:false,job:'尚未工作',band:bandWord,path:pick(s,['在自己的城市安了家','换了几个城市，最后留了下来','一直留在出生的地方','去了很远的城市，很少回来']),milestoneAge:10});
  }
  s.classBand=s.family.background;
   log(s,'世界多了一个你',`${birthYear}年，你出生在${c.name}${c.city}。对照当地人均 GDP，你家大约高于${Math.round(wealth*100)}%的家庭，更接近${s.family.background}。这是游戏里的分层，不是官方收入统计。父母给你取名${s.name}。`,'birth');
@@ -635,9 +636,9 @@ export function advanceYear(life,options={}){
  for(const p of life.companions){
  if(p.dead)continue;
  p.age=Math.min(age,p.life);
- if(age>=p.life){p.dead=true;p.job='人生已结束';log(life,`${p.name}离开了`,`同一秒出生的${p.name}在${p.age}岁走完了一生，${p.path}。你们从未见面，但年份一直把你们并排往前推。你的这一页还在写。`,'world');continue;}
+ if(age>=p.life){p.dead=true;p.job='人生已结束';log(life,`${p.name}离开了`,`同一秒出生的${p.name}在${p.age}岁走完了一生，出身${p.band || '普通'}人家，${p.path}。你们从未见面，但年份一直把你们并排往前推。你的这一页还在写。`,'world');continue;}
  p.job=p.dead?'人生已结束':age<18?'学生':age>=65?'退休':age>=22?'在自己的城市工作':'初入社会';
- if(age>=18&&age>=(p.milestoneAge||10)){p.milestoneAge=(p.milestoneAge||10)+10;log(life,`${p.name}的十年`,`${p.name}今年${p.age}岁，${p.path}。你的${age}岁：${['还在写','正翻到新的一页','故事过了一半还没完'][age%3]}。这是同一秒起跑的另一条人生，不是排行榜。`,'world');}
+ if(age>=18&&age>=(p.milestoneAge||10)){p.milestoneAge=(p.milestoneAge||10)+10;log(life,`${p.name}的十年`,`${p.name}今年${p.age}岁，出身${p.band || '普通'}人家，${p.path}。你的${age}岁：${['还在写','正翻到新的一页','故事过了一半还没完'][age%3]}。这是同一秒起跑的另一条人生，不是排行榜。`,'world');}
 }
  life.netWorthHistory.push({age,value:netWorth(life)});
  if(deathCheck(life))return life;
