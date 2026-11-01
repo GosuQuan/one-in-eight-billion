@@ -515,3 +515,21 @@ test('envy events name a missing condition without opening a dialog', () => {
   const envy = life.log.filter(e => /羡慕上学的朋友|别人家的灯|一双新鞋/.test(e.title));
   assert.ok(envy.length >= 1 || life.dead, `expected an envy event or natural progression, got ${envy.length}`);
 });
+
+test('cause of death follows the age band and how life was lived', () => {
+  const base = seed => { const l = createLife({ seed, country: 'CN' }); l.pending = null; return l; };
+  // young + no conditions
+  const young = base('cause-young'); young.age = 30; young.stats.health = 20; young.systems.conditions = [];
+  advanceYear(young, { events: false });
+  if (young.dead) assert.match(young.deathCause, /意外与疾病|一场没能扛过去的病/);
+  // middle-aged with an untreated condition
+  const mid = base('cause-mid'); mid.age = 55; mid.stats.health = 10; mid.longevity = 95;
+  mid.systems.conditions = [{ id: 'c1', name: '高血压', severity: 60, resolved: false, treatment: 'delay', diagnosedAge: 50 }];
+  advanceYear(mid, { events: false });
+  if (mid.dead) assert.match(mid.deathCause, /拖了太久的病|长期疾病/);
+  // very old: quiet sleep
+  const old = base('cause-old'); old.age = 88; old.stats.health = 85; old.longevity = 89;
+  old.systems.conditions = [];
+  advanceYear(old, { events: false });
+  if (old.dead) assert.match(old.deathCause, /睡梦中安静地离开|身体逐渐衰老/);
+});

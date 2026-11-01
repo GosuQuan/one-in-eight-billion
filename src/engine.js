@@ -345,10 +345,20 @@ function familyStep(life){
   life.money=Math.max(0,round(life.money*1.01))||0;
  }
 }
-function deathCheck(life){
+function deathCauseOf(life){
+ const h=life.stats.health||0;
+ const conds=life.systems?.conditions||[];
+ const untreated=conds.some(c=>!c.resolved&&(c.treatment==='delay'||!c.treatment));
+ if(life.age<45) return conds.length?'一场没能扛过去的病':'意外与疾病，来的时候没有打招呼';
+ if(life.age<65) return untreated?'拖了太久的病':'身体在多年操劳后先停了下来';
+ if(h<45) return '拖了太久的病';
+ if(life.age>=80) return '在睡梦中安静地离开';
+ return '身体逐渐衰老';
+}
+ function deathCheck(life){
  const limit=clamp(life.longevity+(life.stats.health-50)*.14,40,109);
  if(life.age>=110||life.age>=limit||(life.age>50&&chance(life,(100-life.stats.health)*.00015))){
-  life.dead=true;life.deathAge=life.age;life.deathCause=life.stats.health<30?'长期疾病':'身体逐渐衰老';life.income=0;life.pending=null;
+  life.dead=true;life.deathAge=life.age;life.deathCause=life.stats.health<30?'长期疾病':deathCauseOf(life);life.income=0;life.pending=null;
   log(life,'这一生，走到了终点',`${life.age}岁时，你的人生停在这里。那些相遇、选择与普通的日子，组成了独一无二的一生。`,'death');
   return true;
  }
