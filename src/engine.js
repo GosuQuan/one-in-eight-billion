@@ -688,6 +688,15 @@ CULTURE_EVENTS && Object.entries(CULTURE_EVENTS).forEach(([cid, list]) => list.f
  build: () => ({ title: c.title, text: c.text, type: c.type, effects: (() => { const out = { ...c.effects }; if (typeof out.cash === 'string') out.cash = out.cash; return out; })() })
 })));
 ENVY_EVENTS.forEach(e => EVENTS.push(e));
+EVENTS.push({id:'early_marriage_ask',age:[14,17],weight:.9,cond:l=>['NG','IN','PK','BD','ET'].includes(l.country?.id)&&l.sex==='女'&&!(l.systems?.earlyMarriageAsked)&&!l.partner,build:l=>{
+  const par=[l.family?.mother,l.family?.father].filter(p=>p&&p.alive!==false);
+  if(!par.length)return null;
+  l.systems.earlyMarriageAsked=true;
+  const who=par.map(p=>p.name).join('和');
+  return{title:'家里提了一门亲事',text:`${who}认为${l.name}年纪到了，托人来说了一门亲。对方家里催得紧。你还没有满十八岁。`,type:'family',options:[
+   {key:'refuse',label:'说自己要继续读书',description:'家里可能不高兴，但这门亲事会就此打住。',effects:{knowledge:4,happiness:-3,social:-2}},
+   {key:'delay',label:'说再等两年',description:'把话先接住，往后拖。',effects:{happiness:-1}},
+   {key:'hear',label:'先见一面听听',description:'见一面不代表答应，但话会传开。',effects:{happiness:-2,social:2}}]}}});
 const EVENT_BY_ID=Object.fromEntries(EVENTS.map(e=>[e.id,e]));
 
 function maybeEvent(life){

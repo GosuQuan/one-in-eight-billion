@@ -572,3 +572,31 @@ test('BR/MX/KR/TR culture events appear for those countries', () => {
     assert.ok(hit, `${cc} culture event never fired`);
   }
 });
+
+test('early-marriage pressure appears once for girls in high-risk regions, and refusal keeps school', () => {
+  const step = (l, v = 0) => l.pending ? choose(l, v % l.pending.options.length) : advanceYear(l);
+  let hit = null;
+  for (let s = 0; s < 12 && !hit; s++) {
+    const life = createLife({ seed: 'em-' + s, country: 'NG' });
+    life.sex = '女';
+    for (let n = 0; n < 220 && !life.dead && life.age < 18; n++) {
+      if (life.pending?.title === '家里提了一门亲事') { hit = { life, age: life.age }; break; }
+      step(life, n);
+    }
+  }
+  assert.ok(hit, 'early-marriage ask never appeared in 12 NG female lives');
+  const life = hit.life;
+  assert.equal(life.systems.earlyMarriageAsked, true, 'asked flag set');
+  // refuse: school path stays open, dialog closes
+  const refuseIdx = life.pending.options.findIndex(o => o.key === 'refuse');
+  choose(life, refuseIdx);
+  assert.equal(life.pending, null);
+  assert.ok(life.log.some(e => e.title === '家里提了一门亲事'), 'the ask is in the record');
+  // never asked again before 18
+  while (!life.dead && life.age < 18) {
+    if (life.pending) choose(life, life.pending.options.length - 1);
+    else advanceYear(life);
+    assert.notEqual(life.pending?.title, '家里提了一门亲事', 're-asked before 18');
+    if (life.dead) break;
+  }
+});
