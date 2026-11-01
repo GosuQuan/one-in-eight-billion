@@ -49,7 +49,7 @@ function renderHome() {
  app.innerHTML = `<div class="wrap">${nav()}<main>
   <section class="hero"><div class="hero-text"><div class="eyebrow"><span class="dot"></span> ONE IN EIGHT BILLION <span style="margin-left:8px">人生模拟</span></div>
    <h1><span>80亿</span><span class="title-bottom">分之<em>1</em></span></h1>
-   <p class="lede">就在此刻，每秒都有新的生命降临。<br>随机出生，读书、工作、恋爱，投资、旅行、经历意外，<br>把世界交给偶然，把选择留给自己。</p>
+   <p class="lede">就在此刻，每秒都有新的生命降临。<br>随机出生，读书、工作、恋爱，投资、旅行、经历意外，<br>把世界交给偶然，把选择留给自己。<br><small>一段完整人生大约 20–30 分钟。8× 倍速更快，也可以「跳到下个选择」。</small></p>
    <div class="counters"><div class="counter"><strong id="birth-counter">0</strong><span>打开页面后，世界上新生的婴儿</span></div><div class="counter"><strong id="death-counter">0</strong><span>同一刻，向世界告别的人</span></div></div>
    <p class="live-line"><i class="live-dot"></i>每一段看似普通的人生，都只有一次。</p></div>
    <div class="hero-right">${worldMap()}<div class="odds paper"><h2>如果你是此刻出生的婴儿</h2><p class="tiny">全球出生分布参考 · 联合国《世界人口展望2024》</p>${odds.map(([n,v])=>`<div class="odds-row"><span>${n}</span><div class="track"><i style="width:${v/17.6*100}%"></i></div><span class="percent">${v.toFixed(1)}%</span></div>`).join('')}<div class="odds-row"><span>世界其他地方</span><div class="track"><i style="width:100%;opacity:.35"></i></div><span class="percent">58.1%</span></div><button class="text-link" data-action="countries">探索 ${COUNTRIES.length} 个国家的出生资料 <span class="arrow">↗</span></button></div></div></section>
@@ -87,7 +87,7 @@ const holdingHTML=()=>{const rows=life.holdings.map(h=>{const s=STOCKS.find(x=>x
 function renderLife(){
  view='life';const c=life.country;const place=incomePlace(life);const stage=lifeStage(life);const placeLine=place.income>0?`年收入大约高于当地 ${place.local}% 的人，高于世界 ${place.world}% 的人。这是游戏估算，不是官方统计。`:'还没有年收入，谈不上在当地或世界的位置。';
  yearTurned=paintedAge!=null&&paintedAge!==life.age;paintedAge=life.age;
- app.innerHTML=`<header class="topbar"><div class="wrap">${homeLink}<div class="age-display"><div class="age-number${yearTurned?' year-turn':''}">${life.age}<small>岁</small></div><div class="age-year">${life.birthYear+life.age} 年<div class="year-track"><i style="width:${life.age/110*100}%"></i></div></div></div><div class="controls"><button class="ghost" data-action="pause" aria-pressed="${paused}">${paused?'▶ 继续':'Ⅱ 暂停'}</button><div class="speed-group" role="group" aria-label="播放速度">${[1,2,4,8].map(s=>`<button data-speed="${s}" class="${speed===s?'active':''}" aria-pressed="${speed===s}">${s}×</button>`).join('')}</div><button class="ghost" data-action="next">下一年 ›</button><button class="ghost ${auto?'active':''}" data-action="auto" aria-pressed="${auto}">自动抉择</button><button class="ghost" data-action="study">学习与生计</button><button class="ghost" data-action="invest">投资</button><button class="ghost" data-action="travel">旅行</button><button class="ghost" data-action="systems">家与人生</button><button class="plain theme" data-action="menu" aria-label="更多选项">⋯</button></div></div></header>
+ app.innerHTML=`<header class="topbar"><div class="wrap">${homeLink}<div class="age-display"><div class="age-number${yearTurned?' year-turn':''}">${life.age}<small>岁</small></div><div class="age-year">${life.birthYear+life.age} 年<div class="year-track"><i style="width:${life.age/110*100}%"></i></div></div></div><div class="controls"><button class="ghost" data-action="pause" aria-pressed="${paused}">${paused?'▶ 继续':'Ⅱ 暂停'}</button><div class="speed-group" role="group" aria-label="播放速度">${[1,2,4,8].map(s=>`<button data-speed="${s}" class="${speed===s?'active':''}" aria-pressed="${speed===s}">${s}×</button>`).join('')}</div><button class="ghost" data-action="next">下一年 ›</button><button class="ghost" data-action="skip" title="快速推进到下一个需要你拍板的时刻；反思提问仍会停下">跳到下个选择 »»</button><button class="ghost ${auto?'active':''}" data-action="auto" aria-pressed="${auto}">自动抉择</button><button class="ghost" data-action="study">学习与生计</button><button class="ghost" data-action="invest">投资</button><button class="ghost" data-action="travel">旅行</button><button class="ghost" data-action="systems">家与人生</button><button class="plain theme" data-action="menu" aria-label="更多选项">⋯</button></div></div></header>
  <main class="wrap">${worldHTML()}<div class="life-layout">
   <aside class="column">
    <section class="panel identity"><div class="id-band"><span>${e(c.flag)} ${e(c.name)}</span><span>人生档案</span></div><div class="id-body">${avatarSVG(life,{size:84})}<div class="id-info"><h2>${e(life.name)}</h2><p>${e(life.sex)} · ${life.birthYear} 年生 · ${life.age} 岁</p><p>${e(c.city)} · ${e(life.education || '尚未入学')}</p><p>${e(life.job || '还在慢慢长大')}</p><p class="tiny">${e(stage.line)}</p><p class="tiny">${e(placeLine)}</p></div></div><div class="mrz">LIFE&lt;${e(c.id)}&lt;${String(life.birthYear)}&lt;${e(String(life.id).slice(-12))}<br>ONE&lt;IN&lt;EIGHT&lt;BILLION&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</div></section>
@@ -111,6 +111,19 @@ function renderLife(){
  if(life.pending && !auto) showChoice();
 }
 function updateCounters(){const secs=(Date.now()-startTime)/1000;if($('#birth-counter'))$('#birth-counter').textContent=num(secs*4.18);if($('#death-counter'))$('#death-counter').textContent=num(secs*1.95);}
+function skipToChoice(){
+ if(!life||life.dead||view!=='life')return;
+ let guard=0;
+ while(!life.pending&&!life.dead&&guard++<90){
+  advanceYear(life);
+  if(life.pending&&life.pending.kind==='reflection')break;
+  if(life.pending)break;
+ }
+ save();
+ if(life.dead){finish();return;}
+ renderLife();
+ if(life.pending)showChoice();
+}
 function step(){
  if(!life||life.dead||view!=='life')return;
  if(life.pending){if(auto){choose(life,Math.floor(Math.random()*life.pending.options.length));save();renderLife();}else showChoice();return;}
@@ -294,6 +307,7 @@ function handleClick(event){
   case 'begin':view='life';paused=false;stepTime=Date.now();save();renderLife();window.scrollTo(0,0);break;
   case 'resume':paused=false;stepTime=Date.now();renderLife();window.scrollTo(0,0);break;
   case 'next':step();stepTime=Date.now();break;
+  case 'skip':skipToChoice();stepTime=Date.now();break;
   case 'pause':paused=!paused;stepTime=Date.now();renderLife();break;
   case 'auto':auto=!auto;toast(auto?'自动抉择已开启':'自动抉择已关闭');renderLife();break;
   case 'theme':store.dark=!store.dark;document.body.classList.toggle('dark',store.dark);save();break;
