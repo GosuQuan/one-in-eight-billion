@@ -149,8 +149,10 @@ export function upgradeLife(life){
 
 export function createLife({era='now',mode='birth',seed=Date.now(),country,sex,name}={}){
  const s={randomState:hash(seed)};
- const c=COUNTRIES.find(c=>c.id===(typeof country==='object'?country?.id:country))||countryFor(s,mode);
+ const base=COUNTRIES.find(c=>c.id===(typeof country==='object'?country?.id:country))||countryFor(s,mode);
  const birthYear=era==='past'?1970:era==='future'?2050:era==='any'?1950+Math.floor(roll(s)*101):2026;
+ const eraFactor=birthYear===1970?.42:birthYear>=2050?1.35:1;
+ const c=eraFactor===1?base:{...base,gdp:Math.round(base.gdp*eraFactor)};
  const who=person(s,c,sex==='男'||sex==='女'?sex:undefined),wealth=roll(s);s.name=name||who.name;
  Object.assign(s,{id:`life-${hash(seed).toString(36)}-${c.id}`,seed,era,mode,name:name||who.name,sex:who.sex,
   country:JSON.parse(JSON.stringify(c)),birthCountry:JSON.parse(JSON.stringify(c)),birthYear,age:0,
@@ -773,7 +775,7 @@ export function setInsurance(life,on=true){
 }
 export function travelCost(life,destinationId,companion='solo'){
  const d=DESTINATIONS.find(x=>x.id===destinationId);if(!d)return null;
- const base=Math.max(d.minCost,life.country.gdp*d.costFactor);
+ const base=Math.max(d.minCost*(life.era==='past'?.42:life.era==='future'?1.35:1),life.country.gdp*d.costFactor);
  const mult=companion==='partner'?1.8:companion==='family'?(1+(life.partner?.8:0)+Math.min(3,life.children.filter(c=>c.age<18).length)*.5):companion==='friends'?1:1;
  return Math.round(base*mult);
 }

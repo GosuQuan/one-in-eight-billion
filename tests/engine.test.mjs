@@ -132,6 +132,24 @@ test('seed reproduces the complete life and rng stays in [0,1)',()=>{
   assert.notDeepEqual(createLife({seed:'same'}),createLife({seed:'different'}));
 });
 
+test('birth era changes the economy, not just the calendar', () => {
+  const past = createLife({ seed: 'era-p', country: 'US', era: 'past' });
+  const now = createLife({ seed: 'era-n', country: 'US', era: 'now' });
+  const future = createLife({ seed: 'era-f', country: 'US', era: 'future' });
+  assert.equal(past.birthYear, 1970);
+  assert.equal(now.birthYear, 2026);
+  assert.equal(future.birthYear, 2050);
+  assert.ok(past.country.gdp <= now.country.gdp * .58, 'past economy is smaller');
+  assert.ok(future.country.gdp >= now.country.gdp * 1.2, 'future economy is larger');
+  assert.ok(past.money < now.money, 'past pocket money is smaller');
+  assert.equal(travelCost(past, 'jp') < travelCost(now, 'jp'), true, 'past travel is cheaper');
+  const us = COUNTRIES.find(c => c.id === 'US');
+  assert.equal(us.gdp, 80000, 'country catalog is never mutated');
+  const again = createLife({ seed: 'era-p', country: 'US', era: 'past' });
+  assert.equal(again.country.gdp, past.country.gdp);
+  assert.equal(again.money, past.money);
+});
+
 test('event cash scales with the local economy instead of staying fixed', () => {
   const step = (l, v = 0) => l.pending ? choose(l, v % l.pending.options.length) : advanceYear(l);
   function collect(tag, country) {
