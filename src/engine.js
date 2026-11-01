@@ -414,7 +414,7 @@ function prepareEffects(effects,life){
 }
 function reflectionPause(life,age){
  const prompts={
-  5:`${life.name}五岁了。此刻最需要的是什么？`,
+  5:`五岁的${life.name}还说不出完整的话。家里人替TA想一想：此刻最需要的是什么？`,
   15:`十五岁的${life.name}坐在教室或工地之间。学校对你来说算什么？`,
   30:`三十岁的${life.name}今天最想感谢谁，或者感谢什么？`,
   50:`谁在${life.name}这一生里稳稳地扶过你一把？`,
