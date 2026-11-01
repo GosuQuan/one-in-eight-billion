@@ -60,3 +60,25 @@ test('memorial states the length of a life in years and roughly in days', () => 
   assert.ok(card.lifespan.body.includes(days.toLocaleString('zh-CN')), card.lifespan.body);
   assert.ok(card.lifespan.body.includes('游戏换算'), 'labels the conversion as a game estimate');
 });
+
+test('the grain derives four word-pairs from the record', () => {
+  const life = createLife({ seed: 'grain-1', country: 'CN' });
+  life.age = 70; life.dead = true; life.deathAge = 70; life.deathCause = '身体逐渐衰老';
+  life.log.push({ age: 30, title: '给家里汇了一笔', text: 'need 汇给 mother', type: 'family' });
+  const card = memorialOf(life);
+  assert.ok(card.grain, 'grain exists');
+  assert.equal(card.grain.pairs.length, 4, 'four pairs');
+  for (const g of card.grain.pairs) {
+    assert.ok(g.a && g.b, 'pair has both words');
+    assert.ok(g.lean >= -100 && g.lean <= 100, `lean in range: ${g.lean}`);
+  }
+  assert.ok(card.grain.title.length > 0, 'grain title present');
+  assert.ok(card.grain.body.includes('／'), 'grain body lists pairs');
+  // a life with moves should lean 闯荡 on the second pair
+  const moved = createLife({ seed: 'grain-2', country: 'CN' });
+  moved.age = 40; moved.dead = true; moved.deathAge = 40; moved.deathCause = '身体逐渐衰老';
+  moved.systems.migration.push({ from: 'CN', to: 'US', age: 25, status: 'arrived' });
+  const card2 = memorialOf(moved);
+  const pair2 = card2.grain.pairs[1];
+  assert.ok(pair2.lean < 0, `mover leans away from 守在这里: ${pair2.lean}`);
+});

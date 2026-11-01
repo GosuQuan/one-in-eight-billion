@@ -74,6 +74,31 @@ export function memorialOf(life) {
     helped ? '做过不拿工资的帮忙或陪伴' : ''
   ].filter(Boolean).join('。') || '没有一份可计的功绩，日子被身边的人记住。';
 
+  // ---- the grain: four pairs, derived from the record ----
+  const kidsCount = kids.length;
+  const movesCount = movesOf(life).length;
+  const travelsCount = (life.travels || []).length;
+  const friendsTouched = (life.log || []).filter(l => /朋友|好友|相识|介绍/.test(`${l.title || ''}${l.text || ''}`)).length;
+  const careTouched = (life.log || []).filter(l => /照护|陪伴|探望|守着/.test(`${l.title || ''}${l.text || ''}`)).length;
+  const workTouched = (life.log || []).filter(l => /录用|晋升|加班|求职|副业|岗位/.test(`${l.title || ''}${l.text || ''}`)).length;
+  const calmTouched = (life.log || []).filter(l => /散步|读|休息|静|爱好|长椅/.test(`${l.title || ''}${l.text || ''}`)).length;
+  const moneyGiven = (life.log || []).filter(l => /汇给|帮忙|借给|捐|塞到/.test(`${l.title || ''}${l.text || ''}`)).length;
+  const moneyKept = (life.log || []).filter(l => /存款|投资|买入|攒|还清/.test(`${l.title || ''}${l.text || ''}`)).length;
+  const pair = (a, b, aw, bw) => {
+    const total = aw + bw;
+    const lean = total === 0 ? 0 : Math.round((aw - bw) / total * 100);
+    return { a, b, lean };
+  };
+  const grain = [
+    pair('身边有人', '远方奔波', friendsTouched + careTouched + kidsCount * 2, movesCount * 3),
+    pair('守在这里', '出去闯荡', (movesCount ? 0 : 2) + calmTouched, movesCount * 2 + travelsCount * 2),
+    pair('慢慢过', '赶着走', calmTouched, workTouched),
+    pair('给出去', '攒下来', moneyGiven * 2 + kidsCount, moneyKept * 2),
+  ];
+  const grainWords = grain.map(g => (g.lean > 30 ? g.a : g.lean < -30 ? g.b : '')).filter(Boolean);
+  const grainBody = grain.map(g => `${g.a}／${g.b}：${g.lean > 30 ? '偏' + g.a : g.lean < -30 ? '偏' + g.b : '两边都占一些'}`).join('。');
+  const grainTitle = grainWords.length >= 2 ? `这是一段${grainWords.slice(0, 2).join('、')}的人生` : '这是一段两边都沾一些的人生';
+
   const who = partner || mother || life.name || '这一生';
   const stayed = stops.length < 2;
   const q1 = stayed
@@ -113,6 +138,7 @@ export function memorialOf(life) {
     status: `${standing.band} · ${life.job || '没有固定职业'} · ${life.education || '学历停在原处'}`,
     contribution,
     philosophy,
+    grain: { title: grainTitle, body: grainBody, pairs: grain },
     ownWords: reflectionQuote,
     ownWordsAge: reflections.length ? Number(reflections[reflections.length - 1][0]) : null,
     questions: [q1, q2]

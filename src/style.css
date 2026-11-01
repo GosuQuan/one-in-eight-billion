@@ -136,4 +136,12 @@
 .ending-philosophy{font:28px var(--serif);margin:22px 0 8px}
 .ending-question{margin:8px 0;color:var(--muted);font-size:15px}
 .ending-ownwords{font:italic 22px var(--serif);color:#7a4a2e;border-left:3px solid var(--gold);padding:6px 0 6px 14px;margin:16px 0 0}
+.ending-grain{margin:18px 0 4px;border:1px solid var(--line);background:color-mix(in srgb,var(--paper) 92%,var(--gold));padding:16px 18px}
+.ending-grain-title{font:24px var(--serif);margin:0 0 8px}
+.ending-grain-body{font-size:14px;color:var(--muted);margin:0 0 14px}
+.ending-pair{display:flex;align-items:center;gap:10px;margin:8px 0;font-size:13px}
+.ending-pair span:first-child{min-width:74px;text-align:right}
+.ending-pair span:last-child{min-width:74px}
+.ending-pair i{flex:1;height:6px;background:var(--line);position:relative;display:block}
+.ending-pair em{min-width:44px;text-align:center;font:12px var(--sans);color:var(--muted);font-style:normal}
 @media(max-width:760px){.ending-marks{grid-template-columns:1fr}.ending-age{font-size:32px}}
