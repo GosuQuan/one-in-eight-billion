@@ -525,7 +525,31 @@ const CULTURE_EVENTS = {
   { age: [10, 22], title: '周日不开门的街', text: '整条街安静得反常，店门都关着。有人在河边骑车，有人在草地上躺着看书。', type: 'warm', effects: { happiness: 3 } },
   { age: [16, 30], title: '职业学校的车间', text: '一边是课本，一边是真机床。手上的油污到晚上才洗得掉。', type: 'event', effects: { knowledge: 4, cash: 'gdp:.02' } },
   { age: [20, 70], title: '足球夜', text: '朋友家的客厅里挤满人，盯着同一块屏幕。进球时整间屋子炸开，啤酒洒了一地。', type: 'warm', effects: { happiness: 5, social: 4 } }
- ]
+ ],
+ BR: [
+  { age: [4, 14], title: '街角的足球', text: '天还没黑，球已经踢起来了。球门是两只拖鞋，守门的是最小的那个。', type: 'warm', effects: { happiness: 5, health: 2, social: 3 } },
+  { age: [6, 18], title: '海边的一天', text: '巴士坐到海边只要几个硬币。浪比想象的大，西瓜比想象甜。', type: 'warm', effects: { happiness: 5 } },
+  { age: [16, 40], title: '狂欢节的彩带', text: '整条街都是鼓点和彩带，陌生人往你脸上抹一点彩粉。没有人问你是谁。', type: 'warm', effects: { happiness: 6, social: 4 } },
+  { age: [20, 70], title: '烧烤的长桌', text: '周末的院子支起烤架，肉从中午烤到天黑。孩子追着狗跑，大人的话题换了三轮。', type: 'family', effects: { happiness: 5, social: 4 } }
+ ],
+ MX: [
+  { age: [4, 14], title: '亡灵节的橘色', text: '家门口摆满了万寿菊和照片。大人说，只要记得，他们就一直都在。', type: 'family', effects: { happiness: 3, social: 3 } },
+  { age: [6, 18], title: '玉米饼的香味', text: '街角的磨坊天不亮就开工。热乎的玉米饼用纸包着，边走边吃最香。', type: 'warm', effects: { happiness: 4 } },
+  { age: [8, 20], title: '广场的傍晚', text: '广场上乐队一响，跳舞的人围成一圈。你被外婆拉进去转了两圈。', type: 'warm', effects: { happiness: 5, social: 4 } },
+  { age: [20, 70], title: '十五岁的裙子', text: '亲戚家女孩的成人礼办了一整天。弥撒、彩车、还有一支突然出现的乐队。', type: 'family', effects: { happiness: 5, social: 4 } }
+ ],
+ KR: [
+  { age: [5, 16], title: '考试前夜的炸鸡', text: '全城都在为考生安静下来。大人和你分一盒炸鸡，说喂给运气吃。', type: 'warm', effects: { happiness: 4 } },
+  { age: [6, 18], title: '爬山的一家', text: '秋天满山都是红叶，登山杖敲石头的声音一路都是。泡面在山顶最好吃。', type: 'warm', effects: { happiness: 4, health: 2 } },
+  { age: [16, 35], title: '深夜的食堂', text: '下班后来到布帐马车，一碗汤下肚。老板娘多给你舀了一勺小菜。', type: 'warm', effects: { happiness: 3 } },
+  { age: [20, 70], title: '春节的祭桌', text: '凌晨摆好祭桌，向长辈行完礼，一起吃年糕汤。吃了这碗，就算长了一岁。', type: 'family', effects: { happiness: 4, social: 3 } }
+ ],
+ TR: [
+  { age: [5, 16], title: '茶杯不离手', text: '郁金香形的小茶杯一天要来七八回。倒茶的人手腕稳得像杂技。', type: 'warm', effects: { happiness: 3, social: 2 } },
+  { age: [6, 18], title: '渡轮上的海鸥', text: '横渡海峡只要十几分钟，海鸥追着船飞。有人把面包掰碎了抛向空中。', type: 'warm', effects: { happiness: 4 } },
+  { age: [8, 22], title: '开斋的第一口', text: '日落前满街飘着饭香。第一口水下去的那一瞬间，全桌人都笑了。', type: 'family', effects: { happiness: 4, social: 3 } },
+  { age: [20, 70], title: '邻里的一杯水', text: '对面的大妈隔三差五端来一碗热汤。你回赠一盘自己做的，一来一往成了习惯。', type: 'family', effects: { happiness: 4, social: 4 } }
+ ],
 };
 
 // ---- "envy" events: pure feeling from a missing condition, never a dialog, never compensated ----

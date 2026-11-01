@@ -553,3 +553,22 @@ test('each year gains one ambient mid-year line, varied and never repeated back-
   const months = new Set(ambient.map(e => e.title.slice(0, 2)));
   assert.ok(months.size >= 3, `months should rotate, got ${[...months].join(',')}`);
 });
+
+test('BR/MX/KR/TR culture events appear for those countries', () => {
+  const step = (l, v = 0) => l.pending ? choose(l, v % l.pending.options.length) : advanceYear(l);
+  const plan = [
+    ['BR', /街角的足球|海边的一天|狂欢节的彩带|烧烤的长桌/],
+    ['MX', /亡灵节的橘色|玉米饼的香味|广场的傍晚|十五岁的裙子/],
+    ['KR', /考试前夜的炸鸡|爬山的一家|深夜的食堂|春节的祭桌/],
+    ['TR', /茶杯不离手|渡轮上的海鸥|开斋的第一口|邻里的一杯水/]
+  ];
+  for (const [cc, re] of plan) {
+    let hit = 0;
+    for (let s = 0; s < 10 && !hit; s++) {
+      const life = createLife({ seed: 'cul2-' + cc + s, country: cc });
+      for (let n = 0; n < 170 && !life.dead; n++) { step(life, n); if (life.dead) break; }
+      if (life.log.some(e => re.test(e.title))) hit = 1;
+    }
+    assert.ok(hit, `${cc} culture event never fired`);
+  }
+});
