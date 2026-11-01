@@ -132,6 +132,22 @@ test('seed reproduces the complete life and rng stays in [0,1)',()=>{
   assert.notDeepEqual(createLife({seed:'same'}),createLife({seed:'different'}));
 });
 
+test('companions keep a decade log and never outlive their years', () => {
+  const life = createLife({ seed: 'comp-mirror', country: 'US' });
+  const step = (l, v = 0) => l.pending ? choose(l, v % l.pending.options.length) : advanceYear(l);
+  for (let n = 0; n < 220 && !life.dead; n++) { step(life, n); if (life.dead) break; }
+  const tens = life.log.filter(e => /的十年$/.test(e.title));
+  assert.ok(tens.length >= 3, 'decade notes appear');
+  assert.ok(tens.every(e => e.text.includes('同一秒起跑')), 'decade notes frame the mirror');
+  for (const p of life.companions) {
+    assert.ok(p.age <= p.life);
+    if (p.dead) assert.equal(p.age, p.life);
+  }
+  const a = createLife({ seed: 'comp-mirror', country: 'US' });
+  const b = createLife({ seed: 'comp-mirror', country: 'US' });
+  assert.deepEqual(a.companions, b.companions);
+});
+
 test('hard age cap holds even with artificially huge longevity and health',()=>{
   const life=createLife({seed:'cap'});life.longevity=10000;setFocus(life,'health');
   finish(life);assert.ok(life.age<=110);
