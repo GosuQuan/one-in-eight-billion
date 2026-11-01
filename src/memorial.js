@@ -90,6 +90,10 @@ export function memorialOf(life) {
   ];
   const philosophy = lines[(stops.length + kids.length + (life.age || 0)) % lines.length];
   const played = formatPlay(life.playMs);
+  const reflections = Object.entries(life.reflections || {}).filter(([k, v]) => v);
+  const reflectionQuote = reflections.length
+    ? `"${reflections[reflections.length - 1][1]}"`
+    : '';
 
   return {
     playTitle: '你停留的时间',
@@ -106,6 +110,8 @@ export function memorialOf(life) {
     status: `${standing.band} · ${life.job || '没有固定职业'} · ${life.education || '学历停在原处'}`,
     contribution,
     philosophy,
+    ownWords: reflectionQuote,
+    ownWordsAge: reflections.length ? Number(reflections[reflections.length - 1][0]) : null,
     questions: [q1, q2]
   };
 }

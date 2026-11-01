@@ -742,7 +742,7 @@ function startThread(l, p, key) {
   parent.bond = clamp((parent.bond ?? 60) + 4);
   const pocket = Math.round(gdp(l) * (l.age >= 12 ? .012 : .004));
   l.money += pocket; stats(l, { happiness: 2, social: 3 });
-  log(l, `和${parent.name}过了一个下午`, `你留下来分担手上的事。${parent.name}把${pocket}塞到你手里。过一阵还会再找你，帮不帮得上要到时候才知道。`, 'family');
+  log(l, `和${parent.name}过了一个下午`, `你留下来分担手上的事。${parent.name}把${pocket}塞到你手里，说是这个月的一点心意。过一阵还会再找你，帮不帮得上要到时候才知道。`, 'family');
   return;
  }
  const f = cast[key === 'sport' ? 'sport' : 'science'];

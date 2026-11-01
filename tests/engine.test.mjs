@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 import {
   COUNTRIES, DESTINATIONS, STOCKS, createLife, upgradeLife, advanceYear, choose,
   setFocus, summarize, rng, netWorth, investedValue, invest, withdraw, buyStock,
-  sellStock, investStocks, STOCK_RISKS, buyHouse, buyCar, buyItem, travel, travelCost
+  sellStock, investStocks, STOCK_RISKS, buyHouse, buyCar, buyItem, travel, travelCost,
+  reflectionAnswer
 } from '../src/engine.js';
+import { memorialOf } from '../src/memorial.js';
 
 const clone = value => JSON.parse(JSON.stringify(value));
 const step = (life, variant=0) => life.pending ? choose(life, variant % life.pending.options.length) : advanceYear(life);
@@ -130,6 +132,34 @@ test('seed reproduces the complete life and rng stays in [0,1)',()=>{
   for(let i=0;i<100;i++) {const n=a();assert.equal(n,b());assert.ok(n>=0&&n<1);}
   assert.deepEqual(finish(createLife({seed:'same'}),1),finish(createLife({seed:'same'}),1));
   assert.notDeepEqual(createLife({seed:'same'}),createLife({seed:'different'}));
+});
+
+test('mid-life reflection pauses ask the player and keep the words for the card', () => {
+  const life = createLife({ seed: 'reflect-test', country: 'JP' });
+  life.longevity = 95; life.stats.health = 95;
+  const pauses = [];
+  for (let n = 0; n < 260 && !life.dead; n++) {
+    if (life.age >= 20 && life.pending?.kind !== 'reflection') { life.money = Math.max(life.money, 50000); life.debt = 0; }
+    if (life.pending?.kind === 'reflection') {
+      pauses.push(life.age);
+      const idx = life.pending.options.findIndex(o => o.key === 'write');
+      choose(life, idx);
+      reflectionAnswer(life, `${life.age}岁的一句话`);
+      continue;
+    }
+    if (life.pending) choose(life, life.pending.options.length - 1);
+    else advanceYear(life);
+  }
+  assert.deepEqual(pauses, [15, 30, 50]);
+  assert.equal(life.reflections[15], '15岁的一句话');
+  assert.equal(life.reflections[30], '30岁的一句话');
+  assert.equal(life.reflections[50], '50岁的一句话');
+  const card = memorialOf(life);
+  assert.ok(card.ownWords.includes('50岁的一句话'), 'the last written line reaches the card');
+  // age-5 people milestone still owns its year; reflection never blocks it
+  const a = createLife({ seed: 'reflect-age5', country: 'CN' });
+  for (let i = 0; i < 8 && !a.pending; i++) advanceYear(a);
+  assert.equal(a.pending?.system, 'thread-start');
 });
 
 test('birth era changes the economy, not just the calendar', () => {

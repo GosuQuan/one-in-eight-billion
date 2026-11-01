@@ -135,6 +135,8 @@ function showModal(html,kind='info',wide=false){
 function closeModal(){overlay.hidden=true;overlay.innerHTML='';modalKind='';document.body.style.overflow='';lastFocus?.isConnected&&lastFocus.focus();stepTime=Date.now();}
 function showChoice(){if(!life.pending||modalKind==='choice')return;const p=life.pending;showModal(`<div class="dialog-kicker">${life.age} 岁 / ${life.birthYear+life.age} · ${p.kind==='event'?'一件没有预料到的事':p.kind==='system'?'人生还在继续 · '+(p.system||'生活安排'):'人生的岔路口'}</div><h2 id="dialog-title">${e(p.title)}</h2><p>${e(p.text)}</p><div class="choice-list">${p.options.map((o,i)=>`<button class="choice-btn" data-choice="${i}"><strong>${e(o.label)} <span>↗</span></strong><small>${e(o.description || '选择属于你的方向')}</small></button>`).join('')}</div><p class="tiny" style="margin:16px 0 0">${p.system==='thread'||p.system==='thread-start'?'你是在跟一个具体的人相处。选完以后，这条故事还会再找上门，也可能在这里停住。':p.system==='lived'?'这件事不会每年都打断你。做与不做，时间都会继续，只是后果会留下。':'没有最优解，只有你愿意走的路。选择后时间会继续。'}</p>`,'choice');}
 
+function noteDialogReflection(){const q=life.log.filter(l=>l.type==='choice'&&l.title==='停下来想一句').at(-1);showModal(`<div class="dialog-kicker">${life.age} 岁 · 留给纪念卡</div><h2 id="dialog-title">${e(q?.text||'这一刻，你想说什么？')}</h2><p>这句话只写在你的纪念卡上，不发布到任何地方。留空也可以。</p><textarea id="note-text" maxlength="60" placeholder="写下一句话……" aria-label="你的答案">${e((life.reflections||{})[life.age]||'')}</textarea><button class="cta" data-action="save-reflection">写好，继续人生 →</button>`,'reflection');}
+
 function noteDialog(farewell=false){showModal(`<div class="dialog-kicker">${farewell?'写给这一生':'在时间里，暂停片刻'}</div><h2 id="dialog-title">${farewell?'你想对自己说些什么？':'把此刻的想法，留在这里。'}</h2><p>只保存在你的浏览器里，不会发布到任何地方。</p><textarea id="note-text" maxlength="300" placeholder="写下一句话……" aria-label="你的想法">${e(farewell?life.farewell||'':'')}</textarea><button class="cta" data-action="${farewell?'save-farewell':'save-note'}">留下这句话 →</button>`,farewell?'farewell':'note');}
 
 function countryDialog(){const sorted=[...COUNTRIES].sort((a,b)=>b.birth-a.birth);const total=COUNTRIES.reduce((s,c)=>s+c.birth,0);showModal(`<div class="dialog-kicker">世界很大，起点各不相同</div><h2 id="dialog-title">${COUNTRIES.length} 个国家的出生资料</h2><p>出生与人口权重、寿命及人均 GDP 使用约数。出生地按照所列国家的出生人口权重抽取。</p><table><thead><tr><th>国家 / 地区</th><th>抽样权重</th><th>寿命</th><th>GDP / PPP</th></tr></thead><tbody>${sorted.map(c=>`<tr><td>${e(c.flag)} ${e(c.name)}</td><td>${(c.birth/total*100).toFixed(1)}%</td><td>${c.life} 岁</td><td>${money(c.gdp)}</td></tr>`).join('')}</tbody></table>`,'countries',true);}
@@ -167,7 +169,7 @@ function memorialBlock(life){
  touchPlay();
  const card=memorialOf(life);
  const mark=(k,v)=>`<article class="ending-mark"><small>${e(k)}</small><p>${e(v)}</p></article>`;
- return `<section class="ending-walk" aria-label="这一生的纪念"><p class="ending-age">${life.age} 岁，你走完了这一生</p><div class="ending-marks">${mark(card.playTitle,card.playBody)}${mark(card.pathTitle,card.pathBody)}${mark(card.sceneTitle,card.sceneBody)}${mark(card.regionTitle,card.regionBody)}${mark('生育',card.fertility)}${mark('社会地位',card.status)}${mark('社会贡献',card.contribution)}${mark(card.peopleTitle,card.peopleBody)}</div><p class="ending-philosophy">${e(card.philosophy)}</p>${card.questions.map(q=>`<p class="ending-question">${e(q)}</p>`).join('')}</section>`;
+ return `<section class="ending-walk" aria-label="这一生的纪念"><p class="ending-age">${life.age} 岁，你走完了这一生</p><div class="ending-marks">${mark(card.playTitle,card.playBody)}${mark(card.pathTitle,card.pathBody)}${mark(card.sceneTitle,card.sceneBody)}${mark(card.regionTitle,card.regionBody)}${mark('生育',card.fertility)}${mark('社会地位',card.status)}${mark('社会贡献',card.contribution)}${mark(card.peopleTitle,card.peopleBody)}${card.ownWords?`<p class="ending-ownwords">${life.age}岁时你写下：${e(card.ownWords)}</p>`:''}</div><p class="ending-philosophy">${e(card.philosophy)}</p>${card.questions.map(q=>`<p class="ending-question">${e(q)}</p>`).join('')}</section>`;
 }
 function wrapText(ctx,text,width){const out=[];let line='';for(const ch of [...String(text||'')]){if(line&&ctx.measureText(line+ch).width>width){out.push(line);line=ch;}else line+=ch;}if(line)out.push(line);return out;}
 function downloadCard(){
@@ -192,6 +194,7 @@ function downloadCard(){
  head('社会贡献');body(card.contribution);
  y+=8;ctx.fillStyle='#8c2946';ctx.font='30px "Microsoft YaHei"';
  for(const line of wrapText(ctx,card.philosophy,936).slice(0,3)){ctx.fillText(line,72,y);y+=44;}
+ if(card.ownWords){ctx.fillStyle='#7a4a2e';ctx.font='italic 26px "Microsoft YaHei"';for(const line of wrapText(ctx,`${card.ownWordsAge}岁的你写下：${card.ownWords}`,936).slice(0,2)){ctx.fillText(line,72,y);y+=40;}}
  y+=12;ctx.fillStyle='#3e534e';ctx.font='24px "Microsoft YaHei"';
  for(const q of card.questions){for(const line of wrapText(ctx,q,936).slice(0,3)){ctx.fillText(line,72,y);y+=36;}y+=16;}
  y+=20;ctx.fillStyle='#74817b';ctx.font='18px "Microsoft YaHei"';ctx.fillText('80亿分之1 · 这一张只属于这场游玩',72,y);
@@ -260,7 +263,7 @@ function handleClick(event){
  if(b.dataset.pref){prefs[b.dataset.pref]=b.dataset.value;save();renderHome();return;}
  if(b.dataset.speed){speed=Number(b.dataset.speed);renderLife();return;}
  if(b.dataset.focus){setFocus(life,b.dataset.focus);save();renderLife();return;}
- if(b.dataset.choice!==undefined){const selected=life.pending?.options[Number(b.dataset.choice)];choose(life,Number(b.dataset.choice));life.lastChoiceResult={age:life.age,title:selected?.label||'新的选择',text:life.log.at(-1)?.text||'',id:Date.now()};closeModal();save();if(life.dead)finish();else renderLife();return;}
+ if(b.dataset.choice!==undefined){const selected=life.pending?.options[Number(b.dataset.choice)];const wasReflection=life.pending?.kind==='reflection'&&selected?.key==='write';choose(life,Number(b.dataset.choice));life.lastChoiceResult={age:life.age,title:selected?.label||'新的选择',text:life.log.at(-1)?.text||'',id:Date.now()};closeModal();save();if(wasReflection){renderLife();noteDialogReflection();return;}if(life.dead)finish();else renderLife();return;}
  if(b.dataset.system){const action=b.dataset.system;closeModal();const r=systemAction(life,action,{});save();renderLife();toast(r?.message||'生活有了新的安排');return;}
  if(b.dataset.lived){const r=livedAction(life,b.dataset.lived);save();toast(r?.message||'这件事有了结果');if(view==='life')showModal(livedCatalogHTML(life),'lived',true);return;}
   if(b.dataset.edu){const r=educationAction(life,b.dataset.edu);save();toast(r.message);if(view==='life')openStudy();return;}
@@ -306,6 +309,7 @@ function handleClick(event){
   case 'invest':openInvest();break;
   case 'travel':openTravel();break;
    case 'ease':{const r=improveLife(life);save();toast(r.message);if(view==='life')renderLife();break;}
+  case 'save-reflection':{const text=$('#note-text').value.trim();life.reflections=life.reflections||{};if(text)life.reflections[life.age]=text;save();closeModal();toast(text?'这句话会出现在纪念卡上':'留了空白，也很好');renderLife();break;}
   case 'save-note':{const text=$('#note-text').value.trim();if(text){life.notes ||= [];life.notes.push({age:life.age,text});save();}closeModal();toast(text?'此刻的想法已留下':'留一点空白，也很好');break;}
   case 'save-farewell':life.farewell=$('#note-text').value.trim();{const idx=history.findIndex(l=>l.id===life.id);if(idx>=0)history[idx]=JSON.parse(JSON.stringify(life));}save();closeModal();renderEnding();break;
   case 'export':exportLife();break;

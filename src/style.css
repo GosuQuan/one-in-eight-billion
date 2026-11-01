@@ -133,4 +133,5 @@
 .ending-mark p{margin:6px 0 0;font:18px var(--serif);line-height:1.55}
 .ending-philosophy{font:28px var(--serif);margin:22px 0 8px}
 .ending-question{margin:8px 0;color:var(--muted);font-size:15px}
+.ending-ownwords{font:italic 22px var(--serif);color:#7a4a2e;border-left:3px solid var(--gold);padding:6px 0 6px 14px;margin:16px 0 0}
 @media(max-width:760px){.ending-marks{grid-template-columns:1fr}.ending-age{font-size:32px}}

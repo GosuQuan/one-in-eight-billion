@@ -411,10 +411,30 @@ function prepareEffects(effects,life){
  }
  return e;
 }
+function reflectionPause(life,age){
+ const prompts={
+  5:`${life.name}五岁了。此刻最需要的是什么？`,
+  15:`十五岁的${life.name}坐在教室或工地之间。学校对你来说算什么？`,
+  30:`三十岁的${life.name}今天最想感谢谁，或者感谢什么？`,
+  50:`谁在${life.name}这一生里稳稳地扶过你一把？`,
+ };
+ life.pending={kind:'reflection',title:'停下来想一句',text:prompts[age],options:[
+  {key:'write',label:'写一句留到结尾',description:'一句话会保存在这一生的纪念卡上，不判定好坏，不花时间。'},
+  {key:'skip',label:'不写，继续过',description:'不留字。人生继续。'}]};
+ log(life,'停下来想一句',prompts[age],'choice');
+}
+export function reflectionAnswer(life,text){
+ const t=String(text||'').trim().slice(0,60);
+ if(t)life.reflections=life.reflections||{},life.reflections[life.age]=t;
+ life.pending=null;
+ log(life,life.reflections&&life.reflections[life.age]?'一句话留了下来':'这一句没有写',life.reflections&&life.reflections[life.age]?`${life.age}岁的你写下：${life.reflections[life.age]}`:'你没有留字。日子照常往前。','memory');
+}
 function setMilestone(life,age){
+ if(age!==5&&[15,30,50].includes(age)&&!(life.reflections||{})[age]&&!(life.reflectionMiss||{})[age]){reflectionPause(life,age);return;}
  if([15,18,22].includes(age)){educationMilestone(life,age);return;}
  if(age===26){if(!life.partner||life.partner.alive===false)systemAction(life,'seek-partner');return;}
- if(age===5||(age===12&&!(life.systems?.homeThread&&!life.systems.homeThread.ended)&&!(life.friends||[]).some(f=>f&&f.thread&&!f.thread.ended))){peopleMilestone(life,age);return;}
+ if([15,30,50].includes(age)&&!(life.reflections||{})[age]&&!(life.reflectionMiss||{})[age]){life.reflectionMiss=life.reflectionMiss||{},life.reflectionMiss[age]=true;reflectionPause(life,age);return;}
+  if(age===5||(age===12&&!(life.systems?.homeThread&&!life.systems.homeThread.ended)&&!(life.friends||[]).some(f=>f&&f.thread&&!f.thread.ended))){peopleMilestone(life,age);return;}
  const m=MILESTONES[age];if(!m)return;
  const options=m.options.map(o=>({label:o.label,description:o.description,effects:prepareEffects(o.effects,life)}));
  life.pending={kind:'milestone',title:m.title,text:m.text,options};
@@ -573,6 +593,7 @@ export function choose(life,index){
  if(!Number.isInteger(index)||!life.pending.options[index])throw new RangeError('选择不存在');
  const pending=life.pending;
  if(pending.kind==='education'){educationChoice(life,index);return life;}
+  if(pending.kind==='reflection'){const opt=pending.options[index];if(opt.key==='write')life.awaitingReflectionText=true;life.pending=null;log(life,'这一句留到你落笔','答案会保存在这一生的纪念卡上。现在，日子继续。','memory');return life;}
  if(pending.kind==='system'){systemChoice(life,pending,index);return life;}
  life.pending=null;
  const option=pending.options[index];let outcome={effects:option.effects||{},text:option.description||''};

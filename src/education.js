@@ -71,12 +71,12 @@ export function educationYear(l){
  if(roll(l)<passChance){p.progress++;l.stats.knowledge=cap((l.stats.knowledge||0)+4);}else note(l,'学年考核未通过',`${p.label}课程或考核未完成，保留${p.progress}/${p.duration}年进度；下一学年需要重修并缴费。`);
  if(p.progress>=p.duration){s.credential=p.credential;if(rank[s.credential]>=2)s.basicProgress=9;s.program=null;sync(l);note(l,'完成学业',`经过逐年学习与考核，你获得${labels[s.credential]}学历。`);return l;}
  if(cash(l)<p.annualCost){p.paused=true;sync(l);note(l,'学费不足，暂时休学',`${p.label}已完成${p.progress}/${p.duration}年；续读需现金${p.annualCost}，当前${Math.round(cash(l))}。未新增债务；攒钱后可缴费复学。`);}else{l.money-=p.annualCost;p.paidAge=l.age;note(l,'继续学业',`${p.label}进度${p.progress}/${p.duration}年，支付下一学年学费${p.annualCost}。`);}return l;}
- if(rank[s.credential]>=2||l.age<6||l.age>18)return l;const policy=educationPolicy(l);
+ if(rank[s.credential]>=2||l.age<6)return l;const policy=educationPolicy(l);
  if(l.age===6&&s.basicProgress===0){s.basicStarted=true;l.education='小学在读';note(l,'进入基础教育',`${policy.description}学费0；家庭用品交通估计每年${policy.householdCost}（由家庭生活预算承担，此处不重复扣款）。九年进度从下一学年累计。${policy.caveat}`);return l;}
  if(l.age<7)return l;
  if(roll(l)>=policy.access){note(l,'基础教育暂时中断','当地学校距离、交通或教学资源限制使本学年未完成；这不是学识不足。下一年继续尝试，成年后也可补读成人基础学历。');return l;}
  s.basicProgress=Math.min(9,s.basicProgress+1);l.stats.knowledge=cap((l.stats.knowledge||0)+2);
- if(s.basicProgress>=9){s.credential='basic';sync(l);note(l,'完成基础教育','完成九个学年，取得初中阶段学历；高中、职业学校需另行申请。');}else if(s.basicProgress>=6){s.credential='primary';l.education='初中在读';}else l.education='小学在读';return l;
+ if(s.basicProgress>=9){s.credential='basic';sync(l);note(l,'完成基础教育','完成九个学年，取得初中阶段学历；高中、职业学校需另行申请。');}else if(l.age>=19){l.education=s.basicProgress>=6?'校外（初中学业未完成）':'校外（小学学业未完成）';if(l.age===19)note(l,'学业停在校门外','基础教育的九个学年一直没有凑齐，成年后仍可用成人基础学历或夜校把它补完。');}else if(s.basicProgress>=6){s.credential='primary';l.education='初中在读';}else l.education='小学在读';return l;
 }
 export function educationMilestone(l,age=l.age){initEducation(l);if(l.dead||l.pending||![6,12,15,18,22].includes(age)||l.school.milestones.includes(age))return false;l.school.milestones.push(age);const policy=educationPolicy(l);l.pending={kind:'education',title:'教育与下一步',text:`${policy.description}当前：${l.education}。${policy.caveat}`,options:[...educationOptions(l).filter(o=>!o.disabled).map(o=>({...o,key:o.id})),{id:'continue',key:'continue',label:age>=18?'暂不升学，继续生活或前往求职':'按当前安排继续',description:'继续当前学习或生活；教育面板保留备考、重试和成人教育入口。成年后可从职业面板求职。'}]};return true;}
 export function educationChoice(l,index){if(l.pending?.kind!=='education')return{ok:false,message:'当前不是教育选择'};if(!Number.isInteger(index)||!l.pending.options[index])throw new RangeError('选择不存在');const option=l.pending.options[index];l.pending=null;if(option.id==='continue'||option.key==='continue')return result(l,true,'继续当前安排；成年后可在职业面板求职，之后仍可在教育面板申请学习。');return educationAction(l,option.id||option.key);}
