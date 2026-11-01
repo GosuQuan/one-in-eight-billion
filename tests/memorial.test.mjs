@@ -49,3 +49,14 @@ test('moves, a child and a trip show up on the card', () => {
   assert.match(card.questions[1], /你会不会/);
   assert.match(card.playBody, /计时从你打开这一生开始/);
 });
+
+test('memorial states the length of a life in years and roughly in days', () => {
+  const life = createLife({ seed: 'days-1', country: 'CN' });
+  life.age = 79; life.dead = true; life.deathAge = 79; life.deathCause = '身体逐渐衰老';
+  const card = memorialOf(life);
+  assert.ok(card.lifespan, 'lifespan entry exists');
+  assert.ok(card.lifespan.title.includes('长度'));
+  const days = Math.round(79 * 365.25);
+  assert.ok(card.lifespan.body.includes(days.toLocaleString('zh-CN')), card.lifespan.body);
+  assert.ok(card.lifespan.body.includes('游戏换算'), 'labels the conversion as a game estimate');
+});

@@ -94,10 +94,13 @@ export function memorialOf(life) {
   const reflectionQuote = reflections.length
     ? `"${reflections[reflections.length - 1][1]}"`
     : '';
+  const days = Math.round((life.age || 0) * 365.25);
+  const lifespan = { title: '人生的长度', body: `${life.age} 岁，大约 ${days.toLocaleString('zh-CN')} 天。天数按每年 365.25 天的游戏换算，只作纪念。` };
 
   return {
     playTitle: '你停留的时间',
     playBody: played ? `这局游戏里，你真实停留了 ${played}，走过角色的 ${life.age} 年。` : '这场游玩的计时从你打开这一生开始。再停留一会儿，卡片会写下分钟。',
+    lifespan,
     pathTitle: '地点轨迹',
     pathBody,
     sceneTitle: '到过的场景',

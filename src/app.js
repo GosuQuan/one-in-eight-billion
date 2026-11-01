@@ -169,7 +169,7 @@ function memorialBlock(life){
  touchPlay();
  const card=memorialOf(life);
  const mark=(k,v)=>`<article class="ending-mark"><small>${e(k)}</small><p>${e(v)}</p></article>`;
- return `<section class="ending-walk" aria-label="这一生的纪念"><p class="ending-age">${life.age} 岁，你走完了这一生</p><div class="ending-marks">${mark(card.playTitle,card.playBody)}${mark(card.pathTitle,card.pathBody)}${mark(card.sceneTitle,card.sceneBody)}${mark(card.regionTitle,card.regionBody)}${mark('生育',card.fertility)}${mark('社会地位',card.status)}${mark('社会贡献',card.contribution)}${mark(card.peopleTitle,card.peopleBody)}${card.ownWords?`<p class="ending-ownwords">${life.age}岁时你写下：${e(card.ownWords)}</p>`:''}</div><p class="ending-philosophy">${e(card.philosophy)}</p>${card.questions.map(q=>`<p class="ending-question">${e(q)}</p>`).join('')}</section>`;
+ return `<section class="ending-walk" aria-label="这一生的纪念"><p class="ending-age">${life.age} 岁，你走完了这一生</p><p class="ending-days">${e(card.lifespan.body)}</p><div class="ending-marks">${mark(card.playTitle,card.playBody)}${mark(card.pathTitle,card.pathBody)}${mark(card.sceneTitle,card.sceneBody)}${mark(card.regionTitle,card.regionBody)}${mark('生育',card.fertility)}${mark('社会地位',card.status)}${mark('社会贡献',card.contribution)}${mark(card.peopleTitle,card.peopleBody)}${card.ownWords?`<p class="ending-ownwords">${life.age}岁时你写下：${e(card.ownWords)}</p>`:''}</div><p class="ending-philosophy">${e(card.philosophy)}</p>${card.questions.map(q=>`<p class="ending-question">${e(q)}</p>`).join('')}</section>`;
 }
 function wrapText(ctx,text,width){const out=[];let line='';for(const ch of [...String(text||'')]){if(line&&ctx.measureText(line+ch).width>width){out.push(line);line=ch;}else line+=ch;}if(line)out.push(line);return out;}
 function downloadCard(){
@@ -180,7 +180,7 @@ function downloadCard(){
  ctx.fillStyle='#8c2946';ctx.font='22px Georgia';ctx.textAlign='left';ctx.fillText('ONE IN EIGHT BILLION',72,78);
  ctx.fillStyle='#263a3b';ctx.font='64px "Microsoft YaHei"';ctx.fillText(life.name,72,156,936);
  ctx.fillStyle='#74817b';ctx.font='28px Georgia';ctx.fillText(`${life.birthYear} — ${life.birthYear+life.age}`,72,204);
- ctx.font='22px "Microsoft YaHei"';ctx.fillText(`${(life.birthCountry||life.country).name} · ${life.sex} · ${life.age} 岁走完`,72,244);
+ ctx.font='22px "Microsoft YaHei"';ctx.fillText(`${(life.birthCountry||life.country).name} · ${life.sex} · ${life.age} 岁走完 · 约 ${Math.round((life.age||0)*365.25).toLocaleString('zh-CN')} 天`,72,244);
  let y=300;
  const head=label=>{ctx.fillStyle='#8c2946';ctx.font='18px "Microsoft YaHei"';ctx.fillText(label,72,y);y+=36;};
  const body=text=>{ctx.fillStyle='#263a3b';ctx.font='26px "Microsoft YaHei"';for(const line of wrapText(ctx,text,936).slice(0,4)){ctx.fillText(line,72,y);y+=38;}y+=18;};
