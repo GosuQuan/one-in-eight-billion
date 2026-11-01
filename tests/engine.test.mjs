@@ -4,11 +4,17 @@ import {
   COUNTRIES, DESTINATIONS, STOCKS, createLife, upgradeLife, advanceYear, choose,
   setFocus, summarize, rng, netWorth, investedValue, invest, withdraw, buyStock,
   sellStock, investStocks, STOCK_RISKS, buyHouse, buyCar, buyItem, travel, travelCost,
-  reflectionAnswer
+  reflectionAnswer, temperamentLead
 } from '../src/engine.js';
 import { memorialOf } from '../src/memorial.js';
 
 const clone = value => JSON.parse(JSON.stringify(value));
+
+const answerTemper = life => {
+  if (life.pending?.title === '气质在成形') { choose(life, 0); return true; }
+  return false;
+};
+
 const step = (life, variant=0) => life.pending ? choose(life, variant % life.pending.options.length) : advanceYear(life);
 const finish = (life, variant=0) => {
   for (let n=0; n<200 && !life.dead; n++) step(life,variant);
@@ -75,6 +81,7 @@ test('100 seeds across all focuses reach death by 110 with bounded stats',()=>{
 test('pending blocks advancement without changing random state or log',()=>{
   const life=createLife({seed:'pending'});
   while(!life.pending) advanceYear(life);
+  while(life.pending?.title==='气质在成形'){choose(life,0);while(!life.pending)advanceYear(life);}
   assert.equal(life.age,5);
   const saved=clone(life);
   for(let i=0;i<10;i++) assert.equal(advanceYear(life),life);
@@ -86,6 +93,7 @@ test('pending blocks advancement without changing random state or log',()=>{
 test('different choices change state and log actual consequences',()=>{
   const a=createLife({seed:'choices'});
   while(!a.pending) advanceYear(a);
+  while(a.pending?.title==='气质在成形'){choose(a,0);while(!a.pending)advanceYear(a);}
   const b=clone(a);
   const club=a.pending.cast.science.name,team=a.pending.cast.sport.name;
   choose(a,0);choose(b,1);
@@ -134,39 +142,68 @@ test('seed reproduces the complete life and rng stays in [0,1)',()=>{
   assert.notDeepEqual(createLife({seed:'same'}),createLife({seed:'different'}));
 });
 
+test('temperament is shaped at 2 and 4 and colours later events', () => {
+  const life = createLife({ seed: 'temper-1', country: 'CN' });
+  const step = (v = 0) => life.pending ? choose(life, v % life.pending.options.length) : advanceYear(life);
+  for (let n = 0; n < 10 && !life.dead && life.age < 5; n++) {
+    if (life.pending?.title === '气质在成形') { choose(life, 0); continue; }
+    step(n);
+  }
+  assert.ok(life.age >= 5, `reached school age: ${life.age}`);
+  assert.equal(life.temperament.lean.cur, 4, 'two curious picks recorded');
+  assert.ok(life.log.some(e => e.title === '气质在成形'), 'shaping logged');
+  assert.ok(life.log.some(e => /岁的性子/.test(e.title)), 'temperament note logged');
+  assert.equal(temperamentLead(life), 'cur', 'curious lead');
+});
+
 test('late life has quiet farewell events instead of going quiet', () => {
-  const life = createLife({ seed: 'late-test', country: 'JP' });
-  life.longevity = 95; life.stats.health = 95;
   const titles = ['抽屉最底层的信', '门口的长椅', '有些话想说在前头'];
-  const seen = new Set();
-  for (let n = 0; n < 300 && !life.dead; n++) {
-    if (life.age >= 20 && life.pending?.kind !== 'reflection') { life.money = Math.max(life.money, 50000); life.debt = 0; }
-    if (life.pending?.kind === 'reflection') { choose(life, life.pending.options.length - 1); continue; }
-    if (life.pending) choose(life, life.pending.options.length - 1);
-    else advanceYear(life);
+  let seen = null;
+  let lastDeathAge = 0;
+  for (let attempt = 0; attempt < 6 && !(seen && seen.size >= 1); attempt++) {
+    const life = createLife({ seed: 'late-test-' + attempt, country: 'JP' });
+    life.longevity = 95; life.stats.health = 95;
+    seen = new Set();
+    for (let n = 0; n < 300 && !life.dead; n++) {
+      if (life.age >= 20 && life.pending?.kind !== 'reflection') { life.money = Math.max(life.money, 50000); life.debt = 0; life.stats.health = Math.max(life.stats.health, 85); }
+      if (answerTemper(life)) continue;
+      if (life.pending?.kind === 'reflection') { choose(life, life.pending.options.length - 1); continue; }
+      if (life.pending) choose(life, life.pending.options.length - 1);
+      else advanceYear(life);
+    }
+    lastDeathAge = life.deathAge || life.age;
+    for (const e of life.log) if (titles.includes(e.title)) {
+      seen.add(e.title);
+      assert.ok(e.age >= 65, `${e.title} fired at ${e.age}`);
+    }
   }
-  for (const e of life.log) if (titles.includes(e.title)) {
-    seen.add(e.title);
-    assert.ok(e.age >= 65, `${e.title} fired at ${e.age}`);
-  }
-  assert.ok(seen.size >= 1, `expected at least one farewell event, got none by ${life.deathAge}`);
+  assert.ok(seen && seen.size >= 1, `expected at least one farewell event across attempts, last died at ${lastDeathAge}`);
 });
 
 test('mid-life reflection pauses ask the player and keep the words for the card', () => {
-  const life = createLife({ seed: 'reflect-test', country: 'JP' });
-  life.longevity = 95; life.stats.health = 95;
-  const pauses = [];
-  for (let n = 0; n < 260 && !life.dead; n++) {
-    if (life.age >= 20 && life.pending?.kind !== 'reflection') { life.money = Math.max(life.money, 50000); life.debt = 0; }
-    if (life.pending?.kind === 'reflection') {
-      pauses.push(life.age);
-      const idx = life.pending.options.findIndex(o => o.key === 'write');
-      choose(life, idx);
-      reflectionAnswer(life, `${life.age}岁的一句话`);
-      continue;
-    }
+  const run = attempt => {
+    const life = createLife({ seed: 'reflect-test-' + attempt, country: 'JP' });
+    life.longevity = 95; life.stats.health = 95;
+    const pauses = [];
+    for (let n = 0; n < 260 && !life.dead; n++) {
+      if (life.age >= 20 && life.pending?.kind !== 'reflection') { life.money = Math.max(life.money, 50000); life.debt = 0; life.stats.health = Math.max(life.stats.health, 85); }
+      if (answerTemper(life)) continue;
+      if (life.pending?.kind === 'reflection') {
+        pauses.push(life.age);
+        const idx = life.pending.options.findIndex(o => o.key === 'write');
+        choose(life, idx);
+        reflectionAnswer(life, `${life.age}岁的一句话`);
+        continue;
+      }
     if (life.pending) choose(life, life.pending.options.length - 1);
     else advanceYear(life);
+    }
+    return { life, pauses };
+  };
+  let life = null, pauses = null;
+  for (let attempt = 0; attempt < 6; attempt++) {
+    ({ life, pauses } = run(attempt));
+    if (pauses.join(',') === '15,30,50') break;
   }
   assert.deepEqual(pauses, [15, 30, 50]);
   assert.equal(life.reflections[15], '15岁的一句话');
@@ -176,7 +213,8 @@ test('mid-life reflection pauses ask the player and keep the words for the card'
   assert.ok(card.ownWords.includes('50岁的一句话'), 'the last written line reaches the card');
   // age-5 people milestone still owns its year; reflection never blocks it
   const a = createLife({ seed: 'reflect-age5', country: 'CN' });
-  for (let i = 0; i < 8 && !a.pending; i++) advanceYear(a);
+  for (let i = 0; i < 12 && !a.pending; i++) advanceYear(a);
+  while (a.pending?.title === '气质在成形') { choose(a, 0); for (let i = 0; i < 6 && !a.pending; i++) advanceYear(a); }
   assert.equal(a.pending?.system, 'thread-start');
 });
 

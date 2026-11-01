@@ -431,6 +431,7 @@ export function reflectionAnswer(life,text){
  log(life,life.reflections&&life.reflections[life.age]?'一句话留了下来':'这一句没有写',life.reflections&&life.reflections[life.age]?`${life.age}岁的你写下：${life.reflections[life.age]}`:'你没有留字。日子照常往前。','memory');
 }
 function setMilestone(life,age){
+ if(age===2||age===4){temperamentAsk(life,age);return;}
  if(age!==5&&[15,30,50].includes(age)&&!(life.reflections||{})[age]&&!(life.reflectionMiss||{})[age]){reflectionPause(life,age);return;}
  if([15,18,22].includes(age)){educationMilestone(life,age);return;}
  if(age===26){if(!life.partner||life.partner.alive===false)systemAction(life,'seek-partner');return;}
@@ -442,12 +443,44 @@ function setMilestone(life,age){
  log(life,m.title,m.text,'choice');
 }
 
+
+// ---------------- temperament shaping (ages 2 & 4) ----------------
+const TEMPER = { cur: '好奇', act: '好动', warm: '黏人', grit: '倔强' };
+function temperamentAsk(life, age){
+ const prompts = {
+  2: `${life.name}迈着还不太稳的步子，第一次自己走向院子里的新东西。家里人在旁边看着，TA会先做什么？`,
+  4: `四岁的${life.name}和邻居的孩子第一次一起玩。大人们聊天时瞥了一眼：TA在做什么？`,
+ };
+ const options = {
+  2: [['cur', '凑过去研究', '伸手抓，翻过来倒过去地看'], ['act', '撒腿跑起来', '先绕着院子跑一圈再说'], ['warm', '回头找大人', '走两步就回来看一眼'], ['grit', '站在原地不动', '先看别人怎么做']],
+  4: [['cur', '拆开看里面', '把玩具或虫子拆开研究'], ['act', '带头疯跑', '第一个冲出去喊别人跟上'], ['warm', '跟在大孩子后面', '别人玩什么就跟着玩什么'], ['grit', '非按自己的规则玩', '规则不对就宁可不来']],
+ };
+ life.temperament = life.temperament || { lean: {} };
+ life.temperament.lean = life.temperament.lean || {};
+ life.pending = { kind: 'milestone', title: '气质在成形', text: prompts[age], options: options[age].map(([k, label, desc]) => ({ key: k, label, description: desc })) };
+ log(life, '气质在成形', prompts[age], 'choice');
+}
+export function temperamentAnswer(life, key){
+ if (!life.pending || life.pending.title !== '气质在成形') return;
+ const labels = { cur: '凑过去研究', act: '撒腿跑起来', warm: '回头找大人', grit: '先看别人怎么做' };
+ life.temperament.lean[key] = (life.temperament.lean[key] || 0) + 2;
+ life.temperament.settledAge = life.age;
+ life.pending = null;
+ const lead = Object.entries(life.temperament.lean).sort((a, b) => b[1] - a[1])[0];
+ log(life, `${life.age}岁的性子`, `${life.name}这一下，家里记住了：偏${TEMPER[lead?.[0] || 'cur']}。日子还长，还会再变。`, 'memory');
+}
+export function temperamentLead(life){
+ const lean = life.temperament?.lean || {};
+ const top = Object.entries(lean).sort((a, b) => b[1] - a[1])[0];
+ return top && top[1] > 0 ? top[0] : null;
+}
+
 // ---------------- Random events ----------------
 const EVENTS=[
  {id:'school_praise',age:[7,14],weight:1,cond:l=>(l.school?.basicProgress||0)>0||!!(l.school?.program&&!l.school.program.paused),build:l=>({title:'老师多看了你一眼',text:'作业本上多了一行字：“你比昨天写得更好。”',type:'warm',options:[
   {key:'study',label:'把那句话记在心里',description:'认真对待下一次作业。',effects:{knowledge:6,happiness:2}},
   {key:'play',label:'和朋友去操场',description:'把下午留给奔跑和笑声。',effects:{happiness:6,social:4}}]})},
- {id:'bully',age:[8,15],weight:.8,cond:()=>true,build:l=>({title:'走廊尽头的声音',text:'有人反复拿你的口音开玩笑。你站在走廊尽头，不知道要不要回头。',type:'bad',options:[
+ {id:'bully',age:[8,15],weight:.8,cond:()=>true,build:l=>({title:'走廊尽头的声音',text:`有人反复拿你的口音开玩笑。${temperamentLead(l)==='grit'?'你站住了，直直地看着对方。':temperamentLead(l)==='cur'?'你在想他们为什么只笑你的口音。':temperamentLead(l)==='act'?'你攥紧了书包带子，手心出了汗。':'你站在走廊尽头，不知道要不要回头。'}`,type:'bad',options:[
   {key:'tell',label:'告诉老师和家人',description:'让大人知道，也让自己不再一个人扛。',effects:{social:4,happiness:2,knowledge:1}},
   {key:'endure',label:'假装没听见',description:'希望他们有一天会腻。',effects:{happiness:-5,social:-2}},
   {key:'fight',label:'当面顶回去',description:'把话说清楚，也承担冲突的后果。',effects:{health:-2,social:2,happiness:1}}]})},
@@ -606,6 +639,7 @@ export function choose(life,index){
  if(!Number.isInteger(index)||!life.pending.options[index])throw new RangeError('选择不存在');
  const pending=life.pending;
  if(pending.kind==='education'){educationChoice(life,index);return life;}
+  if(pending.title==='气质在成形'){temperamentAnswer(life,pending.options[index].key);return life;}
   if(pending.kind==='reflection'){const opt=pending.options[index];if(opt.key==='write')life.awaitingReflectionText=true;life.pending=null;log(life,'这一句留到你落笔','答案会保存在这一生的纪念卡上。现在，日子继续。','memory');return life;}
  if(pending.kind==='system'){systemChoice(life,pending,index);return life;}
  life.pending=null;
