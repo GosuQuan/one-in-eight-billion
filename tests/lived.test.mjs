@@ -10,7 +10,7 @@ import { educationAction } from '../src/education.js';
 const adult = (seed, age = 30) => {
   const l = createLife({ seed, country: 'CN' });
   l.age = age; l.money = 80000; l.debt = 0; l.income = 40000; l.job = '职员'; l.stats.health = 80;
-  l.pending = null;
+  l.systems.lastIdleAsk = l.money; l.pending = null;
   return l;
 };
 

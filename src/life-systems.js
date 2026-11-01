@@ -412,6 +412,7 @@ export function systemChoice(l, p, index) {
   case 'thread-start': startThread(l, p, key); break;
   case 'thread': resolveThread(l, p, key); break;
   case 'lived': livedChoice(l, key); break;
+  case 'idle-cash': if (key === 'mix') { l.systems.idleOpenPanel = true; log(l, '打开投资面板', '配置由你自己决定。基金、债券、股票或房产，都在同一个面板里。', 'finance'); } else log(l, '钱先放在手上', '不配置也不亏。想动的时候，从「投资」进入。', 'finance'); break;
   default: l.pending = p; return false;
  }
  return true;

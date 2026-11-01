@@ -450,3 +450,37 @@ test('save round-trip preserves portfolio, holdings, travels and random state',(
   for(let n=0;n<5;n++){advanceYear(a,{events:false});advanceYear(b,{events:false});assert.deepEqual(a,b);}
   assert.deepEqual(summarize(a).travels,1);
 });
+
+test('a large idle balance asks where to keep it, once per doubling', () => {
+  const life = createLife({ seed: 'idle-1', country: 'CN' });
+  life.age = 30; life.money = 3 * life.country.gdp; life.debt = 0; life.income = 0;
+  life.pending = null; life.systems.lastYear = null;
+  advanceYear(life, { events: false });
+  assert.equal(life.pending?.system, 'idle-cash', 'idle-cash dialog opened');
+  assert.ok(life.systems.lastIdleAsk > 0, 'ask threshold recorded');
+  // answer "keep"
+  const keepIdx = life.pending.options.findIndex(o => o.key === 'keep');
+  choose(life, keepIdx);
+  assert.equal(life.pending, null);
+  assert.ok(life.log.some(e => e.title === '钱先放在手上'), 'keep choice logged');
+  // same balance does not re-ask next year
+  life.systems.lastYear = null; life.pending = null;
+  advanceYear(life, { events: false });
+  assert.notEqual(life.pending?.system, 'idle-cash', 'no repeat ask at same level');
+  // doubled balance asks again
+  life.money = life.systems.lastIdleAsk * 2.2;
+  life.systems.lastYear = null; life.pending = null;
+  advanceYear(life, { events: false });
+  assert.equal(life.pending?.system, 'idle-cash', 're-asks after doubling');
+  // mix opens the panel flag
+  choose(life, life.pending.options.findIndex(o => o.key === 'mix'));
+  assert.equal(life.systems.idleOpenPanel, true, 'panel flag set');
+});
+
+test('small balances never trigger the idle-cash ask', () => {
+  const life = createLife({ seed: 'idle-2', country: 'CN' });
+  life.age = 30; life.money = 2 * life.country.gdp; life.debt = 0;
+  life.pending = null; life.systems.lastYear = null;
+  advanceYear(life, { events: false });
+  assert.notEqual(life.pending?.system, 'idle-cash');
+});

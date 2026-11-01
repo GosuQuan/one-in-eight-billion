@@ -679,7 +679,18 @@ export function advanceYear(life,options={}){
  if(options.events!==false&&!life.pending)setMilestone(life,age);
  systemsYear(life, options);
  financeYear(life);
- for(const p of life.companions){
+if(!life.pending){
+   const idleAsk=Math.max(2*life.country.gdp,(life.systems.lastIdleAsk||0)*1.6);
+   if(life.money>=idleAsk&&life.age>=20){
+    life.systems.lastIdleAsk=life.money;
+    const need=Math.round(idleAsk);
+    life.pending={kind:'system',system:'idle-cash',title:'一笔闲钱放在哪儿',text:`你手上的现金超过了${need.toLocaleString('zh-CN')}（三倍于${life.country.name}的人均经济）。放在活期里不会生利息，也不会亏。要怎么安顿，你可以现在决定，也可以先放着。`,options:[
+     {key:'mix',label:'看投资面板再定',description:'打开投资 / 资产，自己配置基金、债券或股票。'},
+     {key:'keep',label:'就放在手上',description:'现金不动。以后想配置，随时可以从「投资」进入。'}]};
+    log(life,'一笔闲钱',`现金过了${need.toLocaleString('zh-CN')}。放哪儿，这一次问你自己。`,'finance');
+   }
+  }
+   for(const p of life.companions){
  if(p.dead)continue;
  p.age=Math.min(age,p.life);
  if(age>=p.life){p.dead=true;p.job='人生已结束';log(life,`${p.name}离开了`,`同一秒出生的${p.name}在${p.age}岁走完了一生，出身${p.band || '普通'}人家，${p.path}。你们从未见面，但年份一直把你们并排往前推。你的这一页还在写。`,'world');continue;}
