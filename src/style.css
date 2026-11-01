@@ -140,8 +140,9 @@
 .ending-grain-title{font:24px var(--serif);margin:0 0 8px}
 .ending-grain-body{font-size:14px;color:var(--muted);margin:0 0 14px}
 .ending-pair{display:flex;align-items:center;gap:10px;margin:8px 0;font-size:13px}
+.ending-pair .track{flex:1;height:6px;background:var(--line);position:relative;display:block}
+.ending-pair .dot{position:absolute;top:-3px;width:12px;height:12px;border-radius:50%;background:var(--wine);transform:translateX(-50%)}
 .ending-pair span:first-child{min-width:74px;text-align:right}
 .ending-pair span:last-child{min-width:74px}
-.ending-pair i{flex:1;height:6px;background:var(--line);position:relative;display:block}
 .ending-pair em{min-width:44px;text-align:center;font:12px var(--sans);color:var(--muted);font-style:normal}
 @media(max-width:760px){.ending-marks{grid-template-columns:1fr}.ending-age{font-size:32px}}
