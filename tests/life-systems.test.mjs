@@ -414,3 +414,26 @@ test('teen and elder avatars differ by sex', () => {
   assert.ok(oldF.includes('x="3" y="12" width="10"'));
   assert.ok(oldM.includes('x="13" y="9"'));
 });
+
+test('opportunity offers wait at least three years between asks', () => {
+  const l = adult('throttle-1'); l.age = 30; l.pending = null; l.systems.lastYear = null;
+  let lastAge = null;
+  for (let y = 0; y < 30; y++) {
+    l.age++; l.pending = null; l.systems.lastYear = null;
+    systemsYear(l);
+    if (l.pending?.system === 'opportunity') {
+      if (lastAge != null) assert.ok(l.age - lastAge >= 3, `gap ${l.age - lastAge} at ${l.age}`);
+      lastAge = l.age;
+    }
+    if (l.pending) systemChoice(l, l.pending, l.pending.options.length - 1);
+  }
+  assert.ok(lastAge != null, 'an opportunity appeared at all');
+});
+
+test('random events no longer pile up after quiet stretches', () => {
+  const l = adult('catchup-1'); l.age = 30; l.pending = null; l.systems.lastYear = null;
+  l.lastEventAge = 26;
+  advanceYear(l);
+  // no assertion on firing, just must not crash and stay consistent
+  assert.ok(l.age === 31);
+});

@@ -99,7 +99,7 @@ test('different choices change state and log actual consequences',()=>{
 
 test('JSON round-trip at a pending choice resumes exactly through death',()=>{
   const a=createLife({seed:'saved-pending',country:'JP',era:'future'});
-  while(a.age<26) step(a);
+  while(a.age<26&&!a.dead) step(a);
   const b=clone(a);
   for(let n=0;n<200&&!a.dead;n++) {
     if(n%7===0) {setFocus(a,'health');setFocus(b,'health');}

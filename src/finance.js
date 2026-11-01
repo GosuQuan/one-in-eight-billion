@@ -92,7 +92,7 @@ export function financeYear(l){
   if(left>0&&left<=4){
    const parents=[l.family?.mother,l.family?.father].filter(alive).map(p=>p.name);
    const kin=parents.length?`${parents.join('和')}最多帮一部分`:'家里若还有人，也只能帮一部分';
-   record(l,'这笔债还能撑一阵',`按现在的账单，大约还能再过${left}年。${f.arrears>=3?'拖欠已经连着，某一年会更快。':''}缩减开支还在。${kin}，不会一次还清。去找工作也不保证有回音，这一年不会凭空多出收入。`);
+   record(l,'这笔债还能撑一阵',`这是身体和账单一起算的粗略估计：照目前的健康下滑和拖欠情况，大约还能再过${left}年，不是债务还清的时间。${f.arrears>=3?'拖欠已经连着，某一年会更快。':''}缩减开支还在。${kin}，不会一次还清。去找工作也不保证有回音，这一年不会凭空多出收入。`);
   }
  }
 

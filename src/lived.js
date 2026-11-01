@@ -779,5 +779,5 @@ export function livedCatalogHTML(l) {
   return `<button class="choice-btn lived-card" data-lived="${a.id}" ${ok ? '' : 'disabled'}><strong>${e(a.title)} <span>${ok ? '↗' : '—'}</span></strong><small>${a.ages[0]}–${a.ages[1]}岁 · ${e(a.cost)} · ${e(a.time)}</small><small>${e(a.risk)} ${e(a.mark)}</small></button>`;
  }).join('');
  const brief = livedBrief(l);
- return `<div class="dialog-kicker">${l.age} 岁 · 生活的节奏</div><h2 id="dialog-title">五十件不会一下子跳过的事</h2><p>成年以后，若这一年没有别的事挡着，会直接摆出两三件适龄的小事。这里仍是全部目录，可以自己来找。做成与否都不发放学历、签证、孩子或永久的工作。费用是游戏假设，不是官方统计。</p>${brief ? `<p class="small-note">正在发生：${e(brief)}</p>` : ''}<div class="choice-list lived-list">${cards}</div>`;
+ return `<div class="dialog-kicker">${l.age} 岁 · 生活的节奏</div><h2 id="dialog-title">五十件不会一下子跳过的事</h2><p>成年以后，每隔几年，若这一年没有别的事挡着，会直接摆出两三件适龄的小事。这里仍是全部目录，可以自己来找。做成与否都不发放学历、签证、孩子或永久的工作。费用是游戏假设，不是官方统计。</p>${brief ? `<p class="small-note">正在发生：${e(brief)}</p>` : ''}<div class="choice-list lived-list">${cards}</div>`;
 }

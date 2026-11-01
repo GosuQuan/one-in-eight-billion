@@ -535,8 +535,8 @@ function maybeEvent(life){
  if(life.pending||life.dead||life.age<2)return;
  const since=life.lastEventAge==null?99:life.age-life.lastEventAge;
  let p=life.age<10?.12:.2;
- if(since>=4)p+=.12;
- if(since>=7)p+=.18;
+ if(since>=4)p+=.08;
+ if(since>=7)p+=.10;
  if(!chance(life,p))return;
  const pool=EVENTS.filter(e=>life.age>=e.age[0]&&life.age<=e.age[1]&&!life.recentEvents.includes(e.id)&&(!e.cond||e.cond(life)));
  if(!pool.length)return;

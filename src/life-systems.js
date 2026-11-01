@@ -616,6 +616,7 @@ function tryResidency(l) {
 }
 function hearOpportunity(l) {
  if (l.pending || l.dead || l.retired || l.age < 18 || l.age > 67) return;
+ if ((l.systems.lastOpportunityAge ?? -99) > l.age - 3) return;
  if (!chance(l, .62)) return;
  const employedNow = (l.income || 0) > 0 && !['待业', '尚未工作', '学生', '退休', '求职中'].includes(l.job || '');
  if (employedNow && chance(l, .12)) {
@@ -634,6 +635,7 @@ function hearOpportunity(l) {
  if (r.abroadSince != null && l.age - r.abroadSince >= 4 && l.systems.residency === 'temporary') kinds.push('pr');
  if (r.abroadSince != null) kinds.push('home-offer');
  const kind = pick(l, kinds);
+ l.systems.lastOpportunityAge = l.age;
  if (kind === 'local') {
   const jobKind = pick(l, localJobs).id;
   const preview = localIncome(l, jobKind);
