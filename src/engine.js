@@ -551,7 +551,19 @@ const EVENTS=[
   {key:'skip',label:'改天再说',description:'最近实在太忙。',effects:{health:-1}}]})},
  {id:'retire_plan',age:[55,66],weight:.5,cond:l=>!l.retired,build:l=>({title:'退休这件事',text:'你开始认真算一笔账：还要工作几年，养老金够不够，房子和存款能不能撑住。',type:'event',options:[
   {key:'save',label:'再多存一点',description:'把一部分现金放进更稳的地方。',effects:{cash:'-gdp:.15',invest:{bonds:1},happiness:-1}},
-  {key:'enjoy',label:'也给自己花一点',description:'日子不是只为退休准备的。',effects:{cash:'-gdp:.08',happiness:5}}]})}
+  {key:'enjoy',label:'也给自己花一点',description:'日子不是只为退休准备的。',effects:{cash:'-gdp:.08',happiness:5}}]})},
+ {id:'old_letters',age:[65,100],weight:.5,cond:l=>!l.retired||l.age>=65,build:l=>({title:'抽屉最底层的信',text:'收拾柜子时，翻出一沓旧信。有的字迹已经淡了，落款的人有的还在，有的不在了。',type:'warm',options:[
+  {key:'reread',label:'挑一个下午重读',description:'把它们按年份摆好，看了一遍。',effects:{happiness:6,knowledge:1}},
+  {key:'share',label:'挑一封念给家人听',description:'有人坐下来听完，也问起写信的人。',effects:{happiness:5,social:6}},
+  {key:'box',label:'原样放回去',description:'有些东西还不到打开的时候。',effects:{happiness:1}}]})},
+ {id:'old_revisit',age:[66,100],weight:.5,cond:()=>true,build:l=>({title:'门口的长椅',text:'你常坐的那张长椅换了新漆。坐下来的时候，对面楼的老人朝你点头。',type:'warm',options:[
+  {key:'chat',label:'聊一会儿',description:'聊的都是小事，也聊到了各自的孩子。',effects:{happiness:4,social:5}},
+  {key:'walk',label:'再走一段熟悉的路',description:'慢慢地走完，回家时天还亮着。',effects:{happiness:5,health:2}},
+  {key:'rest',label:'只是坐一坐',description:'什么都不做也很好。',effects:{happiness:3}}]})},
+ {id:'old_tell',age:[68,100],weight:.45,cond:()=>true,build:l=>({title:'有些话想说在前头',text:'你想把几件事交代清楚：存折放在哪、希望的安排、以及不想让家里人争论的事。',type:'family',options:[
+  {key:'tell',label:'和家里人好好说一次',description:'说完了，屋里安静了一会儿，然后像平常一样吃了晚饭。',effects:{happiness:4,social:7}},
+  {key:'write',label:'写在纸上收好',description:'放在他们找得到的地方，没有说破。',effects:{happiness:3,knowledge:2}},
+  {key:'later',label:'再等等，还不急',description:'日子还长，这句话先留在心里。',effects:{happiness:1}}]})},
 ];
 const EVENT_BY_ID=Object.fromEntries(EVENTS.map(e=>[e.id,e]));
 

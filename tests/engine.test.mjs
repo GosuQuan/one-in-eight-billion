@@ -134,6 +134,24 @@ test('seed reproduces the complete life and rng stays in [0,1)',()=>{
   assert.notDeepEqual(createLife({seed:'same'}),createLife({seed:'different'}));
 });
 
+test('late life has quiet farewell events instead of going quiet', () => {
+  const life = createLife({ seed: 'late-test', country: 'JP' });
+  life.longevity = 95; life.stats.health = 95;
+  const titles = ['抽屉最底层的信', '门口的长椅', '有些话想说在前头'];
+  const seen = new Set();
+  for (let n = 0; n < 300 && !life.dead; n++) {
+    if (life.age >= 20 && life.pending?.kind !== 'reflection') { life.money = Math.max(life.money, 50000); life.debt = 0; }
+    if (life.pending?.kind === 'reflection') { choose(life, life.pending.options.length - 1); continue; }
+    if (life.pending) choose(life, life.pending.options.length - 1);
+    else advanceYear(life);
+  }
+  for (const e of life.log) if (titles.includes(e.title)) {
+    seen.add(e.title);
+    assert.ok(e.age >= 65, `${e.title} fired at ${e.age}`);
+  }
+  assert.ok(seen.size >= 1, `expected at least one farewell event, got none by ${life.deathAge}`);
+});
+
 test('mid-life reflection pauses ask the player and keep the words for the card', () => {
   const life = createLife({ seed: 'reflect-test', country: 'JP' });
   life.longevity = 95; life.stats.health = 95;
