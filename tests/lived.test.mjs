@@ -1300,3 +1300,18 @@ test('a year that is not a multiple of seven still puts the acts on the year', (
   assert.ok(acts.length === 2 || acts.length === 3);
   assert.equal(l.pending.options.at(-1).key, 'later');
 });
+
+test('lived acts come in two tiers: most years pass quietly, some still ask', () => {
+  const life = createLife({ seed: 'tiers-1', country: 'CN' });
+  for (let n = 0; n < 220 && !life.dead; n++) {
+    if (life.pending) choose(life, life.pending.options.length - 1);
+    else advanceYear(life);
+    if (life.dead) break;
+  }
+  const dialog = life.log.filter(e => e.title === '这一年有几件小事');
+  const ambient = life.log.filter(e => e.title.includes('的机会') && e.text.includes('从日子里经过'));
+  assert.ok(dialog.length >= 2, `expected dialog years too, got ${dialog.length}`);
+  assert.ok(ambient.length >= 2, `expected ambient years too, got ${ambient.length}`);
+  const yearsWithBoth = dialog.filter(d => ambient.some(a => a.age === d.age));
+  assert.equal(yearsWithBoth.length, 0, 'a year is either ambient or dialog, not both');
+});

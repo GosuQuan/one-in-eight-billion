@@ -700,9 +700,15 @@ export function livedYear(l, options = {}) {
  tick(l);
  if (options.events === false || l.pending) return l;
    if (askChild(l)) return l;
-  if (l.age < 18 || l.age > 88 || l.age % 3 !== 1 || l.lived.lastOfferAge === l.age) return l;
+  if (l.age < 18 || l.age > 88) return l;
   const choices = LIVED_ACTS.filter(a => l.age >= a.ages[0] && l.age <= a.ages[1] && open(l, a.id));
   if (!choices.length) return l;
+  if (l.age % 3 !== 1 || l.lived.lastOfferAge === l.age) {
+    const act = choices[(l.age + 1) % choices.length];
+    l.lived.lastAmbientAge = l.age;
+    log(l, `${act.title}的机会`, `${act.mark}。这一年你没有专门去做，它只是从日子里经过。想认真做一件，可以在「家与人生」的目录里找。`);
+    return l;
+  }
   const want = Math.min(choices.length, l.age % 2 === 0 ? 2 : 3);
   const picked = [];
   for (let i = 0; i < choices.length && picked.length < want; i++) {
