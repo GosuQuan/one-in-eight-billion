@@ -600,3 +600,22 @@ test('early-marriage pressure appears once for girls in high-risk regions, and r
     if (life.dead) break;
   }
 });
+
+test('mini-tier events carry the mini flag and resolve in one step', () => {
+  let hit = null, life = null;
+  for (let s = 0; s < 30 && !hit; s++) {
+    life = createLife({ seed: 'mini-' + s, country: 'CN' });
+    for (let n = 0; n < 220 && !life.dead && !hit; n++) {
+      if (life.pending) {
+        if (life.pending.mini) { hit = life.pending; break; }
+        choose(life, life.pending.options.length - 1);
+      } else advanceYear(life);
+    }
+  }
+  assert.ok(hit, 'no mini event across 30 lives');
+  assert.equal(hit.kind, 'event');
+  assert.ok(['first_crush', 'online_link', 'side_hustle'].includes(hit.eventId), 'known mini id: ' + hit.eventId);
+  assert.ok(hit.options.length === 2, 'mini has two choices');
+  choose(life, hit.options.length - 1);
+  assert.equal(life.pending, null, 'mini resolves immediately');
+});

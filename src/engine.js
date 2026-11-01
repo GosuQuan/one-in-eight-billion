@@ -578,13 +578,13 @@ const EVENTS=[
   {key:'cram',label:'熬夜复习',description:'把能记住的都记住。',effects:{knowledge:8,health:-3}},
   {key:'normal',label:'按平常节奏复习',description:'睡够，也留一点空白。',effects:{knowledge:4,happiness:1}},
   {key:'giveup',label:'这次先放下',description:'承认自己需要休息。',effects:{knowledge:-4,happiness:2}}]})},
- {id:'first_crush',age:[14,19],weight:.8,cond:l=>!l.partner,build:l=>({title:'心跳得有点快',text:'你发现自己总在人群里找同一个人。对方笑起来的时候，你忘了要说什么。',type:'warm',options:[
+ {id:'first_crush',age:[14,19],weight:.8,mini:true,cond:l=>!l.partner,build:l=>({title:'心跳得有点快',text:'你发现自己总在人群里找同一个人。对方笑起来的时候，你忘了要说什么。',type:'warm',options:[
   {key:'confess',label:'找个机会说出来',description:'不管结果如何，至少不再猜。',effects:{happiness:6,social:3}},
   {key:'friend',label:'先做朋友',description:'把喜欢放在心里，慢慢相处。',effects:{happiness:2,social:2}}]})},
  {id:'part_time',age:[15,19],weight:.6,cond:()=>true,build:l=>({title:'周末的零工',text:'一家店愿意让你周末去帮忙，工资不高，但够买自己想要的东西。',type:'event',options:[
   {key:'work',label:'去做兼职',description:'攒一点钱，也见识真实的工作。',effects:{cash:'gdp:.12',social:3,knowledge:-2}},
   {key:'study',label:'把周末留给学习',description:'准备考试，暂时不打工。',effects:{knowledge:5}}]})},
- {id:'online_link',age:[12,30],weight:.5,cond:()=>true,build:l=>({title:'一条陌生的链接',text:'屏幕上弹出一条消息：点开就能领取一份礼物。你盯着那个陌生的网址。',type:'bad',options:[
+ {id:'online_link',age:[12,30],weight:.5,mini:true,cond:()=>true,build:l=>({title:'一条陌生的链接',text:'屏幕上弹出一条消息：点开就能领取一份礼物。你盯着那个陌生的网址。',type:'bad',options:[
   {key:'click',label:'点开看看',description:'也许是真的。',effects:{cash:'-gdp:.05',happiness:-3}},
   {key:'ignore',label:'关掉并举报',description:'不把时间交给陌生人的链接。',effects:{knowledge:1,happiness:1}}]})},
  {id:'promotion',age:[23,58],weight:1,cond:l=>l.age>=18&&!l.retired&&l.income>0,build:l=>({title:'更大的责任',text:'上司问你愿不愿意接手一个更重要的项目。它会占用很多晚上。',type:'event',options:[
@@ -594,7 +594,7 @@ const EVENTS=[
   {key:'hunt',label:'马上找工作',description:'把简历投出去，也问问旧同事。',effects:{job:'求职中',income:-1,happiness:-5,cash:'-gdp:.065'}},
   {key:'reskill',label:'先学一门新技能',description:'用几个月补上缺口。',effects:{job:'求职中',income:0,cash:'-gdp:.16',knowledge:8,happiness:-2}},
   {key:'rest',label:'休息一段时间',description:'允许自己停一停。',effects:{job:'待业',income:0,happiness:2,cash:'-gdp:.13'}}]})},
- {id:'side_hustle',age:[22,55],weight:.7,cond:l=>!l.retired&&l.income>0,build:l=>({title:'下班后的副业',text:'朋友拉你一起做一个小项目：周末拍视频，或者接一点设计活。',type:'event',options:[
+ {id:'side_hustle',age:[22,55],weight:.7,mini:true,cond:l=>!l.retired&&l.income>0,build:l=>({title:'下班后的副业',text:'朋友拉你一起做一个小项目：周末拍视频，或者接一点设计活。',type:'event',options:[
   {key:'join',label:'试着做起来',description:'少睡一点，多一份可能。',effects:{cash:'-gdp:.08',incomePct:.08,health:-3,knowledge:4}},
   {key:'pass',label:'先顾好主业',description:'把精力留给已经选择的生活。',effects:{happiness:1}}]})},
  {id:'stock_tip',age:[22,65],weight:.7,cond:l=>l.money>800,build:l=>({title:'行情软件的深夜推送',text:'群里有人晒出收益截图，劝你在市场里下一注。你决定先想清楚自己能承受多大亏损，再由系统配置标的。这次投入四分之一现金，按一段持有期的行情结算。',type:'event',options:[
@@ -715,7 +715,7 @@ function maybeEvent(life){
  if(life.age<6&&data.options?.length)return;
  life.lastEventAge=life.age;life.recentEvents.push(event.id);if(life.recentEvents.length>8)life.recentEvents.shift();
  if(data.options?.length){
-  life.pending={kind:'event',eventId:event.id,buildState,title:data.title,text:data.text,options:data.options.map(o=>({key:o.key,label:o.label,description:o.description}))};
+  life.pending={kind:'event',eventId:event.id,buildState,mini:event.mini===true,title:data.title,text:data.text,options:data.options.map(o=>({key:o.key,label:o.label,description:o.description}))};
   log(life,data.title,data.text,'event');
  }else{
   const details=applyEffects(life,data.effects||{});
