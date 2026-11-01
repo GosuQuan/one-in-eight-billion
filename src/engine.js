@@ -475,6 +475,56 @@ export function temperamentLead(life){
  return top && top[1] > 0 ? top[0] : null;
 }
 
+
+// ---- country-bound cultural background events (auto-resolved, no dialog) ----
+// Each set is our own writing about ordinary life in that place; no source text is reused.
+const CULTURE_EVENTS = {
+ CN: [
+  { age: [3, 12], title: '第一次跟着去买年货', text: '市场里挂满了红纸和腊味。大人挑对联，你被塞了一串糖葫芦。', type: 'warm', effects: { happiness: 5 } },
+  { age: [5, 16], title: '中秋的院子', text: '一家人在院子里摆开小桌，月饼切成小块。月亮很圆，长辈说起从前的事。', type: 'family', effects: { happiness: 4, social: 3 } },
+  { age: [6, 18], title: '教室里的早读', text: '天还没完全亮，全班一起念课文。声音乱糟糟的，但很有力气。', type: 'warm', effects: { knowledge: 4 } },
+  { age: [18, 60], title: '春运的车厢', text: '过道里站满了人，行李箱叠在门口。你靠着窗，一路听着方言和呼噜。', type: 'event', effects: { happiness: 2, health: -2 } },
+  { age: [30, 80], title: '楼下的小馆子', text: '老板记得你不吃葱。一碗面端上来，热气把镜片蒙住了。', type: 'warm', effects: { happiness: 3 } }
+ ],
+ IN: [
+  { age: [4, 14], title: '排灯节的灯', text: '邻居在窗前点起一排小灯，街道亮到半夜。有人递来一盘甜点。', type: 'warm', effects: { happiness: 5, social: 2 } },
+  { age: [6, 16], title: '季风来的第一场雨', text: '雨砸在铁皮顶上，整条街的人都跑出来看。孩子们在水里跳。', type: 'warm', effects: { happiness: 4, health: -1 } },
+  { age: [8, 18], title: '火车上的长夜', text: '卧铺里挤着陌生人和行李，有人分你半块饼。天亮时窗外全是绿。', type: 'event', effects: { happiness: 2, knowledge: 2 } },
+  { age: [20, 70], title: '婚礼上的鼓', text: '亲戚从很远的地方赶来，鼓声从傍晚响到深夜。你被拉进人群跳了一段。', type: 'family', effects: { happiness: 6, social: 4 } }
+ ],
+ NG: [
+  { age: [4, 14], title: '发电机的声音', text: '停电了，家里的小发电机响起来。风扇转起来那一刻，屋子里有人欢呼。', type: 'event', effects: { happiness: 3, health: -1 } },
+  { age: [6, 18], title: '市场里的布', text: '跟着大人去市场挑布，颜色亮得晃眼。摊主一边喊价一边笑。', type: 'warm', effects: { happiness: 4, social: 2 } },
+  { age: [8, 20], title: '雨后的红土路', text: '雨停了，路变成深红色。鞋子陷进去，走两步就要甩一下。', type: 'event', effects: { happiness: 2, health: -1 } },
+  { age: [20, 70], title: '婚礼上的米和油', text: '亲戚们凑了米和油送来。有人唱歌，有人记账，热闹了一整天。', type: 'family', effects: { happiness: 5, social: 4 } }
+ ],
+ US: [
+  { age: [5, 15], title: '万圣节的门口', text: '你穿着临时拼的服装挨家敲门，袋子越来越沉。有人夸你的扮相。', type: 'warm', effects: { happiness: 5, social: 3 } },
+  { age: [14, 22], title: '第一份暑期工', text: '收银台站一整天，腿是酸的，工资单上还扣了税。', type: 'event', effects: { cash: 'gdp:.03', knowledge: 2, health: -1 } },
+  { age: [16, 30], title: '公路上的长途', text: '车窗外的平原一望无际，电台放着一首老歌。你在休息站买了杯咖啡。', type: 'warm', effects: { happiness: 4 } },
+  { age: [25, 70], title: '感恩节的餐桌', text: '桌上的菜多得放不下。有人为了谁坐哪边吵了几句，最后还是碰了杯。', type: 'family', effects: { happiness: 5, social: 4 } }
+ ],
+ JP: [
+  { age: [4, 14], title: '夏祭的烟火', text: '穿上浴衣走进人群，摊位前排着队。烟火在头顶炸开的时候，所有人一起抬头。', type: 'warm', effects: { happiness: 6, social: 3 } },
+  { age: [6, 18], title: '开学第一天', text: '教室换了新座位，窗外樱花刚开。老师让学生一个个站起来说假期做了什么。', type: 'warm', effects: { knowledge: 3, social: 2 } },
+  { age: [18, 60], title: '加班后的末班车', text: '车厢里全是和你一样的人，领带松着，都在看手机。有人睡着坐过了站。', type: 'event', effects: { happiness: -1, health: -2 } },
+  { age: [20, 70], title: '新年第一次参拜', text: '天还没亮就排起长队，冷得跺脚。钟声一下一下地敲，没有人说话。', type: 'warm', effects: { happiness: 4 } }
+ ],
+ DE: [
+  { age: [5, 16], title: '圣诞市场的热酒', text: '广场上支起一排小木屋，空气里是肉桂和烤肠的味道。你捧着一杯热饮暖手。', type: 'warm', effects: { happiness: 5, social: 2 } },
+  { age: [10, 22], title: '周日不开门的街', text: '整条街安静得反常，店门都关着。有人在河边骑车，有人在草地上躺着看书。', type: 'warm', effects: { happiness: 3 } },
+  { age: [16, 30], title: '职业学校的车间', text: '一边是课本，一边是真机床。手上的油污到晚上才洗得掉。', type: 'event', effects: { knowledge: 4, cash: 'gdp:.02' } },
+  { age: [20, 70], title: '足球夜', text: '朋友家的客厅里挤满人，盯着同一块屏幕。进球时整间屋子炸开，啤酒洒了一地。', type: 'warm', effects: { happiness: 5, social: 4 } }
+ ]
+};
+
+// ---- "envy" events: pure feeling from a missing condition, never a dialog, never compensated ----
+const ENVY_EVENTS = [
+ { id: 'envy_school', age: [8, 15], weight: .7, cond: l => (l.school?.basicProgress || 0) < 6, build: () => ({ title: '羡慕上学的朋友', text: '同龄人背着书包往学校走，你站在门口看了一会儿。这一天和平常一样难过，也和平常一样过去。', type: 'event', effects: { happiness: -2 } }) },
+ { id: 'envy_light', age: [7, 16], weight: .5, cond: l => l.country.gdp < 8000, build: () => ({ title: '别人家的灯', text: '停电的晚上，隔壁有发电机的屋子还亮着。你把作业挪到门口，借着那点光写完。', type: 'event', effects: { happiness: -2, knowledge: 2 } }) },
+ { id: 'envy_shoes', age: [8, 16], weight: .5, cond: l => (l.family?.wealth || 0) < .35, build: () => ({ title: '一双新鞋', text: '同学换了新鞋，走路时有声音。你低头看了看自己的，鞋头已经开过一次线。', type: 'event', effects: { happiness: -1 } }) }
+];
+
 // ---------------- Random events ----------------
 const EVENTS=[
  {id:'school_praise',age:[7,14],weight:1,cond:l=>(l.school?.basicProgress||0)>0||!!(l.school?.program&&!l.school.program.paused),build:l=>({title:'老师多看了你一眼',text:'作业本上多了一行字：“你比昨天写得更好。”',type:'warm',options:[
@@ -598,6 +648,12 @@ const EVENTS=[
   {key:'write',label:'写在纸上收好',description:'放在他们找得到的地方，没有说破。',effects:{happiness:3,knowledge:2}},
   {key:'later',label:'再等等，还不急',description:'日子还长，这句话先留在心里。',effects:{happiness:1}}]})},
 ];
+// expand country culture sets into pool entries, keyed per country
+CULTURE_EVENTS && Object.entries(CULTURE_EVENTS).forEach(([cid, list]) => list.forEach((c, i) => EVENTS.push({
+ id: `cul_${cid}_${i}`, age: c.age, weight: .45, cond: l => l.country?.id === cid,
+ build: () => ({ title: c.title, text: c.text, type: c.type, effects: (() => { const out = { ...c.effects }; if (typeof out.cash === 'string') out.cash = out.cash; return out; })() })
+})));
+ENVY_EVENTS.forEach(e => EVENTS.push(e));
 const EVENT_BY_ID=Object.fromEntries(EVENTS.map(e=>[e.id,e]));
 
 function maybeEvent(life){

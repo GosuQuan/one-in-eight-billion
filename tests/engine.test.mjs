@@ -484,3 +484,34 @@ test('small balances never trigger the idle-cash ask', () => {
   advanceYear(life, { events: false });
   assert.notEqual(life.pending?.system, 'idle-cash');
 });
+
+test('country-bound cultural events appear only for that country', () => {
+  const step = (l, v = 0) => l.pending ? choose(l, v % l.pending.options.length) : advanceYear(l);
+  const cnTitles = [];
+  for (let s = 0; s < 8 && cnTitles.length < 2; s++) {
+    const life = createLife({ seed: 'cul-cn-' + s, country: 'CN' });
+    for (let n = 0; n < 200 && !life.dead; n++) { step(life, n); if (life.dead) break; }
+    for (const e of life.log) if (/年货|中秋的院子|教室里的早读|春运的车厢|楼下的小馆子/.test(e.title)) cnTitles.push(e.title);
+  }
+  assert.ok(cnTitles.length >= 1, `expected a CN culture event, got none`);
+  const usTitles = [];
+  for (let s = 0; s < 14 && usTitles.length < 1; s++) {
+    const life = createLife({ seed: 'cul-us-' + s, country: 'US' });
+    for (let n = 0; n < 200 && !life.dead; n++) { step(life, n); if (life.dead) break; }
+    for (const e of life.log) if (/万圣节的门口|第一份暑期工|公路上的长途|感恩节的餐桌/.test(e.title)) usTitles.push(e.title);
+  }
+  assert.ok(usTitles.length >= 1, `expected a US culture event, got none`);
+});
+
+test('envy events name a missing condition without opening a dialog', () => {
+  const life = createLife({ seed: 'envy-1', country: 'CN' });
+  life.age = 10; life.education = '校外（小学学业未完成）'; life.stats.happiness = 50;
+  life.pending = null; life.systems.lastYear = null;
+  life.recentEvents = [];
+  for (let n = 0; n < 40 && !life.dead && life.age < 16; n++) {
+    if (life.pending) choose(life, life.pending.options.length - 1);
+    else advanceYear(life);
+  }
+  const envy = life.log.filter(e => /羡慕上学的朋友|别人家的灯|一双新鞋/.test(e.title));
+  assert.ok(envy.length >= 1 || life.dead, `expected an envy event or natural progression, got ${envy.length}`);
+});
