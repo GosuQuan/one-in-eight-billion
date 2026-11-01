@@ -763,6 +763,23 @@ if(!life.pending){
  p.job=p.dead?'人生已结束':age<18?'学生':age>=65?'退休':age>=22?'在自己的城市工作':'初入社会';
  if(age>=18&&age>=(p.milestoneAge||10)){p.milestoneAge=(p.milestoneAge||10)+10;log(life,`${p.name}的十年`,`${p.name}今年${p.age}岁，出身${p.band || '普通'}人家，${p.path}。你的${age}岁：${['还在写','正翻到新的一页','故事过了一半还没完'][age%3]}。这是同一秒起跑的另一条人生，不是排行榜。`,'world');}
 }
+ if(!life.dead&&options.events!==false){
+  const month=['三月','六月','九月','十一月'][life.age%4];
+  const pool=CULTURE_EVENTS[life.country?.id]||[];
+  const busyThisAge=life.log.some(l=>l.age===life.age&&(l.type==='warm'||l.type==='family'));
+  const fitting=pool.filter(c=>life.age>=c.age[0]&&life.age<=c.age[1]&&c.title!==life.systems.lastCul);
+  if(!busyThisAge&&fitting.length){
+   const c=fitting[(life.age+life.birthYear+Math.floor((life.systems.culIdx=(life.systems.culIdx||0)+1)*7))%fitting.length];
+   life.systems.lastCul=c.title;
+   log(life,`${month} · ${c.title}`,c.text,c.type);
+   if(c.effects)applyEffects(life,c.effects);
+  }else if(!busyThisAge&&life.age>=3){
+   const beats=['楼下桂花开了，走过去时带了一身香。','傍晚的菜市场比白天热闹，你帮邻居挑了两个熟透的。','连着几天好天气，被子晒出了太阳的味道。','第一场冷空气来的那天，你翻出了厚衣服。'];
+   const avail=beats.filter(b=>b!==life.systems.lastBeat);const beat=avail[life.age%avail.length];
+   life.systems.lastBeat=beat;
+   log(life,`${month}的一天`,beat,'warm');
+  }
+ }
  life.netWorthHistory.push({age,value:netWorth(life)});
  if(deathCheck(life))return life;
  if(options.events!==false){

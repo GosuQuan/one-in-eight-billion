@@ -533,3 +533,23 @@ test('cause of death follows the age band and how life was lived', () => {
   advanceYear(old, { events: false });
   if (old.dead) assert.match(old.deathCause, /睡梦中安静地离开|身体逐渐衰老/);
 });
+
+test('each year gains one ambient mid-year line, varied and never repeated back-to-back', () => {
+  const life = createLife({ seed: 'inyear-1', country: 'CN' });
+  for (let n = 0; n < 90 && !life.dead; n++) {
+    if (life.pending) choose(life, life.pending.options.length - 1);
+    else advanceYear(life);
+    if (life.dead) break;
+  }
+  const ambient = life.log.filter(e => /^(三月|六月|九月|十一月)/.test(e.title));
+  assert.ok(ambient.length >= 15, `expected ambient lines across a life, got ${ambient.length}`);
+  for (let i = 1; i < ambient.length; i++) {
+    const strip = s => s.replace(/^(三月|六月|九月|十一月)( · |的一天)/, '');
+    const prev = ambient[i - 1].text.slice(0, 24);
+    const cur = ambient[i].text.slice(0, 24);
+    assert.notEqual(prev, cur, `back-to-back same line: ${strip(ambient[i-1].title)} then ${strip(ambient[i].title)}`);
+  }
+  // months rotate — the year reads as passing time, not a single lump
+  const months = new Set(ambient.map(e => e.title.slice(0, 2)));
+  assert.ok(months.size >= 3, `months should rotate, got ${[...months].join(',')}`);
+});
