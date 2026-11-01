@@ -437,3 +437,24 @@ test('random events no longer pile up after quiet stretches', () => {
   // no assertion on firing, just must not crash and stay consistent
   assert.ok(l.age === 31);
 });
+
+test('opportunity dialogs state the in-game odds', () => {
+  const l = adult('odds-1');
+  l.age = 30; l.pending = null; l.systems.lastYear = null; l.systems.lastOpportunityAge = -99;
+  let seen = false;
+  for (let y = 0; y < 40 && !seen; y++) {
+    l.age++; l.pending = null; l.systems.lastYear = null;
+    systemsYear(l);
+    if (l.pending?.system === 'opportunity') {
+      const kind = l.pending.offerKind;
+      if (kind !== 'local' && kind !== 'remote') { systemChoice(l, l.pending, l.pending.options.length - 1); continue; }
+      seen = true;
+      const text = l.pending.text;
+      assert.match(text, /录用机会约 \d+%/, `odds shown in: ${text.slice(0, 80)}`);
+      const pct = Number(text.match(/录用机会约 (\d+)%/)[1]);
+      assert.ok(pct >= 10 && pct <= 90, `odds in sane band: ${pct}`);
+    }
+    if (l.pending) systemChoice(l, l.pending, l.pending.options.length - 1);
+  }
+  assert.ok(seen, 'an opportunity appeared');
+});

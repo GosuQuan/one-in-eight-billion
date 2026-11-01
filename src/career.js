@@ -27,6 +27,10 @@ export function localIncome(l, kind, country = l.country) {
  const gdp = country?.gdp || l.country?.gdp || 1;
  return Math.max(0, Math.round(gdp * spec.factor * (1 + edu * .06) * (1 + exp * .018) * focus * interest));
 }
+export function jobOdds(l, kind, hasRef = false) {
+  const o = JOBS[kind] || JOBS.office;
+  return Math.min(.86, o.chance + (l.stats.knowledge || 0) * .002 + (l.stats.social || 0) * .001 + (l.focus === 'work' ? .08 : 0) + (kind === 'promotion' ? Math.min(.28, (l.careerYears || 0) * .02) : 0) + (hasRef ? .12 : 0));
+}
 export function careerOptions(l) {
  const r = rank[l.school?.credential] ?? 0;
  const fulltime = !!(l.school?.program && !l.school.program.paused && ['apply-university', 'apply-masters', 'apply-high', 'apply-vocational'].includes(l.school.program.id));

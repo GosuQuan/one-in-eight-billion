@@ -1,6 +1,6 @@
 // Original, serializable life systems. Monetary figures are illustrative PPP units.
 import { COUNTRIES } from './engine.js';
-import { inferKind, localIncome, careerOptions } from './career.js';
+import { inferKind, localIncome, careerOptions, jobOdds } from './career.js';
 import { initLived, livedYear, livedChoice, askChild, gateNewLocalJob, activeReference } from './lived.js';
 
 const clamp = n => Math.max(0, Math.min(100, Number(n) || 0));
@@ -645,11 +645,11 @@ function hearOpportunity(l) {
   const notes = [];
   if (abroadNow && !livedNow.fluent) notes.push('当地语言还不熟，面试可能因此停住');
   if (abroadNow && (livedNow.unrecognizedUntil || 0) >= l.age && jobKind !== 'apprentice') notes.push('学历在这里还没被承认，要学历的职位会直接被挡下');
-  pending(l, 'opportunity', '有人提起一个本地的位置', `在${l.country.name}，以你的学历和${l.careerYears || 0}年经验，这份工作不一定录用。若做成，年收入大约${preview}（游戏购买力单位），按这里的物价计算。${notes.length ? notes.join('。') + '。' : ''}`, [option('try', '去试试', '花时间面试，可能没有回音。'), option('skip', '先不接', '消息会过去，你留在现在的状态。')], { offerKind: 'local', jobKind });
+  pending(l, 'opportunity', '有人提起一个本地的位置', `在${l.country.name}，以你的学历和${l.careerYears || 0}年经验，游戏里的录用机会约 ${Math.round(jobOdds(l, jobKind, !!activeReference(l)) * 100)}%。若做成，年收入大约${preview}（游戏购买力单位），按这里的物价计算。${notes.length ? notes.join('。') + '。' : ''}`, [option('try', '去试试', '花时间面试，可能没有回音。'), option('skip', '先不接', '消息会过去，你留在现在的状态。')], { offerKind: 'local', jobKind });
  } else if (kind === 'raise') {
   pending(l, 'opportunity', '主管提起你的名字', `你在这里做了${l.careerYears || 0}年。晋升不看你想不想，看他们认不认。没通过就留在原岗位。`, [option('try', '参加评估', '可能被拒绝。'), option('skip', '当作没听见', '岗位维持原样。')], { offerKind: 'raise' });
  } else if (kind === 'remote') {
-  pending(l, 'opportunity', '一份可以不坐在办公室的工作', `申请可能失败。若做成，以后换国家这份收入还在，开销仍按你住的地方算。`, [option('try', '去申请', '失败就还是现在的工作。'), option('skip', '先不申请', '机会会过去。')], { offerKind: 'remote' });
+  pending(l, 'opportunity', '一份可以不坐在办公室的工作', `游戏里的录用机会约 ${Math.round(jobOdds(l, 'remote') * 100)}%。若做成，以后换国家这份收入还在，开销仍按你住的地方算。`, [option('try', '去申请', '失败就还是现在的工作。'), option('skip', '先不申请', '机会会过去。')], { offerKind: 'remote' });
  } else if (kind === 'pr') {
   pending(l, 'opportunity', `可以申请在${l.country.name}长期留下`, `你已住了${l.age - r.abroadSince}年，身份仍是临时的。申请费不退，可能被拒，被拒后三年不能再申。`, [option('try', '递交申请', '花钱，结果不确定。'), option('skip', '以后再说', '继续临时居留。')], { offerKind: 'pr' });
  } else if (kind === 'home-offer') {
