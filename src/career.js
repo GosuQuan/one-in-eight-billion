@@ -66,7 +66,7 @@ export function careerAction(l, id) {
   else { l.employerGdp = null; l.employerCountryId = l.country.id; }
   l.income = localIncome(l, id, l.remote ? { gdp: l.employerGdp } : l.country);
  }
- record(l, id === 'promotion' ? '名字出现在晋升名单上' : '收到录用通知', `你现在是${l.job}，年收入${l.income}，按${l.remote ? '雇主所在地' : l.country.name}的物价、你的学历和${l.careerYears || 0}年经验计算。${ref ? `${ref.name}的名字在材料上，这句推荐到此用掉。` : ''}以后仍可能失业，换地方时收入和开销会重算。`);
+ record(l, id === 'promotion' ? '名字出现在晋升名单上' : '收到录用通知', `你现在是${l.job}，年收入${l.income}（游戏购买力单位），按${l.remote ? '雇主所在地' : l.country.name}的物价、你的学历和${l.careerYears || 0}年经验计算。${ref ? `${ref.name}的名字在材料上，这句推荐到此用掉。` : ''}以后仍可能失业，换地方时收入和开销会重算。`);
   if (ref) l.lived.reference = null;
  return { ok: true, message: `成为${l.job}，年收入${l.income}` };
 }

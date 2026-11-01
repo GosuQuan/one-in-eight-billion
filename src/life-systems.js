@@ -99,10 +99,10 @@ function arriveWork(l, destination, originGdp, mode) {
   l.income = localIncome(l, kind, destination);
   const cheaper = destination.gdp < originGdp * .75, richer = destination.gdp > originGdp * 1.25;
   stats(l, cheaper ? { happiness: 6, knowledge: 2 } : richer ? { happiness: -3, knowledge: 3 } : { knowledge: 1 });
-  log(l, cheaper ? '到了消费更低的地方' : '收入和开销改按这里计算', `年收入现在是${l.income}，按${destination.name}的物价重算。日常开销也改按这里，不再沿用原来的账单。${cheaper ? '消费没那么高，收入通常会降下来，日子却松一点。' : richer ? '收入有机会更高，房租和日常也跟着涨。' : ''}`, 'work');
+  log(l, cheaper ? '到了消费更低的地方' : '收入和开销改按这里计算', `年收入现在是${l.income}（游戏购买力单位，已按${destination.name}的物价重算）。日常开销也改按这里，不再沿用原来的账单。${cheaper ? '消费没那么高，收入通常会降下来，日子却松一点。' : richer ? '收入有机会更高，房租和日常也跟着涨。' : ''}`, 'work');
  } else if (l.remote) {
   if (destination.gdp < originGdp * .75) stats(l, { happiness: 5 });
-  log(l, '远程收入还在', `工作仍按原雇主那边计算，年收入${l.income}。你住在${destination.name}，吃饭、房租和账单改按这里。`, 'work');
+  log(l, '远程收入还在', `工作仍按原雇主那边计算，年收入${l.income}（游戏购买力单位）。你住在${destination.name}，吃饭、房租和账单改按这里。`, 'work');
  } else if ((l.income || 0) > 0 || (l.job && !['待业', '尚未工作', '学生', '退休'].includes(l.job))) {
   l.income = 0; l.job = '待业'; l.jobKind = null; l.remote = false;
   log(l, '工作没有一起过来', `你到了${destination.name}。开销按这里计算，但这份工作不能远程，收入先归零。${l.careerYears || 0}年经验还在，要等当地的机会。`, 'work');
@@ -403,7 +403,7 @@ export function systemChoice(l, p, index) {
    } else if (kind === 'remote') {
     if (!chance(l, .32 + (l.stats.knowledge || 0) * .002)) { log(l, '远程岗位没你', '对方要的经验和时区你暂时对不上。', 'work'); break; }
     l.remote = true; l.employerGdp = l.country.gdp; l.employerCountryId = l.country.id; l.jobKind = 'remote'; l.job = '远程职员'; l.retired = false; l.income = localIncome(l, 'remote');
-    log(l, '做成了一份远程工作', `年收入${l.income}，按现在雇主所在的物价计算。以后换国家，这份收入还在，开销按你住的地方算。`, 'work');
+    log(l, '做成了一份远程工作', `年收入${l.income}（游戏购买力单位，按雇主所在地计算）。以后换国家，这份收入还在，开销按你住的地方算。`, 'work');
    } else if (kind === 'pr') tryResidency(l);
    else if (kind === 'home-offer') returnHome(l, 'transfer');
    else if (kind === 'abroad') move(l, p.countryId, false, 'transfer');
@@ -644,7 +644,7 @@ function hearOpportunity(l) {
   const notes = [];
   if (abroadNow && !livedNow.fluent) notes.push('当地语言还不熟，面试可能因此停住');
   if (abroadNow && (livedNow.unrecognizedUntil || 0) >= l.age && jobKind !== 'apprentice') notes.push('学历在这里还没被承认，要学历的职位会直接被挡下');
-  pending(l, 'opportunity', '有人提起一个本地的位置', `在${l.country.name}，以你的学历和${l.careerYears || 0}年经验，这份工作不一定录用。若做成，年收入大约${preview}，按这里的物价计算。${notes.length ? notes.join('。') + '。' : ''}`, [option('try', '去试试', '花时间面试，可能没有回音。'), option('skip', '先不接', '消息会过去，你留在现在的状态。')], { offerKind: 'local', jobKind });
+  pending(l, 'opportunity', '有人提起一个本地的位置', `在${l.country.name}，以你的学历和${l.careerYears || 0}年经验，这份工作不一定录用。若做成，年收入大约${preview}（游戏购买力单位），按这里的物价计算。${notes.length ? notes.join('。') + '。' : ''}`, [option('try', '去试试', '花时间面试，可能没有回音。'), option('skip', '先不接', '消息会过去，你留在现在的状态。')], { offerKind: 'local', jobKind });
  } else if (kind === 'raise') {
   pending(l, 'opportunity', '主管提起你的名字', `你在这里做了${l.careerYears || 0}年。晋升不看你想不想，看他们认不认。没通过就留在原岗位。`, [option('try', '参加评估', '可能被拒绝。'), option('skip', '当作没听见', '岗位维持原样。')], { offerKind: 'raise' });
  } else if (kind === 'remote') {
