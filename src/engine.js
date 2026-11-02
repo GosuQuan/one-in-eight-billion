@@ -561,7 +561,7 @@ const ENVY_EVENTS = [
 
 // ---------------- Random events ----------------
 const EVENTS=[
- {id:'school_praise',age:[7,14],weight:1,cond:l=>(l.school?.basicProgress||0)>0||!!(l.school?.program&&!l.school.program.paused),build:l=>({title:'老师多看了你一眼',text:'作业本上多了一行字：“你比昨天写得更好。”',type:'warm',options:[
+ {id:'school_praise',age:[7,14],weight:1,mini:true,cond:l=>(l.school?.basicProgress||0)>0||!!(l.school?.program&&!l.school.program.paused),build:l=>({title:'老师多看了你一眼',text:'作业本上多了一行字：“你比昨天写得更好。”',type:'warm',options:[
   {key:'study',label:'把那句话记在心里',description:'认真对待下一次作业。',effects:{knowledge:6,happiness:2}},
   {key:'play',label:'和朋友去操场',description:'把下午留给奔跑和笑声。',effects:{happiness:6,social:4}}]})},
  {id:'bully',age:[8,15],weight:.8,cond:()=>true,build:l=>({title:'走廊尽头的声音',text:`有人反复拿你的口音开玩笑。${temperamentLead(l)==='grit'?'你站住了，直直地看着对方。':temperamentLead(l)==='cur'?'你在想他们为什么只笑你的口音。':temperamentLead(l)==='act'?'你攥紧了书包带子，手心出了汗。':'你站在走廊尽头，不知道要不要回头。'}`,type:'bad',options:[
@@ -616,7 +616,7 @@ const EVENTS=[
   {key:'transfer',label:'按对方说的做',description:'你很担心账户真的出事。',effects:{cash:-Math.min(Math.round(l.country.gdp*.35),Math.max(Math.round(l.country.gdp*.05),Math.round(l.money*.25))),happiness:-6}},
   {key:'hangup',label:'挂断并打官方电话',description:'先核实，再决定。',effects:{knowledge:2,happiness:1}},
   {key:'report',label:'报警并提醒家人',description:'让这件事停在今天。',effects:{social:2,happiness:2}}]})},
- {id:'wedding',age:[20,50],weight:.7,cond:l=>l.age>=20,build:l=>({title:'一张婚礼请柬',text:'老朋友要结婚了。请柬上写着你的名字，地点在另一座城市。',type:'event',options:[
+ {id:'wedding',age:[20,50],weight:.7,mini:true,cond:l=>l.age>=20,build:l=>({title:'一张婚礼请柬',text:'老朋友要结婚了。请柬上写着你的名字，地点在另一座城市。',type:'event',options:[
   {key:'go',label:'去参加，随一份礼',description:'见见旧朋友，也送上祝福。',effects:{cash:'-gdp:.08',social:5,happiness:4}},
   {key:'decline',label:'礼到人不到',description:'最近实在走不开。',effects:{cash:'-gdp:.03',social:-1}}]})},
  {id:'rent_rise',age:[22,60],weight:.5,cond:l=>!l.house,build:l=>({title:'房东发来的消息',text:'房租下个月要涨。房东说附近都这个价，你可以考虑，也可以搬。',type:'event',options:[
