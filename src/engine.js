@@ -697,6 +697,16 @@ EVENTS.push({id:'early_marriage_ask',age:[14,17],weight:.9,cond:l=>['NG','IN','P
    {key:'refuse',label:'说自己要继续读书',description:'家里可能不高兴，但这门亲事会就此打住。',effects:{knowledge:4,happiness:-3,social:-2}},
    {key:'delay',label:'说再等两年',description:'把话先接住，往后拖。',effects:{happiness:-1}},
    {key:'hear',label:'先见一面听听',description:'见一面不代表答应，但话会传开。',effects:{happiness:-2,social:2}}]}}});
+EVENTS.push(
+ {id:'sm_oldfriend',age:[30,70],weight:.5,mini:true,cond:l=>!l.systems?.smOldFriend,title:'旧友的消息',type:'event',build:l=>{
+  l.systems.smOldFriend=(l.systems.smOldFriend||0)+1;
+  return{title:'旧友的消息',text:'一个很久没联系的朋友发来消息，说想见一面。',type:'event',options:[
+   {key:'meet',label:'约个时间见一面',description:'可能聊得挺好，也可能发现彼此已经没什么可说的。',effects:{happiness:3,social:4}},
+   {key:'later',label:'说最近太忙',description:'消息停在已读，关系慢慢淡下去。',effects:{happiness:-1,social:-2}}]};}},
+ {id:'sm_lostitem',age:[12,60],weight:.45,mini:true,cond:()=>true,type:'event',build:l=>({title:'捡到一件东西',text:'你在路边捡到一件不算贵重但有主人的东西。',type:'event',options:[
+   {key:'find_owner',label:'想办法找到失主',description:'多走几步，可能有人正着急。',effects:{social:3,happiness:2}},
+   {key:'keep',label:'带回家',description:'没有人看见。',effects:{happiness:-1}}]})},
+);
 const EVENT_BY_ID=Object.fromEntries(EVENTS.map(e=>[e.id,e]));
 
 function maybeEvent(life){
