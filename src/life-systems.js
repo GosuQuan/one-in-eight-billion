@@ -1,7 +1,8 @@
 // Original, serializable life systems. Monetary figures are illustrative PPP units.
 import { COUNTRIES } from './engine.js';
-import { inferKind, localIncome, careerOptions } from './career.js';
-import { tr, label } from './i18n.js';
+import { inferKind, localIncome, careerOptions, jobOdds } from './career.js';
+import { initLived, livedYear, livedChoice, askChild, gateNewLocalJob, activeReference } from './lived.js';
+import { tr, label, logSource } from './i18n.js';
 import { personName } from './names.js';
 import { familyCovers } from './finance.js';
 
@@ -14,11 +15,11 @@ function roll(l) { l.randomState = (l.randomState + 0x6D2B79F5) >>> 0; let t = l
 const pick = (l, xs) => xs[Math.floor(roll(l) * xs.length)];
 const chance = (l, p) => roll(l) < p;
 const pickWeighted = (l, xs) => { const total = xs.reduce((sum, x) => sum + (x.w || 1), 0); let n = roll(l) * total; for (const x of xs) { n -= (x.w || 1); if (n < 0) return x; } return xs.at(-1); };
-const log = (l, title, text, type = 'family') => l.log.push({ age: l.age, year: yearOf(l), title, text, type });
+const log = (l, title, text, type = 'family') => l.log.push({ age: l.age, year: yearOf(l), title, text, type, ...logSource(title, text) });
 function stats(l, effects) { for (const [k, v] of Object.entries(effects)) l.stats[k] = clamp(l.stats[k] + v); }
 function spend(l, n) { n = Math.max(0, Math.round(n)); const paid = Math.min(l.money, n); l.money -= paid; if (l.age < 18) familyCovers(l, n - paid); else l.debt = (l.debt || 0) + n - paid; return n; }
 function medicalBill(l, amount) { return spend(l, amount * (l.insurance ? .3 : 1)); }
-function action(l, type, text, from = '', to = '') { l.systems.actionSequence++; l.sceneAction = { id: `scene-${l.age}-${l.systems.actionSequence}`, type, age: l.age, text, from, to }; }
+function action(l, type, text, from = '', to = '') { l.systems.actionSequence++; l.sceneAction = { id: `scene-${l.age}-${l.systems.actionSequence}`, type, age: l.age, text, from, to }; l.systems.scenes ||= []; l.systems.scenes.push({ age: l.age, type, text, from, to, place: l.country?.name || '', city: l.systems.residence?.city || '' }); if (l.systems.scenes.length > 16) l.systems.scenes.shift(); }
 const option = (key, label, description = '') => ({ key, label, description });
 function pending(l, system, title, text, options, context = {}) { l.pending = { kind: 'system', system, title, text, options, ...context }; }
 function offer(l, ...args) { if (!l.pending) pending(l, ...args); }
@@ -45,6 +46,7 @@ export function initSystems(l) {
  for (let i = 0; i < l.friends.length; i++) { const f = l.friends[i]; f.id ??= `friend-${i}`; f.bond ??= 50; f.countryId ??= r.countryId; f.metThrough ??= tr('旧日相识'); }
  if (alive(l.partner)) { l.partner.bond ??= 60; l.partner.countryId ??= r.familyCountryId; l.partner.distanceYears ??= 0; }
  for (let i = 0; i < l.children.length; i++) { const c = l.children[i]; c.id ??= `child-${c.birthYear ?? yearOf(l) - (c.age || 0)}-${i}`; c.bond ??= 70; c.development ??= 50; }
+ initLived(l);
  return l;
 }
 function grandparents(l) { const r = l.systems.residence; return r.countryId === (r.parentsCountryId || r.homeCountry) ? [l.family.mother, l.family.father].filter(alive) : []; }
@@ -81,15 +83,21 @@ function fertilityBlock(l) {
 function arriveWork(l, destination, originGdp, mode) {
  if (mode === 'transfer') {
   const kind = l.jobKind || inferKind(l.job);
+  const gate = gateNewLocalJob(l, kind);
+  if (!gate.ok) {
+   l.income = 0; l.job = '待业'; l.jobKind = null; l.remote = false; l.employerGdp = null; l.employerCountryId = destination.id;
+   log(l, gate.title, tr('{text}人已经在{name}，开销按这里算。', {text: gate.text, name: destination.name}), 'work');
+   return;
+  }
   l.remote = false; l.employerGdp = null; l.employerCountryId = destination.id; l.jobKind = kind;
   if (!l.job || ['待业', '尚未工作', '学生'].includes(l.job)) l.job = '本地职员';
   l.income = localIncome(l, kind, destination);
   const cheaper = destination.gdp < originGdp * .75, richer = destination.gdp > originGdp * 1.25;
   stats(l, cheaper ? { happiness: 6, knowledge: 2 } : richer ? { happiness: -3, knowledge: 3 } : { knowledge: 1 });
-  log(l, cheaper ? tr('到了消费更低的地方') : tr('收入和开销改按这里计算'), tr('年收入现在是{income}，按{name}的物价重算。日常开销也改按这里，不再沿用原来的账单。{x}', {income: l.income, name: destination.name, x: cheaper ? tr('消费没那么高，收入通常会降下来，日子却松一点。') : richer ? tr('收入有机会更高，房租和日常也跟着涨。') : ''}), 'work');
+  log(l, cheaper ? tr('到了消费更低的地方') : tr('收入和开销改按这里计算'), tr('年收入现在是{income}（游戏购买力单位，已按{name}的物价重算）。日常开销也改按这里，不再沿用原来的账单。{x}', {income: l.income, name: destination.name, x: cheaper ? tr('消费没那么高，收入通常会降下来，日子却松一点。') : richer ? tr('收入有机会更高，房租和日常也跟着涨。') : ''}), 'work');
  } else if (l.remote) {
   if (destination.gdp < originGdp * .75) stats(l, { happiness: 5 });
-  log(l, tr('远程收入还在'), tr('工作仍按原雇主那边计算，年收入{income}。你住在{name}，吃饭、房租和账单改按这里。', {income: l.income, name: destination.name}), 'work');
+  log(l, tr('远程收入还在'), tr('工作仍按原雇主那边计算，年收入{income}（游戏购买力单位）。你住在{name}，吃饭、房租和账单改按这里。', {income: l.income, name: destination.name}), 'work');
  } else if ((l.income || 0) > 0 || (l.job && !['待业', '尚未工作', '学生', '退休'].includes(l.job))) {
   l.income = 0; l.job = '待业'; l.jobKind = null; l.remote = false;
   log(l, tr('工作没有一起过来'), tr('你到了{name}。开销按这里计算，但这份工作不能远程，收入先归零。{careerYears}年经验还在，要等当地的机会。', {name: destination.name, careerYears: l.careerYears || 0}), 'work');
@@ -225,7 +233,7 @@ export function systemAction(l, name, payload = {}) {
   s.relationshipActions.contact = l.age; return communicate(l, name === 'relationship-counsel' ? 'counsel' : 'talk'); }
  case 'start-business':
   if (s.business) return result(false, tr('已经有一家企业，可进入经营菜单。'));
-  pending(l, 'business-start', tr('选择创业方向'), tr('先投入启动资金，再承担每年的经营风险；投入不保证回本。'), [option('shop', tr('社区小店'), tr('投入约{gdp}，服务附近居民。', {gdp: Math.round(gdp(l) * .18)})), option('service', tr('技术服务工作室'), tr('投入约{gdp}，承接服务项目。', {gdp: Math.round(gdp(l) * .25)})), option('food', tr('餐饮小馆'), tr('投入约{gdp}，经营日常餐饮。', {gdp: Math.round(gdp(l) * .3)})), option('cancel', tr('暂缓创业'))], { businessName: (payload.name ? String(payload.name).slice(0, 30) : tr('{name}的小事业', {name: l.name})) }); return result(true, tr('请选择行业。'));
+  pending(l, 'business-start', tr('选择创业方向'), tr('只能用手上的存款。还要留下大约当地水平 8% 的生活钱，钱不够就开不了张，也不会因此欠债。开张以后每年仍可能亏。'), [option('shop', tr('社区小店'), tr('投入约{gdp}，服务附近居民。', {gdp: Math.round(gdp(l) * .18)})), option('service', tr('技术服务工作室'), tr('投入约{gdp}，承接服务项目。', {gdp: Math.round(gdp(l) * .25)})), option('food', tr('餐饮小馆'), tr('投入约{gdp}，经营日常餐饮。', {gdp: Math.round(gdp(l) * .3)})), option('cancel', tr('暂缓创业'))], { businessName: (payload.name ? String(payload.name).slice(0, 30) : tr('{name}的小事业', {name: l.name})) }); return result(true, tr('请选择行业。'));
  case 'business-manage':
   if (!s.business) return result(false, tr('目前没有经营中的企业。'));
   pending(l, 'business-manage', s.business.name, tr('行业：{sector}；员工{staff}人；上年净利润{income}。', {sector: s.business.sector, staff: s.business.staff, income: s.business.income}), [option('hire', tr('招聘一名员工'), tr('增加工资成本和服务能力。')), option('market', tr('投入营销'), tr('花费预算争取客户。')), option('expand', tr('扩大经营'), tr('追加资本，增加收益和亏损的幅度。')), option('close', tr('关闭并清算'), tr('收回部分资本，结束年度经营风险。'))]); return result(true, tr('请选择经营安排。'));
@@ -314,6 +322,7 @@ export function systemChoice(l, p, index) {
  case 'relationship':
   if (!alive(l.partner)) break;
   if (key === 'separate') divorceOffer(l);
+  else if (key === 'later') { log(l, tr('和{name}先这样过', {name: l.partner.name}), tr('你没有把这件事摊开。关系还是现在这样，同样的问题不会再自动出现。想谈的时候，可以自己去安排。')); }
   else { s.relationshipActions.contact = l.age; communicate(l, key); } break;
  case 'pet-care':
   if (!s.pet?.alive) break;
@@ -322,7 +331,9 @@ export function systemChoice(l, p, index) {
   else { s.pet.health = clamp(s.pet.health - 15); stats(l, { happiness: -3 }); }
   log(l, tr('{name}的照顾', {name: s.pet.name}), tr('{label}，{name}的健康为{health}。', {label: o.label, name: s.pet.name, health: Math.round(s.pet.health)}), 'pet'); break;
  case 'business-start':
-  if (key !== 'cancel') { const factor = { shop: .18, service: .25, food: .3 }[key]; if (!factor) break; const capital = Math.round(gdp(l) * factor); spend(l, capital); s.business = { name: p.businessName, sector: ({ shop: tr('零售'), service: tr('技术服务'), food: tr('餐饮') })[key], capital, income: 0, level: 1, staff: 0, marketing: 0, foundedAge: l.age }; log(l, tr('自己的事业开张'), tr('{businessName}投入{capital}启动资金，进入{sector}行业。', {businessName: p.businessName, capital, sector: s.business.sector}), 'business'); action(l, 'business', tr('为自己的事业开张')); } break;
+  if (key !== 'cancel') { const factor = { shop: .18, service: .25, food: .3 }[key]; if (!factor) break; const capital = Math.round(gdp(l) * factor); const reserve = Math.round(gdp(l) * .08);
+    if ((l.money || 0) < capital + reserve) { log(l, tr('存款不够开张'), tr('{businessName}至少要{capital}，还得留下大约{reserve}过日子。你现在手上只有{money}。没有开张，也没有因此欠债。', {businessName: p.businessName || tr('这件事'), capital, reserve, money: Math.round(l.money || 0)})); break; }
+    l.money -= capital; s.business = { name: p.businessName, sector: ({ shop: tr('零售'), service: tr('技术服务'), food: tr('餐饮') })[key], capital, income: 0, level: 1, staff: 0, marketing: 0, foundedAge: l.age }; log(l, tr('自己的事业开张'), tr('{businessName}用存款投入{capital}，进入{sector}行业。留下的钱还要过日子。赚不赚得到，要等这一年的账。', {businessName: p.businessName, capital, sector: s.business.sector}), 'business'); action(l, 'business', tr('为自己的事业开张')); } break;
  case 'business-manage': {
   const b = s.business; if (!b) break;
   if (key === 'close') { const recovered = Math.round(b.capital * .4); l.money += recovered; log(l, tr('关上店门'), tr('{name}结束经营，清算收回{recovered}。', {name: b.name, recovered}), 'business'); s.business = null; }
@@ -365,22 +376,29 @@ export function systemChoice(l, p, index) {
   spend(l, gdp(l) * .015); stats(l, { health: -2, happiness: -2 }); log(l, tr('危机中的选择'), tr('面对年度情境，你选择了{label}。钱已经花出去，安全并不因此确定。', {label: o.label}), 'world'); break;
  case 'opportunity': {
    if (key === 'skip' || key === 'cancel') { log(l, tr('让这个消息过去'), tr('你听见了，但没有去追。机会不会在原地等你。')); break; }
+   if ((l.lived?.serviceUntil || 0) >= l.age) { log(l, tr('服役还没结束'), tr('这一年在社区服役，这份工作没有开始。职位和收入都不变。'), 'work'); break; }
    const kind = p.offerKind;
    if (kind === 'local') {
+    const gate = gateNewLocalJob(l, p.jobKind);
+    if (!gate.ok) { stats(l, { happiness: -2 }); log(l, gate.title, tr('{text}你仍是{job}。', {text: gate.text, job: label(l.job)}), 'work'); break; }
     const preview = localIncome(l, p.jobKind);
-    const pass = chance(l, .28 + (l.stats.knowledge || 0) * .002 + Math.min(.2, (l.careerYears || 0) * .02));
-    if (!pass) { stats(l, { happiness: -2 }); log(l, tr('本地的位置没有你'), tr('面试结束了。以你现在的学历和{careerYears}年经验，对方选了别人。你仍是{job}。', {careerYears: l.careerYears || 0, job: label(l.job)}), 'work'); break; }
+    const ref = activeReference(l);
+    const pass = chance(l, Math.min(.86, .28 + (l.stats.knowledge || 0) * .002 + Math.min(.2, (l.careerYears || 0) * .02) + (ref ? .12 : 0)));
+    if (!pass) { stats(l, { happiness: -2 }); log(l, tr('本地的位置没有你'), tr('面试结束了。以你现在的学历和{careerYears}年经验，对方选了别人。{x}你仍是{job}。', {careerYears: l.careerYears || 0, x: ref ? tr('{name}的名字在材料上，这次仍没有录用。推荐留到{until}岁。', {name: ref.name, until: l.lived.reference.until}) : '', job: label(l.job)}), 'work'); break; }
     l.jobKind = p.jobKind; l.remote = false; l.employerGdp = null; l.employerCountryId = l.country.id; l.retired = false;
     l.job = { apprentice: '维修学徒', office: '行政职员', technical: '技术人员', matched: '专业对口岗位' }[p.jobKind] || '本地职员';
-    l.income = preview; log(l, tr('本地录用了你'), tr('年收入{income}，按{name}的物价、学历和经验计算。以后仍可能失业。', {income: l.income, name: l.country.name}), 'work');
+    l.income = preview; if (ref) l.lived.reference = null; log(l, tr('本地录用了你'), tr('年收入{income}，按{name}的物价、学历和经验计算。{x}以后仍可能失业。', {income: l.income, name: l.country.name, x: ref ? tr('{name}的名字在材料上，这句推荐到此用掉。', {name: ref.name}) : ''}), 'work');
    } else if (kind === 'raise') {
-    if (!chance(l, Math.min(.7, .18 + (l.careerYears || 0) * .03 + (l.stats.knowledge || 0) * .002)) || !(l.income > 0)) { log(l, tr('评估没有通过'), tr('你已有{careerYears}年经验，这次名单上没有你。岗位和收入维持原样。', {careerYears: l.careerYears || 0}), 'work'); break; }
+    if ((l.lived?.leaveUntil || 0) >= l.age) { log(l, tr('假还没结束'), tr('{job}还在，育儿假这一年没有升职。收入维持请假后的数字。', {job: label(l.job) || tr('这份工作')}), 'work'); break; }
+     if ((l.lived?.sickUntil || 0) >= l.age) { log(l, tr('病假还没结束'), tr('{job}还在，这一年没有升职。收入维持原样。', {job: label(l.job) || tr('这份工作')}), 'work'); break; }
+     if ((l.lived?.injuryUntil || 0) >= l.age) { log(l, tr('伤还没好'), tr('{job}还在，这一年没有升职。收入维持原样。', {job: label(l.job) || tr('这份工作')}), 'work'); break; }
+     if (!chance(l, Math.min(.7, .18 + (l.careerYears || 0) * .03 + (l.stats.knowledge || 0) * .002)) || !(l.income > 0)) { log(l, tr('评估没有通过'), tr('你已有{careerYears}年经验，这次名单上没有你。岗位和收入维持原样。', {careerYears: l.careerYears || 0}), 'work'); break; }
     l.income = Math.round(l.income * 1.14); l.job = '资深' + String(l.job || '职员').replace(/^资深/, '');
     log(l, tr('晋升名单上有你'), tr('年收入调整为{income}。这是在{name}的物价上加的，不是一张永远有效的证明。', {income: l.income, name: l.country.name}), 'work');
    } else if (kind === 'remote') {
     if (!chance(l, .32 + (l.stats.knowledge || 0) * .002)) { log(l, tr('远程岗位没你'), tr('对方要的经验和时区你暂时对不上。'), 'work'); break; }
     l.remote = true; l.employerGdp = l.country.gdp; l.employerCountryId = l.country.id; l.jobKind = 'remote'; l.job = '远程职员'; l.retired = false; l.income = localIncome(l, 'remote');
-    log(l, tr('做成了一份远程工作'), tr('年收入{income}，按现在雇主所在的物价计算。以后换国家，这份收入还在，开销按你住的地方算。', {income: l.income}), 'work');
+    log(l, tr('做成了一份远程工作'), tr('年收入{income}（游戏购买力单位，按雇主所在地计算）。以后换国家，这份收入还在，开销按你住的地方算。', {income: l.income}), 'work');
    } else if (kind === 'pr') tryResidency(l);
    else if (kind === 'home-offer') returnHome(l, 'transfer');
    else if (kind === 'abroad') move(l, p.countryId, false, 'transfer');
@@ -388,6 +406,8 @@ export function systemChoice(l, p, index) {
   }
   case 'thread-start': startThread(l, p, key); break;
   case 'thread': resolveThread(l, p, key); break;
+  case 'lived': livedChoice(l, key); break;
+  case 'idle-cash': if (key === 'mix') { l.systems.idleOpenPanel = true; log(l, tr('打开投资面板'), tr('配置由你自己决定。基金、债券、股票或房产，都在同一个面板里。'), 'finance'); } else log(l, tr('钱先放在手上'), tr('不配置也不亏。想动的时候，从「投资」进入。'), 'finance'); break;
   default: l.pending = p; return false;
  }
  return true;
@@ -535,7 +555,15 @@ export function systemsYear(l, options = {}) {
   stats(l, { happiness: 1, social: 1, health: care.mode === 'self' ? -.7 : 0 });
   log(l, tr('{name}又长大了一点', {name: c.name}), tr('{age}岁；{x}照护，费用{annualCost}，家庭收入损失{incomeLoss}。', {age: c.age, x: ({ self: l.name, partner: l.partner?.name, nursery: tr('托育机构'), grandparents: grandparents(l).map(p => p.name).join(tr('、')) })[care.mode], annualCost: care.annualCost, incomeLoss: care.incomeLoss}));
  }
- if (alive(l.partner) && l.partner.bond < 35 && (s.lastRelationshipAge == null || l.age - s.lastRelationshipAge >= 3) && !l.pending) { s.lastRelationshipAge = l.age; offer(l, 'relationship', tr('与{name}的距离', {name: l.partner.name}), tr('争执和沉默让关系变得脆弱，需要共同作出决定。'), [option('talk', tr('认真沟通')), option('counsel', tr('接受伴侣咨询')), option('separate', tr('分开生活'))]); }
+ if (alive(l.partner) && !l.pending) {
+   const name = l.partner.name;
+   if ((l.partner.bond || 0) >= 45) s.relationshipRecovered = name;
+   if (s.relationshipAsked === name && s.relationshipRecovered === name && (l.partner.bond || 0) < 20) { s.relationshipAsked = null; s.relationshipRecovered = null; }
+   if ((l.partner.bond || 0) < 35 && s.relationshipAsked !== name) {
+    s.relationshipAsked = name; s.lastRelationshipAge = l.age;
+    offer(l, 'relationship', tr('与{name}的距离', {name}), tr('争执和沉默让关系变得脆弱。谈一次、去咨询，或者先这样过。先这样过，同样的问题不会再自动出现。'), [option('talk', tr('认真沟通')), option('counsel', tr('接受伴侣咨询')), option('separate', tr('分开生活')), option('later', tr('先这样过'), tr('不花钱，也不分开。想谈的时候自己去安排。'))]);
+   }
+  }
  if (s.pet?.alive) {
   const pet = s.pet; pet.age++; spend(l, gdp(l) * (pet.kind === 'dog' ? .016 : .011)); pet.health = clamp(pet.health - (pet.age > 9 ? 7 : 2)); stats(l, { happiness: 1 });
   if (pet.health <= 0 || pet.age >= (pet.kind === 'dog' ? 17 : 21)) { pet.alive = false; stats(l, { happiness: -7 }); log(l, tr('和小伙伴告别'), tr('{name}在{age}岁离开，你记得一起生活的那些日子。', {name: pet.name, age: pet.age}), 'pet'); }
@@ -559,11 +587,17 @@ export function systemsYear(l, options = {}) {
    const separated = !familyHere && (alive(l.partner) || l.children.some(c => alive(c) && c.age < 18 && c.supportPayer !== 'player'));
    offer(l, 'migration-review', tr('在{name}的第{years}年', {name: l.country.name, years}), familyHere ? tr('你和家人都在{name}，已经{years}年。身份仍是{x}，留下不会自动变成永居。回{name2}会结束这段居住；非远程工作不会跟回去。', {name: l.country.name, years, x: s.residency === 'permanent' ? tr('长期居留') : tr('临时居留'), name2: home?.name || tr('原居国')}) : tr('你在{name}，家人在{name2}。分开已经{years}年。团聚要另付搬迁费，也不会自动办成。', {name: l.country.name, name2: country(r.familyCountryId)?.name || tr('原居国'), years}), [option('stay', tr('继续按当前身份住下去'), tr('不会自动获得永居。开销仍按这里计算。')), ...(separated ? [option('reunite', tr('接家人团聚'), tr('需要搬迁费和生活储备，家人到齐以后才同住。'))] : []), ...(s.residency !== 'permanent' && years >= 4 ? [option('pr', tr('申请长期居留'), tr('申请费不退。可能被拒，被拒后三年不能再申。'))] : []), option('home', tr('回原居国生活'), tr('非远程的工作不会跟回去，收入会先归零，开销改按原居国。'))]);
   }
+ if (options.events !== false && !l.pending) askChild(l);
+ if (options.events !== false && !l.pending && l.age >= 28 && l.age <= 44 && l.age % 5 === 1 && !alive(l.partner) && s.lastSoloAsk !== l.age) {
+  s.lastSoloAsk = l.age;
+  systemAction(l, 'seek-partner');
+ }
  if (options.events !== false) { hometownEvents(l); intimateEvents(l); }
  s.world = worldFor(yearOf(l));
- if (['war', 'crisis'].includes(s.world.kind) && l.age >= 18) { spend(l, gdp(l) * .025); stats(l, { happiness: -2, health: -1 }); if (options.events !== false) offer(l, 'world-crisis', s.world.title, s.world.detail, s.world.kind==='war' ? [option('stay', tr('留守并准备物资')), option('shelter', tr('暂时避难')), option('migrate', tr('考虑移民'))] : [option('stay', tr('缩减开支，准备应急物资')), option('shelter', tr('动用应急预算渡过危机')), option('migrate', tr('寻找其他地方的机会'))]); }
+ if (['war', 'crisis'].includes(s.world.kind) && l.age >= 18) { const levy = Math.round(gdp(l) * .025); const stock = l.lived?.prepared; let covered = 0; if (stock && l.age <= (stock.until || 0) && (stock.cover || 0) > 0) { covered = Math.min(stock.cover, levy); stock.cover -= covered; stock.usedAge = l.age; } spend(l, levy - covered); stats(l, { happiness: covered ? -1 : -2, health: -1 }); if (covered) log(l, tr('预备顶上了这一年'), tr('先前留的{covered}顶上了应急开支。紧张的年份还在，灾害没有取消，工作也不会因此出现。', {covered}), 'world'); if (options.events !== false) offer(l, 'world-crisis', s.world.title, s.world.detail, s.world.kind==='war' ? [option('stay', tr('留守并准备物资')), option('shelter', tr('暂时避难')), option('migrate', tr('考虑移民'))] : [option('stay', tr('缩减开支，准备应急物资')), option('shelter', tr('动用应急预算渡过危机')), option('migrate', tr('寻找其他地方的机会'))]); }
  else if (s.world.kind === 'science') stats(l, { health: .5 });
  if (options.events !== false && !l.pending) hearOpportunity(l);
+ livedYear(l, options);
  return l;
 }
 
@@ -578,6 +612,7 @@ function tryResidency(l) {
 }
 function hearOpportunity(l) {
  if (l.pending || l.dead || l.retired || l.age < 18 || l.age > 67) return;
+ if ((l.systems.lastOpportunityAge ?? -99) > l.age - 3) return;
  if (!chance(l, .62)) return;
  const employedNow = (l.income || 0) > 0 && !['待业', '尚未工作', '学生', '退休', '求职中'].includes(l.job || '');
  if (employedNow && chance(l, .12)) {
@@ -596,14 +631,20 @@ function hearOpportunity(l) {
  if (r.abroadSince != null && l.age - r.abroadSince >= 4 && l.systems.residency === 'temporary') kinds.push('pr');
  if (r.abroadSince != null) kinds.push('home-offer');
  const kind = pick(l, kinds);
+ l.systems.lastOpportunityAge = l.age;
  if (kind === 'local') {
   const jobKind = pick(l, localJobs).id;
   const preview = localIncome(l, jobKind);
-  pending(l, 'opportunity', tr('有人提起一个本地的位置'), tr('在{name}，以你的学历和{careerYears}年经验，这份工作不一定录用。若做成，年收入大约{preview}，按这里的物价计算。', {name: l.country.name, careerYears: l.careerYears || 0, preview}), [option('try', tr('去试试'), tr('花时间面试，可能没有回音。')), option('skip', tr('先不接'), tr('消息会过去，你留在现在的状态。'))], { offerKind: 'local', jobKind });
+  const livedNow = l.lived || {};
+  const abroadNow = r.abroadSince != null;
+  const notes = [];
+  if (abroadNow && !livedNow.fluent) notes.push(tr('当地语言还不熟，面试可能因此停住'));
+  if (abroadNow && (livedNow.unrecognizedUntil || 0) >= l.age && jobKind !== 'apprentice') notes.push(tr('学历在这里还没被承认，要学历的职位会直接被挡下'));
+  pending(l, 'opportunity', tr('有人提起一个本地的位置'), tr('在{name}，以你的学历和{careerYears}年经验，游戏里的录用机会约 {jobOdds}%。若做成，年收入大约{preview}（游戏购买力单位），按这里的物价计算。{x}', {name: l.country.name, careerYears: l.careerYears || 0, jobOdds: Math.round(jobOdds(l, jobKind, !!activeReference(l)) * 100), preview, x: notes.length ? notes.join(tr('。')) + tr('。') : ''}), [option('try', tr('去试试'), tr('花时间面试，可能没有回音。')), option('skip', tr('先不接'), tr('消息会过去，你留在现在的状态。'))], { offerKind: 'local', jobKind });
  } else if (kind === 'raise') {
   pending(l, 'opportunity', tr('主管提起你的名字'), tr('你在这里做了{careerYears}年。晋升不看你想不想，看他们认不认。没通过就留在原岗位。', {careerYears: l.careerYears || 0}), [option('try', tr('参加评估'), tr('可能被拒绝。')), option('skip', tr('当作没听见'), tr('岗位维持原样。'))], { offerKind: 'raise' });
  } else if (kind === 'remote') {
-  pending(l, 'opportunity', tr('一份可以不坐在办公室的工作'), tr('申请可能失败。若做成，以后换国家这份收入还在，开销仍按你住的地方算。'), [option('try', tr('去申请'), tr('失败就还是现在的工作。')), option('skip', tr('先不申请'), tr('机会会过去。'))], { offerKind: 'remote' });
+  pending(l, 'opportunity', tr('一份可以不坐在办公室的工作'), tr('游戏里的录用机会约 {jobOdds}%。若做成，以后换国家这份收入还在，开销仍按你住的地方算。', {jobOdds: Math.round(jobOdds(l, 'remote') * 100)}), [option('try', tr('去申请'), tr('失败就还是现在的工作。')), option('skip', tr('先不申请'), tr('机会会过去。'))], { offerKind: 'remote' });
  } else if (kind === 'pr') {
   pending(l, 'opportunity', tr('可以申请在{name}长期留下', {name: l.country.name}), tr('你已住了{age}年，身份仍是临时的。申请费不退，可能被拒，被拒后三年不能再申。', {age: l.age - r.abroadSince}), [option('try', tr('递交申请'), tr('花钱，结果不确定。')), option('skip', tr('以后再说'), tr('继续临时居留。'))], { offerKind: 'pr' });
  } else if (kind === 'home-offer') {
@@ -647,9 +688,14 @@ function threadYear(l) {
 function offerFriendBeat(l, f) {
  const t = f.thread;
  if (f.countryId && f.countryId !== l.country.id) {
+  if (t.shown === 'apart') { t.ended = true; log(l, tr('同样的话不再问第二次'), tr('{name}的近况你已经回应过一次。这条线先收住，人还在原地。', {name: f.name}), 'social'); return; }
+  t.shown = 'apart';
   pending(l, 'thread', tr('{name}还在原来的地方', {name: f.name}), tr('你们因为{metThrough}认识。你已经不住在同一个地方，这条线不会自动跟着你走。', {metThrough: f.metThrough}), [option('write', tr('给{name}写信', {name: f.name}), tr('可能有回音，也可能没有。')), option('letgo', tr('先各自生活'), tr('人还在，故事先停在这里。'))], { friendId: f.id, beat: 'apart' });
   return;
  }
+ const beat = `${t.kind}-${Math.min(t.stage, 3)}`;
+ if (t.shown === beat) { t.ended = true; log(l, tr('同样的话不再问第二次'), tr('{name}这里的事你已经答过一遍。这条线到这里收住。', {name: f.name}), 'social'); return; }
+ t.shown = beat;
  if (t.kind === 'sport') {
   if (t.stage <= 1) pending(l, 'thread', tr('{name}想加练', {name: f.name}), tr('你们从{since}岁起一起运动。{name}说这周还想再练一次。留下会累，也可能受伤；回去，{name}会觉得你不是真的想一起。', {since: t.since, name: f.name}), [option('stay', tr('留下来和{name}练', {name: f.name}), tr('健康和关系都会变，受伤也有可能。')), option('home', tr('先回家'), tr('关系会松一点，故事还没结束。'))], { friendId: f.id, beat: 'sport-1' });
   else if (t.stage === 2) pending(l, 'thread', tr('{name}受伤了', {name: f.name}), tr('{name}训练时扭了脚，问你能不能去看看。去要花一点钱和时间；不去，你们可能就不再约了。', {name: f.name}), [option('visit', tr('去看{name}', {name: f.name}), tr('花钱，关系会靠近。')), option('skip', tr('继续自己练'), tr('你的身体还在进步，这段搭档可能到此为止。'))], { friendId: f.id, beat: 'sport-2' });
@@ -670,6 +716,9 @@ function offerHomeBeat(l, home) {
  const parent = home.role === 'father' ? l.family.father : l.family.mother;
  if (!alive(parent)) { home.ended = true; log(l, tr('{name}不在了', {name: home.name}), tr('你还想接着帮家里，可是那个人已经不在。这条线停在这里。'), 'family'); return; }
  home.name = parent.name;
+ const beat = `home-${Math.min(home.stage, 3)}`;
+ if (home.shown === beat) { home.ended = true; log(l, tr('同样的话不再问第二次'), tr('{name}问过的那句你已经答过。这条线到这里收住。', {name: parent.name}), 'family'); return; }
+ home.shown = beat;
  if (home.stage <= 1) pending(l, 'thread', tr('{name}又提起下午的事', {name: parent.name}), tr('自从{since}岁那个下午，{name}知道你会留下来。现在又问你：这阵子还帮不帮。继续会有一点零用钱，也会占掉你自己的时间。', {since: home.since, name: parent.name}), [option('keep', tr('继续帮{name}', {name: parent.name}), tr('拿到一点钱，关系更近。')), option('own', tr('把下午要回来'), tr('{name}可能理解，也可能不说话。', {name: parent.name}))], { beat: 'home-1' });
  else if (home.stage === 2) {
   const sib = (l.family.siblings || []).find(c => alive(c) && (c.age ?? 0) < 12);
@@ -685,16 +734,16 @@ function startThread(l, p, key) {
   const role = cast.home?.role;
   const parent = role === 'father' ? l.family.father : l.family.mother;
   if (!alive(parent)) { log(l, tr('家里没有人在'), tr('你想留下来，可是这天下午没有人应你。'), 'family'); return; }
-  s.homeThread = { role, name: parent.name, stage: 1, since: l.age, nextAge: l.age + 2, ended: false };
+  s.homeThread = { role, name: parent.name, stage: 1, since: l.age, nextAge: l.age + 4, ended: false };
   parent.bond = clamp((parent.bond ?? 60) + 4);
   const pocket = Math.round(gdp(l) * (l.age >= 12 ? .012 : .004));
   l.money += pocket; stats(l, { happiness: 2, social: 3 });
-  log(l, tr('和{name}过了一个下午', {name: parent.name}), tr('你留下来分担手上的事。{name}把{pocket}塞到你手里。过一阵还会再找你，帮不帮得上要到时候才知道。', {name: parent.name, pocket}), 'family');
+  log(l, tr('和{name}过了一个下午', {name: parent.name}), tr('你留下来分担手上的事。{name}把{pocket}塞到你手里，说是这个月的一点心意。过一阵还会再找你，帮不帮得上要到时候才知道。', {name: parent.name, pocket}), 'family');
   return;
  }
  const f = cast[key === 'sport' ? 'sport' : 'science'];
  if (!f?.name) return;
- f.thread = { kind: key === 'sport' ? 'sport' : 'science', stage: 1, since: l.age, nextAge: l.age + 2, ended: false };
+ f.thread = { kind: key === 'sport' ? 'sport' : 'science', stage: 1, since: l.age, nextAge: l.age + 4, ended: false };
  f.sharedMemory = key === 'sport' ? tr('第一次一起跑到喘不上气') : (l.age >= 12 ? tr('第一天下午一起洗烧杯') : tr('一起把旧书翻到最后一页'));
  f.metThrough = key === 'sport' ? tr('运动队') : (l.age >= 12 ? tr('科学小组') : tr('一起看书'));
  l.friends.push(f); remember(f, l);
@@ -708,7 +757,7 @@ function resolveThread(l, p, key) {
  if (beat === 'apart' && f?.thread) {
   if (key === 'letgo') { f.thread.ended = true; log(l, tr('和{name}先停在这里', {name: f.name}), tr('{name}还在原来的地方。你们没有断掉这个人，只是不再推进这件事。', {name: f.name}), 'social'); return; }
   const reply = chance(l, .6);
-  f.bond = clamp(f.bond + (reply ? 4 : -3)); f.thread.nextAge = l.age + 3; remember(f, l);
+  f.bond = clamp(f.bond + (reply ? 4 : -3)); f.thread.ended = true; remember(f, l);
   log(l, reply ? tr('{name}回信了', {name: f.name}) : tr('信没有回音'), reply ? tr('{name}写了近况。人没有搬到你身边，故事只能隔着距离慢慢继续。', {name: f.name}) : tr('你把信寄给了{name}。这一次没有回音，关系淡了一点。', {name: f.name}), 'social');
   return;
  }
@@ -717,7 +766,7 @@ function resolveThread(l, p, key) {
   const ok = chance(l, Math.min(.8, .42 + (l.stats.knowledge || 0) * .003));
   f.bond = clamp(f.bond + (ok ? 10 : -5)); stats(l, { knowledge: ok ? 6 : 2, happiness: ok ? 3 : -2 });
   f.sharedMemory = ok ? tr('实验做成的那个晚上') : tr('实验失败后互相不说话的走廊');
-  f.thread.stage = 2; f.thread.nextAge = l.age + 2; f.thread.strained = !ok; remember(f, l);
+  f.thread.stage = 2; f.thread.nextAge = l.age + 4; f.thread.strained = !ok; remember(f, l);
   log(l, ok ? tr('和{name}做成了', {name: f.name}) : tr('{name}和你吵了一架', {name: f.name}), ok ? tr('老师看见了你们的结果。{name}说下次还有机会，想继续拉你。', {name: f.name}) : tr('东西没有做出来。{name}埋怨你拖了时间，你也觉得委屈。人还在，后面的机会会更难。', {name: f.name}), 'social');
   return;
  }
@@ -725,7 +774,7 @@ function resolveThread(l, p, key) {
   if (key === 'stop') { f.bond = clamp(f.bond - 4); f.thread.ended = true; remember(f, l); log(l, tr('你拒绝了{name}', {name: f.name}), tr('{name}自己去问了报名的事，没有再拉你。这条线停了。', {name: f.name}), 'social'); return; }
   const fee = Math.round(gdp(l) * .008); spend(l, fee);
   const ok = chance(l, Math.max(.15, .36 + f.bond / 400 - (f.thread.strained ? .15 : 0)));
-  f.thread.stage = 3; f.thread.nextAge = l.age + 2; remember(f, l);
+  f.thread.stage = 3; f.thread.nextAge = l.age + 4; remember(f, l);
   if (ok) { const prize = Math.round(gdp(l) * .02); l.money += prize; f.bond = clamp(f.bond + 8); stats(l, { knowledge: 4, happiness: 4 }); f.sharedMemory = tr('一起拿到名次的那天'); log(l, tr('和{name}一起去了', {name: f.name}), tr('报名费{fee}。你们拿到了一个小名次，带回{prize}。{name}说有人想认识你们。那还不是资格，只是下一次可以去问问。', {fee, prize, name: f.name}), 'social'); }
   else { f.bond = clamp(f.bond - 2); stats(l, { happiness: -2 }); log(l, tr('和{name}没能入选', {name: f.name}), tr('报名费{fee}已经交掉。名单上没有你们。{name}说没关系，但回家的路上话很少。', {fee, name: f.name}), 'social'); }
   return;
@@ -741,17 +790,17 @@ function resolveThread(l, p, key) {
   return;
  }
  if (beat === 'sport-1' && f?.thread) {
-  if (key === 'home') { f.bond = clamp(f.bond - 5); f.thread.stage = 2; f.thread.nextAge = l.age + 2; remember(f, l); log(l, tr('你先回了家'), tr('{name}在操场上又练了一会儿。下次见面，话会少一点。', {name: f.name}), 'social'); return; }
+  if (key === 'home') { f.bond = clamp(f.bond - 5); f.thread.stage = 2; f.thread.nextAge = l.age + 4; remember(f, l); log(l, tr('你先回了家'), tr('{name}在操场上又练了一会儿。下次见面，话会少一点。', {name: f.name}), 'social'); return; }
   const hurt = chance(l, .28);
   if (hurt) { stats(l, { health: -6, social: 2 }); f.bond = clamp(f.bond + 6); f.sharedMemory = tr('你受伤时来看你的那个傍晚'); log(l, tr('加练时你受伤了'), tr('{name}把你送到校医那里。健康掉了一截，{name}没有丢下你。', {name: f.name}), 'social'); }
   else { stats(l, { health: 5, social: 3 }); f.bond = clamp(f.bond + 4); log(l, tr('和{name}加练完了', {name: f.name}), tr('没有受伤。你们约好还一起练，也说好不要每次都硬撑。'), 'social'); }
-  f.thread.stage = 2; f.thread.nextAge = l.age + 2; remember(f, l);
+  f.thread.stage = 2; f.thread.nextAge = l.age + 4; remember(f, l);
   return;
  }
  if (beat === 'sport-2' && f?.thread) {
-  if (key === 'skip') { f.bond = clamp(f.bond - 8); stats(l, { health: 2 }); f.thread.ended = chance(l, .55); if (!f.thread.ended) f.thread.nextAge = l.age + 3; remember(f, l); log(l, f.thread.ended ? tr('{name}不再约你', {name: f.name}) : tr('{name}还是来了', {name: f.name}), f.thread.ended ? tr('你没有去看{name}。后来的训练名单里没有你。', {name: f.name}) : tr('{name}养好了脚，又来找你，但没有以前热络。', {name: f.name}), 'social'); return; }
+  if (key === 'skip') { f.bond = clamp(f.bond - 8); stats(l, { health: 2 }); f.thread.ended = true; remember(f, l); log(l, tr('{name}不再约你', {name: f.name}), tr('你没有去看{name}。后来的训练名单里没有你。', {name: f.name}), 'social'); return; }
   const bill = Math.round(gdp(l) * .01); spend(l, bill);
-  f.bond = clamp(f.bond + 10); f.sharedMemory = tr('去看{name}的那一次', {name: f.name}); f.thread.stage = 3; f.thread.nextAge = l.age + 2; remember(f, l); stats(l, { social: 3, happiness: 2 });
+  f.bond = clamp(f.bond + 10); f.sharedMemory = tr('去看{name}的那一次', {name: f.name}); f.thread.stage = 3; f.thread.nextAge = l.age + 4; remember(f, l); stats(l, { social: 3, happiness: 2 });
   log(l, tr('你去看了{name}', {name: f.name}), tr('花了{bill}。{name}说等好了，要介绍一个也常在这边的人给你。那个人还不一定想见你。', {bill, name: f.name}), 'social');
   return;
  }
@@ -779,14 +828,14 @@ function resolveThread(l, p, key) {
    return;
   }
   const pocket = Math.round(gdp(l) * .012); l.money += pocket; parent.bond = clamp((parent.bond ?? 60) + 6); stats(l, { social: 2 });
-  home.stage = 2; home.nextAge = l.age + 2;
+  home.stage = 2; home.nextAge = l.age + 4;
   log(l, tr('又帮了{name}一阵', {name: parent.name}), tr('{name}给了你{pocket}。说好过些日子还有事找你，不一定是钱。', {name: parent.name, pocket}), 'family');
   return;
  }
  if (beat === 'home-2') {
   if (!alive(parent)) { home.ended = true; return; }
   const sib = (l.family.siblings || []).find(c => c.id === p.siblingId);
-  home.stage = 3; home.nextAge = l.age + 2;
+  home.stage = 3; home.nextAge = l.age + 4;
   if (sib && key === 'watch') { sib.bond = clamp((sib.bond ?? 50) + 8); parent.bond = clamp((parent.bond ?? 60) + 3); stats(l, { social: 3, happiness: 2 }); log(l, tr('带{name}出去了一趟', {name: sib.name}), tr('{name}在家休息。{name2}一路叫你的名字。你们有了一件以后能一起说的事。', {name: parent.name, name2: sib.name}), 'family'); return; }
   if (sib) { sib.bond = clamp((sib.bond ?? 50) - 4); log(l, tr('你没有带{name}', {name: sib.name}), tr('{name}听到了。{name2}自己看着孩子，没责备你，也没像以前那样把事情交给你。', {name: sib.name, name2: parent.name}), 'family'); return; }
   if (key === 'stay') { parent.bond = clamp((parent.bond ?? 60) + 6); stats(l, { happiness: 1 }); log(l, tr('你陪着{name}', {name: parent.name}), tr('没什么大事。{name}后来能起床了，记得是你留了下来。', {name: parent.name}), 'family'); return; }

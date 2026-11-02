@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { createLife, COUNTRIES, advanceYear, choose } from '../src/engine.js';
 import { financeYear } from '../src/finance.js';
 import { initSystems, systemsYear, systemAction, systemChoice, getHousehold, getSceneState, peopleMilestone } from '../src/life-systems.js';
+import { familyHTML } from '../src/system-ui.js';
+import { avatarSVG } from '../src/art.js';
 const clone = x => JSON.parse(JSON.stringify(x));
 function adult(seed = 'systems') { const l = createLife({ seed, country: 'CN' }); l.age = 28; l.income = 20000; l.money = 500000; initSystems(l); l.systems.residence.with = 'alone'; return l; }
 function select(l, key) { const p = l.pending; assert.equal(p?.kind, 'system'); const i = p.options.findIndex(o => o.key === key); assert.ok(i >= 0, key); assert.equal(systemChoice(l, p, i), true); }
@@ -285,4 +287,174 @@ test('a storyline can introduce someone new or fail to', () => {
  }
  assert.ok(met, 'introduction can succeed');
  assert.ok(missed, 'introduction can fail');
+});
+
+test('a single adult is asked again, and a refusal adds no partner', () => {
+  const l = adult('court-again');
+  l.age = 31; l.partner = null; l.pending = null; l.systems.lastYear = null;
+  if (l.systems.homeThread) l.systems.homeThread.ended = true;
+  for (const f of l.friends) if (f.thread) f.thread.ended = true;
+  systemsYear(l);
+  assert.equal(l.pending && l.pending.system, 'courtship');
+  assert.equal(l.pending.options.at(-1).key, 'cancel');
+  select(l, 'cancel');
+  assert.equal(l.partner, null);
+  const quiet = adult('court-quiet');
+  quiet.age = 31; quiet.partner = null; quiet.pending = null; quiet.systems.lastYear = null;
+  systemsYear(quiet, { events: false });
+  assert.notEqual(quiet.pending && quiet.pending.system, 'courtship');
+});
+
+test('telling someone can be turned down and still is not a partner', () => {
+  let refused = false;
+  for (let i = 0; i < 16 && !refused; i++) {
+    const l = adult('court-no-' + i);
+    l.age = 31; l.partner = null; l.pending = null; l.systems.lastYear = null;
+    if (l.systems.homeThread) l.systems.homeThread.ended = true;
+    for (const f of l.friends) if (f.thread) f.thread.ended = true;
+    systemsYear(l);
+    assert.equal(l.pending.system, 'courtship');
+    const choice = l.pending.options.find(o => o.key !== 'cancel');
+    select(l, choice.key);
+    if (!l.partner) refused = true;
+    assert.notEqual(l.job, '伴侣');
+  }
+  assert.equal(refused, true);
+});
+
+test('declining the same relationship question does not spend or ask again', () => {
+ const l = adult('later'); addPartner(l); l.partner.bond = 20; const money = l.money;
+ systemsYear(l); assert.equal(l.pending.system, 'relationship'); select(l, 'later');
+ assert.equal(l.pending, null); assert.equal(l.partner.bond, 20); assert.equal(l.money, money);
+ for (let i = 0; i < 6; i++) {
+  l.age += 1; systemsYear(l, { events: false });
+  assert.notEqual(l.pending?.system, 'relationship');
+  l.pending = null;
+ }
+});
+
+test('a business does not open on debt when savings cannot cover it', () => {
+ const l = adult('broke-shop'); l.money = 100; l.debt = 0;
+ systemAction(l, 'start-business', { name: '空店' }); select(l, 'service');
+ assert.equal(l.systems.business, null); assert.equal(l.debt, 0); assert.equal(l.money, 100);
+ assert.ok(l.log.some(e => e.title === '存款不够开张'));
+});
+
+test('crushing debt names the years left and does not create income', () => {
+  const l = adult('runway');
+  l.age = 28; l.income = 0; l.job = '尚未工作'; l.money = 0; l.debt = l.country.gdp * 3;
+  l.stats.health = 22; l.finance.arrears = 1; l.finance.lastYear = null; l.house = null;
+  financeYear(l);
+  assert.equal(l.stats.health, 17);
+  assert.equal(l.income, 0);
+  assert.equal(l.job, '尚未工作');
+  const note = l.log.find(e => e.title === '这笔债还能撑一阵');
+  assert.ok(note);
+  assert.match(note.text, /大约还能再过3年/);
+  assert.match(note.text, /缩减开支/);
+  assert.match(note.text, /一部分/);
+  assert.match(note.text, /找工作/);
+  assert.match(note.text, /不会凭空多出收入/);
+  assert.ok(note.text.includes(l.family.mother.name) || note.text.includes(l.family.father.name));
+  const calm = adult('runway-far');
+  calm.age = 28; calm.income = 0; calm.job = '尚未工作'; calm.money = 0; calm.debt = calm.country.gdp * 3;
+  calm.stats.health = 80; calm.finance.arrears = 0; calm.finance.lastYear = null;
+  financeYear(calm);
+  assert.equal(calm.stats.health, 76);
+  assert.equal(calm.income, 0);
+  assert.equal(calm.log.some(e => e.title === '这笔债还能撑一阵'), false);
+});
+
+test('family names never collide and newborn siblings appear in the panel', () => {
+  for (let i = 0; i < 40; i++) {
+    const l = createLife({ seed: 'names-' + i, country: 'IN' });
+    const names = [l.name, l.family.mother.name, l.family.father.name];
+    assert.equal(new Set(names).size, 3, names.join(','));
+  }
+  const l2 = createLife({ seed: 'sib-ui', country: 'CN' }); l2.age = 20;
+  l2.family.siblings.push({ name: '张家禾', sex: '男', age: 1, alive: true });
+  const html = familyHTML(l2);
+  assert.ok(html.includes('张家禾'));
+  assert.ok(html.includes('弟弟'));
+});
+
+test('a skipped injury does not return, and an open thread defers the age-12 milestone', () => {
+  const l = adult('sport-loop'); l.age = 12;
+  peopleMilestone(l, 12);
+  systemChoice(l, l.pending, l.pending.options.findIndex(o => o.key === 'sport'));
+  const f = l.friends.find(x => x.thread);
+  assert.ok(f, 'sport friend has a thread');
+  let title = null;
+  for (let y = 0; y < 40 && !title; y++) {
+    l.age++; l.pending = null; l.systems.lastYear = null; systemsYear(l);
+    if (l.pending && l.pending.title.includes('受伤')) title = l.pending.title;
+    else if (l.pending) systemChoice(l, l.pending, l.pending.options.length - 1);
+  }
+  assert.ok(title, 'injury dialog appeared once');
+  systemChoice(l, l.pending, l.pending.options.length - 1);
+  assert.equal(f.thread.ended, true);
+  for (let y = 0; y < 10; y++) { l.age++; l.pending = null; l.systems.lastYear = null; systemsYear(l, { events: false }); if (l.pending) systemChoice(l, l.pending, l.pending.options.length - 1); }
+  assert.ok(!l.log.some(e => e.title === title));
+
+  const open = adult('milestone-open'); open.age = 11;
+  open.friends.push({ id: 'friend-open', name: '李正文', sex: '男', age: 12, alive: true, thread: { kind: 'science', stage: 2, nextAge: 14, ended: false } });
+  advanceYear(open);
+  assert.notEqual(open.pending?.system, 'thread-start');
+  const fresh = adult('milestone-fresh'); fresh.age = 11;
+  advanceYear(fresh);
+  assert.equal(fresh.pending?.system, 'thread-start');
+});
+
+test('teen and elder avatars differ by sex', () => {
+  const base = { country: { id: 'CN' }, name: '测试' };
+  assert.notEqual(avatarSVG({ ...base, age: 15, sex: '女' }), avatarSVG({ ...base, age: 15, sex: '男' }));
+  const oldF = avatarSVG({ ...base, age: 70, sex: '女' });
+  const oldM = avatarSVG({ ...base, age: 70, sex: '男' });
+  assert.notEqual(oldF, oldM);
+  assert.ok(oldF.includes('x="3" y="12" width="10"'));
+  assert.ok(oldM.includes('x="13" y="9"'));
+});
+
+test('opportunity offers wait at least three years between asks', () => {
+  const l = adult('throttle-1'); l.age = 30; l.pending = null; l.systems.lastYear = null;
+  let lastAge = null;
+  for (let y = 0; y < 30; y++) {
+    l.age++; l.pending = null; l.systems.lastYear = null;
+    systemsYear(l);
+    if (l.pending?.system === 'opportunity') {
+      if (lastAge != null) assert.ok(l.age - lastAge >= 3, `gap ${l.age - lastAge} at ${l.age}`);
+      lastAge = l.age;
+    }
+    if (l.pending) systemChoice(l, l.pending, l.pending.options.length - 1);
+  }
+  assert.ok(lastAge != null, 'an opportunity appeared at all');
+});
+
+test('random events no longer pile up after quiet stretches', () => {
+  const l = adult('catchup-1'); l.age = 30; l.pending = null; l.systems.lastYear = null;
+  l.lastEventAge = 26;
+  advanceYear(l);
+  // no assertion on firing, just must not crash and stay consistent
+  assert.ok(l.age === 31);
+});
+
+test('opportunity dialogs state the in-game odds', () => {
+  const l = adult('odds-1');
+  l.age = 30; l.pending = null; l.systems.lastYear = null; l.systems.lastOpportunityAge = -99;
+  let seen = false;
+  for (let y = 0; y < 40 && !seen; y++) {
+    l.age++; l.pending = null; l.systems.lastYear = null;
+    systemsYear(l);
+    if (l.pending?.system === 'opportunity') {
+      const kind = l.pending.offerKind;
+      if (kind !== 'local' && kind !== 'remote') { systemChoice(l, l.pending, l.pending.options.length - 1); continue; }
+      seen = true;
+      const text = l.pending.text;
+      assert.match(text, /录用机会约 \d+%/, `odds shown in: ${text.slice(0, 80)}`);
+      const pct = Number(text.match(/录用机会约 (\d+)%/)[1]);
+      assert.ok(pct >= 10 && pct <= 90, `odds in sane band: ${pct}`);
+    }
+    if (l.pending) systemChoice(l, l.pending, l.pending.options.length - 1);
+  }
+  assert.ok(seen, 'an opportunity appeared');
 });

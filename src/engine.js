@@ -2,7 +2,7 @@ import { initSystems, systemsYear, systemChoice, systemAction, peopleMilestone }
 import { initEducation, educationYear, educationMilestone, educationChoice } from './education.js';
 import { initFinance, financeYear, creditBlocked, familyCovers } from './finance.js';
 import { careerAction, careerYear } from './career.js';
-import { tr, label, setPlayer } from './i18n.js';
+import { tr, label, setPlayer, numberLocale, logSource, splitList } from './i18n.js';
 import { personName } from './names.js';
 export { systemAction };
 // A self-contained, deterministic life simulation for the demo.
@@ -51,7 +51,7 @@ const rows = [
 ];
 export const COUNTRIES = rows.map(([id,name,flag,region,city,pop,birth,life,gdp,male,female,surnames]) => ({
  id,name,flag,region,city,pop,birth,life,gdp,
- names:{male:male.split(','),female:female.split(','),surnames:surnames.split(',')},estimated:true
+ names:{male:splitList(male),female:splitList(female),surnames:splitList(surnames)},estimated:true
 }));
 
 export const DESTINATIONS = [
@@ -106,7 +106,7 @@ const pick=(life,xs)=>xs[Math.floor(roll(life)*xs.length)];
 const pickWeighted=(life,xs,weight=x=>x.weight||1)=>{const total=xs.reduce((s,x)=>s+weight(x),0);let n=roll(life)*total;for(const x of xs){n-=weight(x);if(n<0)return x;}return xs[xs.length-1];};
 const countryFor=(life,mode)=>{const key=mode==='pop'||mode==='population'?'pop':'birth';let n=roll(life)*COUNTRIES.reduce((sum,c)=>sum+c[key],0);return COUNTRIES.find(c=>(n-=c[key])<0)||COUNTRIES.at(-1);};
 const person=(life,c,sex=roll(life)<.5?'男':'女')=>({name:personName(life,c,sex,roll),sex});
-const log=(life,title,text,type='life')=>life.log.push({age:life.age,year:life.birthYear+life.age,title,text,type});
+const log=(life,title,text,type='life')=>life.log.push({age:life.age,year:life.birthYear+life.age,title,text,type,...logSource(title,text)});
 const statLabels={health:tr('健康'),happiness:tr('幸福'),knowledge:tr('学识'),social:tr('人际')};
 const FOCUS_EFFECTS={study:{knowledge:4},work:{knowledge:1,health:-1,happiness:-1},health:{health:3,happiness:1},family:{social:3,happiness:2},joy:{happiness:3,social:1}};
 export const FOCUS_NAMES={study:tr('学习'),work:tr('事业'),health:tr('健康'),family:tr('家人'),joy:tr('体验生活')};
@@ -152,25 +152,29 @@ export function upgradeLife(life){
 
 export function createLife({era='now',mode='birth',seed=Date.now(),country,sex,name}={}){
  const s={randomState:hash(seed)};
- const c=COUNTRIES.find(c=>c.id===(typeof country==='object'?country?.id:country))||countryFor(s,mode);
+ const base=COUNTRIES.find(c=>c.id===(typeof country==='object'?country?.id:country))||countryFor(s,mode);
  const birthYear=era==='past'?1970:era==='future'?2050:era==='any'?1950+Math.floor(roll(s)*101):2026;
- const who=person(s,c,sex==='男'||sex==='女'?sex:undefined),wealth=roll(s);
+ const eraFactor=birthYear===1970?.42:birthYear>=2050?1.35:1;
+ const c=eraFactor===1?base:{...base,gdp:Math.round(base.gdp*eraFactor)};
+ const who=person(s,c,sex==='男'||sex==='女'?sex:undefined),wealth=roll(s);s.name=name||who.name;
  setPlayer(who.sex);
  Object.assign(s,{id:`life-${hash(seed).toString(36)}-${c.id}`,seed,era,mode,name:name||who.name,sex:who.sex,
   country:JSON.parse(JSON.stringify(c)),birthCountry:JSON.parse(JSON.stringify(c)),birthYear,age:0,
   stats:{health:65+Math.floor(roll(s)*30),happiness:55+Math.floor(roll(s)*30),knowledge:5,social:30+Math.floor(roll(s)*30)},
   money:Math.round(c.gdp*(.015+wealth*.08)),income:0,job:'尚未工作',education:'尚未入学',partner:null,children:[],
-  family:{mother:{...person(s,c,'女'),age:22+Math.floor(roll(s)*15),job:pick(s,[tr('教师'),tr('店员'),tr('农民'),tr('护士'),tr('技术员')]),alive:true},
-   father:{...person(s,c,'男'),age:24+Math.floor(roll(s)*16),job:pick(s,[tr('司机'),tr('工人'),tr('农民'),tr('工程师'),tr('小店经营者')]),alive:true},
-   siblings:[],background:wealth<.22?'贫困':wealth<.48?'温饱':wealth<.78?'中产':'富裕',wealth},
+  family:(()=>{const mother={...person(s,c,'女'),age:22+Math.floor(roll(s)*15),job:pick(s,[tr('教师'),tr('店员'),tr('农民'),tr('护士'),tr('技术员')]),alive:true};s.family={siblings:[],mother};const father={
+    ...person(s,c,'男'),age:24+Math.floor(roll(s)*16),job:pick(s,[tr('司机'),tr('工人'),tr('农民'),tr('工程师'),tr('小店经营者')]),alive:true};return{mother,father,
+   siblings:[],background:wealth<.22?'贫困':wealth<.48?'温饱':wealth<.78?'中产':'富裕',wealth};})(),
   log:[],pending:null,dead:false,deathCause:null,deathAge:null,focus:'joy',companions:[],
   notes:[],
   longevity:clamp(c.life+(birthYear===1970?-6:birthYear>=2050?5:0)+(roll(s)-.5)*24,45,106),retired:false,
   investments:initialInvestments(),debt:0,holdings:[],market:initialMarket(),possessions:[],travels:[],house:null,car:false,insurance:false,
   recentEvents:[],lastEventAge:null,lastTravelYear:null,netWorthHistory:[],achievements:[]});
  for(let i=0;i<4;i++){
-  const cc=countryFor(s,mode);s.companions.push({...person(s,cc),id:`companion-${i}`,country:JSON.parse(JSON.stringify(cc)),birthYear,
-   life:Math.round(clamp(cc.life+(roll(s)-.5)*30,35,108)),age:0,dead:false,job:'尚未工作'});
+  const cc=countryFor(s,mode);const lifeLen=Math.round(clamp(cc.life+(roll(s)-.5)*30,35,108));
+  const band=roll(s);const bandWord=band<.22?tr('贫困'):band<.48?tr('温饱'):band<.78?tr('中产'):tr('富裕');
+   s.companions.push({...person(s,cc),id:`companion-${i}`,country:JSON.parse(JSON.stringify(cc)),birthYear,
+   life:lifeLen,age:0,dead:false,job:'尚未工作',band:bandWord,path:pick(s,[tr('在自己的城市安了家'),tr('换了几个城市，最后留了下来'),tr('一直留在出生的地方'),tr('去了很远的城市，很少回来')]),milestoneAge:10});
  }
  s.classBand=s.family.background;
   log(s,tr('世界多了一个你'),tr('{birthYear}年，你出生在{name}{city}。对照当地人均 GDP，你家大约高于{wealth}%的家庭，更接近{background}。这是游戏里的分层，不是官方收入统计。父母给你取名{name2}。', {birthYear, name: c.name, city: c.city, wealth: Math.round(wealth*100), background: label(s.family.background), name2: s.name})+tr('家里为你留出了${money}：小时候生病、意外和你自己的选择都从这里花，吃住和上学用品由家里负担。', {money: s.money}),'birth');
@@ -179,6 +183,36 @@ export function createLife({era='now',mode='birth',seed=Date.now(),country,sex,n
  return s;
 }
 
+export function incomePlace(life){
+ upgradeLife(life);
+ const income=Math.max(0,life.income||0), local=life.country?.gdp||1;
+ const localRank=income<=0?0:Math.max(1,Math.min(99,Math.round(50+28*Math.log2(Math.max(income/local,.05)))));
+ const gdps=COUNTRIES.map(c=>c.gdp).filter(n=>n>0);
+ const world=income<=0||!gdps.length?0:Math.max(1,Math.min(99,Math.round(gdps.filter(g=>income>=g).length/gdps.length*100)));
+ return {income,local:localRank,world};
+}
+export function lifeStage(life){
+ if((life.age||0)>=65||life.retired)return {id:'late',line:tr('这时候更在意身体，以及还愿意陪着你的人。')};
+ if((life.age||0)<6)return {id:'home',line:tr('这时候还在家里，日子绕着身边的人转。')};
+ if((life.age||0)<18)return {id:'school',line:tr('这时候要考虑升学。读不读得上，要看准备和条件。')};
+ if(life.systems?.business)return {id:'venture',line:tr('你在用存款经营一份事。这一年赚不赚得到，要看账。')};
+ return {id:'work',line:tr('这时候要考虑工作。也可以用存款创业，钱不够就开不了张。')};
+}
+export function improveLife(life){
+ upgradeLife(life);
+ if(life.dead)return {ok:false,message:tr('这一生已经结束')};
+ if(life.pending)return {ok:false,message:tr('请先处理眼前的选择')};
+ const g=life.country?.gdp||1;
+ const late=(life.age||0)>=65||life.retired;
+ const cost=Math.round(g*(life.age<18?.015:late?.03:.02));
+ const reserve=Math.round(g*(late?.06:.08));
+ if((life.money||0)<cost+reserve)return {ok:false,message:tr('留下生活所需以后，余钱不够')};
+ if(life.easeAge===life.age)return {ok:false,message:tr('这一年已经用余钱安排过一次')};
+ life.easeAge=life.age; life.money-=cost;
+ if(life.age<18){life.stats.knowledge=clamp(life.stats.knowledge+2); log(life,tr('为升学准备了一点'),tr('花了{cost}。知识上升了一点。这不是录取，也不是一张文凭。', {cost}),'life'); return {ok:true,message:tr('准备了一点，还没有被录取')};}
+ if(late){life.stats.health=clamp(life.stats.health+2); life.stats.happiness=clamp(life.stats.happiness+2); const who=life.partner?.alive!==false&&life.partner?.name||life.family?.mother?.alive!==false&&life.family?.mother?.name||life.family?.father?.alive!==false&&life.family?.father?.name||tr('还愿意来的人'); log(life,tr('把余钱用在身体和陪伴上'),tr('花了{cost}。身体和心情都上升了一点。{who}陪着你。这不是一次治好的承诺。', {cost, who}),'life'); return {ok:true,message:tr('身体和陪伴都安排了一点')};}
+ life.stats.happiness=clamp(life.stats.happiness+2); log(life,tr('用余钱把日子松开一点'),tr('花了{cost}。心情上升了一点。这不是第二份工作，也没有请家里人来还债。', {cost}),'life'); return {ok:true,message:tr('日子松开了一点')};
+}
 export function classStanding(life){
  const gdp=life.country?.gdp||1;
  const worth=netWorth(life);
@@ -214,12 +248,12 @@ function spend(life,amount){
 }
 function applyStats(life,effects,details){
  for(const k of ['health','happiness','knowledge','social']){
-  if(typeof effects[k]==='number'&&effects[k]!==0){life.stats[k]=clamp(life.stats[k]+effects[k]);details.push(tr('{stat}{change}', {stat: statLabels[k], change: `${effects[k]>=0?'+':''}${effects[k]}`}));}
+  if(typeof effects[k]==='number'&&effects[k]!==0){life.stats[k]=clamp(life.stats[k]+effects[k]);details.push(tr('{stat}{change}', {stat: statLabels[k], change: `${effects[k]>0?tr('上升'):tr('下降')}`}));}
  }
 }
 function ensurePartner(life){
  if(life.partner)return life.partner;
- const p=person(life,life.country,life.sex==='男'?'女':'男');life.partner={...p,age:life.age,countryId:life.country.id,distanceYears:0,bond:72,income:Math.round(life.country.gdp*.35),job:'职员'};return life.partner;
+ const p=person(life,life.country,life.sex==='男'?'女':'男');life.partner={...p,age:life.age,countryId:life.country.id,distanceYears:0,bond:72,income:Math.round(life.country.gdp*.35),job:'职员',togetherSince:life.age};return life.partner;
 }
 function ensureChild(life){
  const c=person(life,life.country,chance(life,.5)?'男':'女');life.children.push({...c,birthYear:life.birthYear+life.age,age:0,bond:70});return life.children.at(-1);
@@ -231,7 +265,7 @@ export function applyEffects(life,effects={}){
  if(effects.cash){const value=effects.cash<0&&effects.medical&&life.insurance?effects.cash*.3:effects.cash;if(value<0)spend(life,-value);else life.money+=value;details.push(tr('现金{x}{value}{x2}', {x: value>=0?'+':'', value: round(value), x2: effects.medical&&life.insurance?tr('（保险承担70%）'):''}));}
  if(effects.debt){life.debt=Math.max(0,life.debt+effects.debt);details.push(tr('负债{x}{debt}', {x: effects.debt>=0?'+':'', debt: round(effects.debt)}));}
  if(typeof effects.income==='number'){life.income=Math.max(0,effects.income);details.push(tr('年收入调整为{income}', {income: round(life.income)}));}
- if(typeof effects.incomePct==='number'){life.income=Math.max(0,life.income*(1+effects.incomePct));details.push(tr('年收入{x}{incomePct}%', {x: effects.incomePct>=0?'+':'', incomePct: Math.round(effects.incomePct*100)}));}
+ if(typeof effects.incomePct==='number'){life.income=Math.max(0,life.income*(1+effects.incomePct));details.push(effects.incomePct>=0?tr('年收入上升'):tr('年收入下降'));}
  if(effects.career){const r=careerAction(life,effects.career);details.push(r.message);}
  if(effects.job)life.job=effects.job;
  if(effects.education)details.push(tr('学历改由逐年学业决定，这次选择不直接授予学历'));
@@ -251,7 +285,7 @@ export function applyEffects(life,effects={}){
   for(const type of ['index','bonds','property'])life.investments[type]=0;
   life.holdings=[];details.push(tr('卖出投资，到账约{total}', {total: round(total*.995)}));
  }
- if(effects.healthRisk){const hurt=Math.round(effects.healthRisk);life.stats.health=clamp(life.stats.health-hurt);details.push(tr('健康-{hurt}', {hurt}));}
+ if(effects.healthRisk){const hurt=Math.round(effects.healthRisk);life.stats.health=clamp(life.stats.health-hurt);details.push(tr('健康下降'));}
  return details;
 }
 
@@ -316,10 +350,20 @@ function familyStep(life){
   life.money=Math.max(0,round(life.money*1.01))||0;
  }
 }
-function deathCheck(life){
+function deathCauseOf(life){
+ const h=life.stats.health||0;
+ const conds=life.systems?.conditions||[];
+ const untreated=conds.some(c=>!c.resolved&&(c.treatment==='delay'||!c.treatment));
+ if(life.age<45) return conds.length?tr('一场没能扛过去的病'):tr('意外与疾病，来的时候没有打招呼');
+ if(life.age<65) return untreated?tr('拖了太久的病'):tr('身体在多年操劳后先停了下来');
+ if(h<45) return tr('拖了太久的病');
+ if(life.age>=80) return tr('在睡梦中安静地离开');
+ return tr('身体逐渐衰老');
+}
+ function deathCheck(life){
  const limit=clamp(life.longevity+(life.stats.health-50)*.14,40,109);
  if(life.age>=110||life.age>=limit||(life.age>50&&chance(life,(100-life.stats.health)*.00015))){
-  life.dead=true;life.deathAge=life.age;life.deathCause=life.stats.health<30?tr('长期疾病'):tr('身体逐渐衰老');life.income=0;life.pending=null;
+  life.dead=true;life.deathAge=life.age;life.deathCause=life.stats.health<30?tr('长期疾病'):deathCauseOf(life);life.income=0;life.pending=null;
   log(life,tr('这一生，走到了终点'),tr('{age}岁时，你的人生停在这里。那些相遇、选择与普通的日子，组成了独一无二的一生。', {age: life.age}),'death');
   return true;
  }
@@ -331,14 +375,14 @@ const MILESTONES={
  5:{title:tr('还没上学的那个下午'),text:tr('母亲把一本旧绘本放在桌边，门外传来邻居孩子的笑声。今天下午，你想怎样度过？'),options:[
   {label:tr('认真听故事'),description:tr('从阅读里发现更大的世界。'),effects:{knowledge:10,happiness:3}},
   {label:tr('认识新朋友'),description:tr('和邻座一起画一张想象中的地图。'),effects:{social:12,happiness:7}},
-  {label:tr('帮家里做事'),description:tr('分担一点生活，也更早理解父母。'),effects:{social:5,happiness:2,cash:200}}]},
+  {label:tr('帮家里做事'),description:tr('分担一点生活，也更早理解父母。'),effects:{social:5,happiness:2,cash:'gdp:.012'}}]},
  12:{title:tr('自己的课余时间'),text:tr('课业变多了，你开始决定下午怎么过。'),options:[
   {label:tr('加入科学小组'),description:tr('花几个月完成一个小实验。'),effects:{knowledge:12,happiness:-2}},
   {label:tr('参加运动队'),description:tr('在操场上学会合作，也把身体练好。'),effects:{health:9,social:8}},
-  {label:tr('帮家里做事'),description:tr('分担家务，也攒下一点零用钱。'),effects:{social:5,money:0,cash:400,happiness:3}}]},
+  {label:tr('帮家里做事'),description:tr('分担家务，也攒下一点零用钱。'),effects:{social:5,money:0,cash:'gdp:.025',happiness:3}}]},
  30:{title:tr('家的形状'),text:tr('你开始想象未来的家，会是什么样子。'),options:[
   {label:tr('和伴侣尝试要一个孩子'),description:tr('没有适龄伴侣就不会出生。即使尝试，这一年也可能没有孩子。'),effects:{conception:true}},
-  {label:tr('先照顾自己'),description:tr('把时间留给自己的生活与兴趣。'),effects:{health:5,happiness:7,cash:1200}}]},
+  {label:tr('先照顾自己'),description:tr('把时间留给自己的生活与兴趣。'),effects:{health:5,happiness:7,cash:'gdp:.08'}}]},
  35:{title:tr('另一座城市'),text:tr('外地的一次机会，让你想到搬家。'),options:[
   {label:tr('去问那个外地机会'),description:tr('只是开始申请。签证可能失败；去成后收入和开销都按目的地重算。'),effects:{relocate:'__random__'}},
   {label:tr('留下扎根'),description:tr('继续经营熟悉的人际关系。'),effects:{social:10,happiness:6}}]},
@@ -351,9 +395,9 @@ const MILESTONES={
  60:{title:tr('时间留给谁'),text:tr('熟悉的人慢慢老去，相聚变得珍贵。'),options:[
   {label:tr('陪伴家人与朋友'),description:tr('让寻常的一餐多一些交谈。'),effects:{social:12,happiness:12,incomePct:-.1}},
   {label:tr('学习一直想学的事'),description:tr('重新体验初学者的好奇。'),effects:{knowledge:12,happiness:9}}]},
- 65:{title:tr('新的生活节奏'),text:tr('你可以重新安排工作的分量。'),options:[
-  {label:tr('正式退休'),description:tr('以积蓄和养老金支持平静生活。'),effects:{retired:true,job:'退休',income:'gdp:.25',health:7,happiness:8}},
-  {label:tr('继续做些工作'),description:tr('保留熟悉的节奏和同事。'),effects:{job:'兼职顾问',income:'gdp:.45',social:6,health:-3}}]},
+ 65:{title:tr('身体和身边的人'),text:tr('工作可以轻一点。更要紧的是身体还撑不撑得住，以及谁还愿意陪着你。'),options:[
+  {label:tr('正式退休'),description:tr('少做一点，把时间留给身体和还在身边的人。'),effects:{retired:true,job:'退休',income:'gdp:.25',health:7,happiness:8}},
+  {label:tr('继续做些工作'),description:tr('事情还在，身体会更累，陪伴也会少。'),effects:{job:'兼职顾问',income:'gdp:.45',social:6,health:-3}}]},
  70:{title:tr('把经验传下去'),text:tr('有人向你请教年轻时经历过的难题。'),options:[
   {label:tr('参与社区互助'),description:tr('帮助别人，也建立新的联结。'),effects:{social:12,happiness:8}},
   {label:tr('写下人生故事'),description:tr('为记忆找一个长久的住处。'),effects:{knowledge:8,happiness:10}}]},
@@ -383,53 +427,182 @@ function prepareEffects(effects,life){
  }
  return e;
 }
+function reflectionPause(life,age){
+ const prompts={
+  5:tr('五岁的{name}还说不出完整的话。家里人替TA想一想：此刻最需要的是什么？', {name: life.name}),
+  15:tr('十五岁的{name}坐在教室或工地之间。学校对你来说算什么？', {name: life.name}),
+  30:tr('三十岁的{name}今天最想感谢谁，或者感谢什么？', {name: life.name}),
+  50:tr('谁在{name}这一生里稳稳地扶过你一把？', {name: life.name}),
+ };
+ life.pending={kind:'reflection',title:tr('停下来想一句'),text:prompts[age],options:[
+  {key:'write',label:tr('写一句留到结尾'),description:tr('一句话会保存在这一生的纪念卡上，不判定好坏，不花时间。')},
+  {key:'skip',label:tr('不写，继续过'),description:tr('不留字。人生继续。')}]};
+ log(life,tr('停下来想一句'),prompts[age],'choice');
+}
+export function reflectionAnswer(life,text){
+ const t=String(text||'').trim().slice(0,60);
+ if(t)life.reflections=life.reflections||{},life.reflections[life.age]=t;
+ life.pending=null;
+ log(life,life.reflections&&life.reflections[life.age]?tr('一句话留了下来'):tr('这一句没有写'),life.reflections&&life.reflections[life.age]?tr('{age}岁的你写下：{reflections}', {age: life.age, reflections: life.reflections[life.age]}):tr('你没有留字。日子照常往前。'),'memory');
+}
 function setMilestone(life,age){
+ if(age===2||age===4){temperamentAsk(life,age);return;}
+ if(age!==5&&[15,30,50].includes(age)&&!(life.reflections||{})[age]&&!(life.reflectionMiss||{})[age]){reflectionPause(life,age);return;}
  if([15,18,22].includes(age)){educationMilestone(life,age);return;}
  if(age===26){if(!life.partner||life.partner.alive===false)systemAction(life,'seek-partner');return;}
- if(age===5||age===12){peopleMilestone(life,age);return;}
+ if([15,30,50].includes(age)&&!(life.reflections||{})[age]&&!(life.reflectionMiss||{})[age]){life.reflectionMiss=life.reflectionMiss||{},life.reflectionMiss[age]=true;reflectionPause(life,age);return;}
+  if(age===5||(age===12&&!(life.systems?.homeThread&&!life.systems.homeThread.ended)&&!(life.friends||[]).some(f=>f&&f.thread&&!f.thread.ended))){peopleMilestone(life,age);return;}
  const m=MILESTONES[age];if(!m)return;
  const options=m.options.map(o=>({label:o.label,description:o.description,effects:prepareEffects(o.effects,life)}));
  life.pending={kind:'milestone',title:m.title,text:m.text,options};
  log(life,m.title,m.text,'choice');
 }
 
+
+// ---------------- temperament shaping (ages 2 & 4) ----------------
+const TEMPER = { cur: tr('好奇'), act: tr('好动'), warm: tr('黏人'), grit: tr('倔强') };
+// The question is recognised by its option keys: its title is shown text and changes with the language.
+const isTemperament = p => p?.kind === 'milestone' && p.options?.length > 0 && p.options.every(o => o.key in TEMPER);
+function temperamentAsk(life, age){
+ const prompts = {
+  2: tr('{name}迈着还不太稳的步子，第一次自己走向院子里的新东西。家里人在旁边看着，TA会先做什么？', {name: life.name}),
+  4: tr('四岁的{name}和邻居的孩子第一次一起玩。大人们聊天时瞥了一眼：TA在做什么？', {name: life.name}),
+ };
+ const options = {
+  2: [['cur', tr('凑过去研究'), tr('伸手抓，翻过来倒过去地看')], ['act', tr('撒腿跑起来'), tr('先绕着院子跑一圈再说')], ['warm', tr('回头找大人'), tr('走两步就回来看一眼')], ['grit', tr('站在原地不动'), tr('先看别人怎么做')]],
+  4: [['cur', tr('拆开看里面'), tr('把玩具或虫子拆开研究')], ['act', tr('带头疯跑'), tr('第一个冲出去喊别人跟上')], ['warm', tr('跟在大孩子后面'), tr('别人玩什么就跟着玩什么')], ['grit', tr('非按自己的规则玩'), tr('规则不对就宁可不来')]],
+ };
+ life.temperament = life.temperament || { lean: {} };
+ life.temperament.lean = life.temperament.lean || {};
+ life.pending = { kind: 'milestone', title: tr('气质在成形'), text: prompts[age], options: options[age].map(([k, label, desc]) => ({ key: k, label, description: desc })) };
+ log(life, tr('气质在成形'), prompts[age], 'choice');
+}
+export function temperamentAnswer(life, key){
+ if (!isTemperament(life.pending)) return;
+ const labels = { cur: tr('凑过去研究'), act: tr('撒腿跑起来'), warm: tr('回头找大人'), grit: tr('先看别人怎么做') };
+ life.temperament.lean[key] = (life.temperament.lean[key] || 0) + 2;
+ life.temperament.settledAge = life.age;
+ life.pending = null;
+ const lead = Object.entries(life.temperament.lean).sort((a, b) => b[1] - a[1])[0];
+ log(life, tr('{age}岁的性子', {age: life.age}), tr('{name}这一下，家里记住了：偏{TEMPER}。日子还长，还会再变。', {name: life.name, TEMPER: TEMPER[lead?.[0] || 'cur']}), 'memory');
+}
+export function temperamentLead(life){
+ const lean = life.temperament?.lean || {};
+ const top = Object.entries(lean).sort((a, b) => b[1] - a[1])[0];
+ return top && top[1] > 0 ? top[0] : null;
+}
+
+
+// ---- country-bound cultural background events (auto-resolved, no dialog) ----
+// Each set is our own writing about ordinary life in that place; no source text is reused.
+const CULTURE_EVENTS = {
+ CN: [
+  { age: [3, 12], title: tr('第一次跟着去买年货'), text: tr('市场里挂满了红纸和腊味。大人挑对联，你被塞了一串糖葫芦。'), type: 'warm', effects: { happiness: 5 } },
+  { age: [5, 16], title: tr('中秋的院子'), text: tr('一家人在院子里摆开小桌，月饼切成小块。月亮很圆，长辈说起从前的事。'), type: 'family', effects: { happiness: 4, social: 3 } },
+  { age: [6, 18], title: tr('教室里的早读'), text: tr('天还没完全亮，全班一起念课文。声音乱糟糟的，但很有力气。'), type: 'warm', effects: { knowledge: 4 } },
+  { age: [18, 60], title: tr('春运的车厢'), text: tr('过道里站满了人，行李箱叠在门口。你靠着窗，一路听着方言和呼噜。'), type: 'event', effects: { happiness: 2, health: -2 } },
+  { age: [30, 80], title: tr('楼下的小馆子'), text: tr('老板记得你不吃葱。一碗面端上来，热气把镜片蒙住了。'), type: 'warm', effects: { happiness: 3 } }
+ ],
+ IN: [
+  { age: [4, 14], title: tr('排灯节的灯'), text: tr('邻居在窗前点起一排小灯，街道亮到半夜。有人递来一盘甜点。'), type: 'warm', effects: { happiness: 5, social: 2 } },
+  { age: [6, 16], title: tr('季风来的第一场雨'), text: tr('雨砸在铁皮顶上，整条街的人都跑出来看。孩子们在水里跳。'), type: 'warm', effects: { happiness: 4, health: -1 } },
+  { age: [8, 18], title: tr('火车上的长夜'), text: tr('卧铺里挤着陌生人和行李，有人分你半块饼。天亮时窗外全是绿。'), type: 'event', effects: { happiness: 2, knowledge: 2 } },
+  { age: [20, 70], title: tr('婚礼上的鼓'), text: tr('亲戚从很远的地方赶来，鼓声从傍晚响到深夜。你被拉进人群跳了一段。'), type: 'family', effects: { happiness: 6, social: 4 } }
+ ],
+ NG: [
+  { age: [4, 14], title: tr('发电机的声音'), text: tr('停电了，家里的小发电机响起来。风扇转起来那一刻，屋子里有人欢呼。'), type: 'event', effects: { happiness: 3, health: -1 } },
+  { age: [6, 18], title: tr('市场里的布'), text: tr('跟着大人去市场挑布，颜色亮得晃眼。摊主一边喊价一边笑。'), type: 'warm', effects: { happiness: 4, social: 2 } },
+  { age: [8, 20], title: tr('雨后的红土路'), text: tr('雨停了，路变成深红色。鞋子陷进去，走两步就要甩一下。'), type: 'event', effects: { happiness: 2, health: -1 } },
+  { age: [20, 70], title: tr('婚礼上的米和油'), text: tr('亲戚们凑了米和油送来。有人唱歌，有人记账，热闹了一整天。'), type: 'family', effects: { happiness: 5, social: 4 } }
+ ],
+ US: [
+  { age: [5, 15], title: tr('万圣节的门口'), text: tr('你穿着临时拼的服装挨家敲门，袋子越来越沉。有人夸你的扮相。'), type: 'warm', effects: { happiness: 5, social: 3 } },
+  { age: [14, 22], title: tr('第一份暑期工'), text: tr('收银台站一整天，腿是酸的，工资单上还扣了税。'), type: 'event', effects: { cash: 'gdp:.03', knowledge: 2, health: -1 } },
+  { age: [16, 30], title: tr('公路上的长途'), text: tr('车窗外的平原一望无际，电台放着一首老歌。你在休息站买了杯咖啡。'), type: 'warm', effects: { happiness: 4 } },
+  { age: [25, 70], title: tr('感恩节的餐桌'), text: tr('桌上的菜多得放不下。有人为了谁坐哪边吵了几句，最后还是碰了杯。'), type: 'family', effects: { happiness: 5, social: 4 } }
+ ],
+ JP: [
+  { age: [4, 14], title: tr('夏祭的烟火'), text: tr('穿上浴衣走进人群，摊位前排着队。烟火在头顶炸开的时候，所有人一起抬头。'), type: 'warm', effects: { happiness: 6, social: 3 } },
+  { age: [6, 18], title: tr('开学第一天'), text: tr('教室换了新座位，窗外樱花刚开。老师让学生一个个站起来说假期做了什么。'), type: 'warm', effects: { knowledge: 3, social: 2 } },
+  { age: [18, 60], title: tr('加班后的末班车'), text: tr('车厢里全是和你一样的人，领带松着，都在看手机。有人睡着坐过了站。'), type: 'event', effects: { happiness: -1, health: -2 } },
+  { age: [20, 70], title: tr('新年第一次参拜'), text: tr('天还没亮就排起长队，冷得跺脚。钟声一下一下地敲，没有人说话。'), type: 'warm', effects: { happiness: 4 } }
+ ],
+ DE: [
+  { age: [5, 16], title: tr('圣诞市场的热酒'), text: tr('广场上支起一排小木屋，空气里是肉桂和烤肠的味道。你捧着一杯热饮暖手。'), type: 'warm', effects: { happiness: 5, social: 2 } },
+  { age: [10, 22], title: tr('周日不开门的街'), text: tr('整条街安静得反常，店门都关着。有人在河边骑车，有人在草地上躺着看书。'), type: 'warm', effects: { happiness: 3 } },
+  { age: [16, 30], title: tr('职业学校的车间'), text: tr('一边是课本，一边是真机床。手上的油污到晚上才洗得掉。'), type: 'event', effects: { knowledge: 4, cash: 'gdp:.02' } },
+  { age: [20, 70], title: tr('足球夜'), text: tr('朋友家的客厅里挤满人，盯着同一块屏幕。进球时整间屋子炸开，啤酒洒了一地。'), type: 'warm', effects: { happiness: 5, social: 4 } }
+ ],
+ BR: [
+  { age: [4, 14], title: tr('街角的足球'), text: tr('天还没黑，球已经踢起来了。球门是两只拖鞋，守门的是最小的那个。'), type: 'warm', effects: { happiness: 5, health: 2, social: 3 } },
+  { age: [6, 18], title: tr('海边的一天'), text: tr('巴士坐到海边只要几个硬币。浪比想象的大，西瓜比想象甜。'), type: 'warm', effects: { happiness: 5 } },
+  { age: [16, 40], title: tr('狂欢节的彩带'), text: tr('整条街都是鼓点和彩带，陌生人往你脸上抹一点彩粉。没有人问你是谁。'), type: 'warm', effects: { happiness: 6, social: 4 } },
+  { age: [20, 70], title: tr('烧烤的长桌'), text: tr('周末的院子支起烤架，肉从中午烤到天黑。孩子追着狗跑，大人的话题换了三轮。'), type: 'family', effects: { happiness: 5, social: 4 } }
+ ],
+ MX: [
+  { age: [4, 14], title: tr('亡灵节的橘色'), text: tr('家门口摆满了万寿菊和照片。大人说，只要记得，他们就一直都在。'), type: 'family', effects: { happiness: 3, social: 3 } },
+  { age: [6, 18], title: tr('玉米饼的香味'), text: tr('街角的磨坊天不亮就开工。热乎的玉米饼用纸包着，边走边吃最香。'), type: 'warm', effects: { happiness: 4 } },
+  { age: [8, 20], title: tr('广场的傍晚'), text: tr('广场上乐队一响，跳舞的人围成一圈。你被外婆拉进去转了两圈。'), type: 'warm', effects: { happiness: 5, social: 4 } },
+  { age: [20, 70], title: tr('十五岁的裙子'), text: tr('亲戚家女孩的成人礼办了一整天。弥撒、彩车、还有一支突然出现的乐队。'), type: 'family', effects: { happiness: 5, social: 4 } }
+ ],
+ KR: [
+  { age: [5, 16], title: tr('考试前夜的炸鸡'), text: tr('全城都在为考生安静下来。大人和你分一盒炸鸡，说喂给运气吃。'), type: 'warm', effects: { happiness: 4 } },
+  { age: [6, 18], title: tr('爬山的一家'), text: tr('秋天满山都是红叶，登山杖敲石头的声音一路都是。泡面在山顶最好吃。'), type: 'warm', effects: { happiness: 4, health: 2 } },
+  { age: [16, 35], title: tr('深夜的食堂'), text: tr('下班后来到布帐马车，一碗汤下肚。老板娘多给你舀了一勺小菜。'), type: 'warm', effects: { happiness: 3 } },
+  { age: [20, 70], title: tr('春节的祭桌'), text: tr('凌晨摆好祭桌，向长辈行完礼，一起吃年糕汤。吃了这碗，就算长了一岁。'), type: 'family', effects: { happiness: 4, social: 3 } }
+ ],
+ TR: [
+  { age: [5, 16], title: tr('茶杯不离手'), text: tr('郁金香形的小茶杯一天要来七八回。倒茶的人手腕稳得像杂技。'), type: 'warm', effects: { happiness: 3, social: 2 } },
+  { age: [6, 18], title: tr('渡轮上的海鸥'), text: tr('横渡海峡只要十几分钟，海鸥追着船飞。有人把面包掰碎了抛向空中。'), type: 'warm', effects: { happiness: 4 } },
+  { age: [8, 22], title: tr('开斋的第一口'), text: tr('日落前满街飘着饭香。第一口水下去的那一瞬间，全桌人都笑了。'), type: 'family', effects: { happiness: 4, social: 3 } },
+  { age: [20, 70], title: tr('邻里的一杯水'), text: tr('对面的大妈隔三差五端来一碗热汤。你回赠一盘自己做的，一来一往成了习惯。'), type: 'family', effects: { happiness: 4, social: 4 } }
+ ],
+};
+
+// ---- "envy" events: pure feeling from a missing condition, never a dialog, never compensated ----
+const ENVY_EVENTS = [
+ { id: 'envy_school', age: [8, 15], weight: .7, cond: l => (l.school?.basicProgress || 0) < 6, build: () => ({ title: tr('羡慕上学的朋友'), text: tr('同龄人背着书包往学校走，你站在门口看了一会儿。这一天和平常一样难过，也和平常一样过去。'), type: 'event', effects: { happiness: -2 } }) },
+ { id: 'envy_light', age: [7, 16], weight: .5, cond: l => l.country.gdp < 8000, build: () => ({ title: tr('别人家的灯'), text: tr('停电的晚上，隔壁有发电机的屋子还亮着。你把作业挪到门口，借着那点光写完。'), type: 'event', effects: { happiness: -2, knowledge: 2 } }) },
+ { id: 'envy_shoes', age: [8, 16], weight: .5, cond: l => (l.family?.wealth || 0) < .35, build: () => ({ title: tr('一双新鞋'), text: tr('同学换了新鞋，走路时有声音。你低头看了看自己的，鞋头已经开过一次线。'), type: 'event', effects: { happiness: -1 } }) }
+];
+
 // ---------------- Random events ----------------
 const EVENTS=[
- {id:'school_praise',age:[7,14],weight:1,cond:l=>(l.school?.basicProgress||0)>0||!!(l.school?.program&&!l.school.program.paused),build:l=>({title:tr('老师多看了你一眼'),text:tr('作业本上多了一行字：“你比昨天写得更好。”'),type:'warm',options:[
+ {id:'school_praise',age:[7,14],weight:1,mini:true,cond:l=>(l.school?.basicProgress||0)>0||!!(l.school?.program&&!l.school.program.paused),build:l=>({title:tr('老师多看了你一眼'),text:tr('作业本上多了一行字：“你比昨天写得更好。”'),type:'warm',options:[
   {key:'study',label:tr('把那句话记在心里'),description:tr('认真对待下一次作业。'),effects:{knowledge:6,happiness:2}},
   {key:'play',label:tr('和朋友去操场'),description:tr('把下午留给奔跑和笑声。'),effects:{happiness:6,social:4}}]})},
- {id:'bully',age:[8,15],weight:.8,cond:()=>true,build:l=>({title:tr('走廊尽头的声音'),text:tr('有人反复拿你的口音开玩笑。你站在走廊尽头，不知道要不要回头。'),type:'bad',options:[
+ {id:'bully',age:[8,15],weight:.8,cond:()=>true,build:l=>({title:tr('走廊尽头的声音'),text:tr('有人反复拿你的口音开玩笑。{x}', {x: temperamentLead(l)==='grit'?tr('你站住了，直直地看着对方。'):temperamentLead(l)==='cur'?tr('你在想他们为什么只笑你的口音。'):temperamentLead(l)==='act'?tr('你攥紧了书包带子，手心出了汗。'):tr('你站在走廊尽头，不知道要不要回头。')}),type:'bad',options:[
   {key:'tell',label:tr('告诉老师和家人'),description:tr('让大人知道，也让自己不再一个人扛。'),effects:{social:4,happiness:2,knowledge:1}},
   {key:'endure',label:tr('假装没听见'),description:tr('希望他们有一天会腻。'),effects:{happiness:-5,social:-2}},
   {key:'fight',label:tr('当面顶回去'),description:tr('把话说清楚，也承担冲突的后果。'),effects:{health:-2,social:2,happiness:1}}]})},
  {id:'family_move',age:[6,16],weight:.5,cond:()=>true,build:l=>({title:tr('家搬到了另一边'),text:tr('父母换了工作，你跟着搬去城市另一头。旧朋友还在原来的学校，新房间的窗朝北。'),type:'event',effects:{social:-3,knowledge:4,happiness:-2}})},
  {id:'found_wallet',age:[8,16],weight:.5,cond:()=>true,build:l=>({title:tr('长椅上的钱包'),text:tr('一只旧钱包躺在长椅上，里面有一张身份证和几张纸币。'),type:'event',options:[
   {key:'return',label:tr('交给附近的店员'),description:tr('也许失主会回来找。'),effects:{social:5,happiness:3}},
-  {key:'keep',label:tr('先收起来'),description:tr('没有人看见。'),effects:{cash:600,happiness:-3}}]})},
+  {key:'keep',label:tr('先收起来'),description:tr('没有人看见。'),effects:{cash:'gdp:.06',happiness:-3}}]})},
  {id:'sibling_try',age:[1,14],weight:.55,cond:l=>{const m=l.family?.mother,f=l.family?.father;if(!m||m.alive===false||!f||f.alive===false)return false;if((m.age??99)<20||(m.age??0)>45||(f.age??0)>62)return false;if((l.family.siblings||[]).length>=3)return false;return (l.family.lastSiblingTry??-9)+4<=l.age;},build:l=>{l.family.siblings||=[];l.family.lastSiblingTry=l.age;const mature=Math.max(0,(l.family.mother.age||40)-34)*.015+Math.max(0,(l.family.father.age||40)-50)*.01;if(!chance(l,Math.max(.12,.58-mature)))return{title:tr('家里没有添人'),text:tr('{name}和{name2}都还在，也提过再要一个孩子。母亲{age}岁，父亲{age2}岁。这一年没有迎来新生儿。', {name: l.family.mother.name, name2: l.family.father.name, age: l.family.mother.age, age2: l.family.father.age}),type:'family',effects:{happiness:-1}};const sex=chance(l,.5)?'男':'女';const sib={...person(l,l.country,sex),id:`sibling-${l.birthYear+l.age}-${l.family.siblings.length}`,age:0,birthYear:l.birthYear+l.age,alive:true,bond:55};l.family.siblings.push(sib);return{title:tr('{name}出生了', {name: sib.name}),text:tr('{name}生下了{x}{name2}。这是一个会和你一起长大的人。', {name: l.family.mother.name, x: sex==='男'?tr('弟弟'):tr('妹妹'), name2: sib.name}),type:'warm',effects:{social:3,happiness:2}};}},
- {id:'child_illness',age:[1,10],weight:.5,cond:()=>true,build:l=>({title:tr('半夜的发烧'),text:tr('你烧到三十九度，父母抱着你去了医院。走廊的灯很白。'),type:'bad',effects:{medical:true,health:-4,cash:-600,happiness:-2}})},
+ {id:'child_illness',age:[1,10],weight:.5,cond:()=>true,build:l=>({title:tr('半夜的发烧'),text:tr('你烧到三十九度，父母抱着你去了医院。走廊的灯很白。'),type:'bad',effects:{medical:true,health:-4,cash:'-gdp:.05',happiness:-2}})},
  {id:'exam_pressure',age:[12,18],weight:1,cond:()=>true,build:l=>({title:tr('一场重要的考试'),text:tr('成绩会决定下一步能去哪里。书桌上的台灯亮到很晚。'),type:'event',options:[
   {key:'cram',label:tr('熬夜复习'),description:tr('把能记住的都记住。'),effects:{knowledge:8,health:-3}},
   {key:'normal',label:tr('按平常节奏复习'),description:tr('睡够，也留一点空白。'),effects:{knowledge:4,happiness:1}},
   {key:'giveup',label:tr('这次先放下'),description:tr('承认自己需要休息。'),effects:{knowledge:-4,happiness:2}}]})},
- {id:'first_crush',age:[14,19],weight:.8,cond:l=>!l.partner,build:l=>({title:tr('心跳得有点快'),text:tr('你发现自己总在人群里找同一个人。对方笑起来的时候，你忘了要说什么。'),type:'warm',options:[
+ {id:'first_crush',age:[14,19],weight:.8,mini:true,cond:l=>!l.partner,build:l=>({title:tr('心跳得有点快'),text:tr('你发现自己总在人群里找同一个人。对方笑起来的时候，你忘了要说什么。'),type:'warm',options:[
   {key:'confess',label:tr('找个机会说出来'),description:tr('不管结果如何，至少不再猜。'),effects:{happiness:6,social:3}},
   {key:'friend',label:tr('先做朋友'),description:tr('把喜欢放在心里，慢慢相处。'),effects:{happiness:2,social:2}}]})},
  {id:'part_time',age:[15,19],weight:.6,cond:()=>true,build:l=>({title:tr('周末的零工'),text:tr('一家店愿意让你周末去帮忙，工资不高，但够买自己想要的东西。'),type:'event',options:[
-  {key:'work',label:tr('去做兼职'),description:tr('攒一点钱，也见识真实的工作。'),effects:{cash:1200,social:3,knowledge:-2}},
+  {key:'work',label:tr('去做兼职'),description:tr('攒一点钱，也见识真实的工作。'),effects:{cash:'gdp:.12',social:3,knowledge:-2}},
   {key:'study',label:tr('把周末留给学习'),description:tr('准备考试，暂时不打工。'),effects:{knowledge:5}}]})},
- {id:'online_link',age:[12,30],weight:.5,cond:()=>true,build:l=>({title:tr('一条陌生的链接'),text:tr('屏幕上弹出一条消息：点开就能领取一份礼物。你盯着那个陌生的网址。'),type:'bad',options:[
+ {id:'online_link',age:[12,30],weight:.5,mini:true,cond:()=>true,build:l=>({title:tr('一条陌生的链接'),text:tr('屏幕上弹出一条消息：点开就能领取一份礼物。你盯着那个陌生的网址。'),type:'bad',options:[
   {key:'click',label:tr('点开看看'),description:tr('也许是真的。'),effects:{cash:'-gdp:.05',happiness:-3}},
   {key:'ignore',label:tr('关掉并举报'),description:tr('不把时间交给陌生人的链接。'),effects:{knowledge:1,happiness:1}}]})},
  {id:'promotion',age:[23,58],weight:1,cond:l=>l.age>=18&&!l.retired&&l.income>0,build:l=>({title:tr('更大的责任'),text:tr('上司问你愿不愿意接手一个更重要的项目。它会占用很多晚上。'),type:'event',options:[
   {key:'accept',label:tr('接下来'),description:tr('收入和压力一起变多。'),effects:{incomePct:.15,health:-4,happiness:3,social:2}},
   {key:'decline',label:tr('把手上的事做好'),description:tr('不急着证明自己。'),effects:{happiness:2,social:2}}]})},
  {id:'layoff',age:[25,60],weight:.5,cond:l=>!l.retired&&l.income>0,build:l=>({title:tr('一封信'),text:tr('公司调整了业务，你的岗位被列进了名单。桌上的东西不多，一个纸箱就装完了。'),type:'bad',options:[
-  {key:'hunt',label:tr('马上找工作'),description:tr('把简历投出去，也问问旧同事。'),effects:{job:'求职中',income:-1,happiness:-5,cash:-1000}},
-  {key:'reskill',label:tr('先学一门新技能'),description:tr('用几个月补上缺口。'),effects:{job:'求职中',income:0,cash:-2500,knowledge:8,happiness:-2}},
-  {key:'rest',label:tr('休息一段时间'),description:tr('允许自己停一停。'),effects:{job:'待业',income:0,happiness:2,cash:-2000}}]})},
- {id:'side_hustle',age:[22,55],weight:.7,cond:l=>!l.retired&&l.income>0,build:l=>({title:tr('下班后的副业'),text:tr('朋友拉你一起做一个小项目：周末拍视频，或者接一点设计活。'),type:'event',options:[
-  {key:'join',label:tr('试着做起来'),description:tr('少睡一点，多一份可能。'),effects:{cash:-800,incomePct:.08,health:-3,knowledge:4}},
+  {key:'hunt',label:tr('马上找工作'),description:tr('把简历投出去，也问问旧同事。'),effects:{job:'求职中',income:-1,happiness:-5,cash:'-gdp:.065'}},
+  {key:'reskill',label:tr('先学一门新技能'),description:tr('用几个月补上缺口。'),effects:{job:'求职中',income:0,cash:'-gdp:.16',knowledge:8,happiness:-2}},
+  {key:'rest',label:tr('休息一段时间'),description:tr('允许自己停一停。'),effects:{job:'待业',income:0,happiness:2,cash:'-gdp:.13'}}]})},
+ {id:'side_hustle',age:[22,55],weight:.7,mini:true,cond:l=>!l.retired&&l.income>0,build:l=>({title:tr('下班后的副业'),text:tr('朋友拉你一起做一个小项目：周末拍视频，或者接一点设计活。'),type:'event',options:[
+  {key:'join',label:tr('试着做起来'),description:tr('少睡一点，多一份可能。'),effects:{cash:'-gdp:.08',incomePct:.08,health:-3,knowledge:4}},
   {key:'pass',label:tr('先顾好主业'),description:tr('把精力留给已经选择的生活。'),effects:{happiness:1}}]})},
  {id:'stock_tip',age:[22,65],weight:.7,cond:l=>l.money>800,build:l=>({title:tr('行情软件的深夜推送'),text:tr('群里有人晒出收益截图，劝你在市场里下一注。你决定先想清楚自己能承受多大亏损，再由系统配置标的。这次投入四分之一现金，按一段持有期的行情结算。'),type:'event',options:[
    ...STOCK_RISKS.map(risk=>({key:risk.id,label:tr('{name}投入', {name: risk.name}),description:tr('{description} 本次模拟收益范围 {minReturn}% 至 +{maxReturn}%。', {description: risk.description, minReturn: Math.round(risk.minReturn*100), maxReturn: Math.round(risk.maxReturn*100)}),resolve:l=>{
@@ -444,31 +617,31 @@ const EVENTS=[
   {key:'hold',label:tr('什么都不做'),description:tr('相信时间，也接受波动。'),effects:{happiness:-2,knowledge:3}},
   {key:'buy',label:tr('再买一点'),description:tr('用一成现金加仓。'),resolve:l=>({text:tr('你又买了一些。没有人知道这是底部，还是半山腰。'),effects:{invest:{index:.1},happiness:-1,knowledge:2}})}]})},
  {id:'lottery',age:[18,80],weight:.5,cond:l=>l.money>500,build:l=>({title:tr('街角的彩票店'),text:tr('一张彩票只要很少的钱，海报上写着“改变命运”。'),type:'event',options:[
-  {key:'buy',label:tr('买一张'),description:tr('当作一个很便宜的梦。'),resolve:l=>{const win=chance(l,.03);return{text:win?tr('你中了一个小奖。金额不算多，但足够请朋友吃一顿。'):tr('没有中。你把彩票夹进书里，当作今年的一枚书签。'),effects:{cash:win?8000:-200,happiness:win?6:0}}}},
+  {key:'buy',label:tr('买一张'),description:tr('当作一个很便宜的梦。'),resolve:l=>{const win=chance(l,.03);return{text:win?tr('你中了一个小奖。金额不算多，但足够请朋友吃一顿。'):tr('没有中。你把彩票夹进书里，当作今年的一枚书签。'),effects:{cash:win?'gdp:.5':'-gdp:.012',happiness:win?6:0}}}},
   {key:'pass',label:tr('走过去'),description:tr('把这点钱留给更确定的事。'),effects:{knowledge:1}}]})},
  {id:'scam_call',age:[20,80],weight:.7,cond:()=>true,build:l=>({title:tr('自称客服的电话'),text:tr('对方说你的账户出了问题，需要马上把钱转到“安全账户”。背景音里有人在敲键盘。'),type:'bad',options:[
-  {key:'transfer',label:tr('按对方说的做'),description:tr('你很担心账户真的出事。'),effects:{cash:-Math.min(5000,Math.max(800,Math.round(l.money*.25))),happiness:-6}},
+  {key:'transfer',label:tr('按对方说的做'),description:tr('你很担心账户真的出事。'),effects:{cash:-Math.min(Math.round(l.country.gdp*.35),Math.max(Math.round(l.country.gdp*.05),Math.round(l.money*.25))),happiness:-6}},
   {key:'hangup',label:tr('挂断并打官方电话'),description:tr('先核实，再决定。'),effects:{knowledge:2,happiness:1}},
   {key:'report',label:tr('报警并提醒家人'),description:tr('让这件事停在今天。'),effects:{social:2,happiness:2}}]})},
- {id:'wedding',age:[20,50],weight:.7,cond:l=>l.age>=20,build:l=>({title:tr('一张婚礼请柬'),text:tr('老朋友要结婚了。请柬上写着你的名字，地点在另一座城市。'),type:'event',options:[
+ {id:'wedding',age:[20,50],weight:.7,mini:true,cond:l=>l.age>=20,build:l=>({title:tr('一张婚礼请柬'),text:tr('老朋友要结婚了。请柬上写着你的名字，地点在另一座城市。'),type:'event',options:[
   {key:'go',label:tr('去参加，随一份礼'),description:tr('见见旧朋友，也送上祝福。'),effects:{cash:'-gdp:.08',social:5,happiness:4}},
-  {key:'decline',label:tr('礼到人不到'),description:tr('最近实在走不开。'),effects:{cash:-500,social:-1}}]})},
+  {key:'decline',label:tr('礼到人不到'),description:tr('最近实在走不开。'),effects:{cash:'-gdp:.03',social:-1}}]})},
  {id:'rent_rise',age:[22,60],weight:.5,cond:l=>!l.house,build:l=>({title:tr('房东发来的消息'),text:tr('房租下个月要涨。房东说附近都这个价，你可以考虑，也可以搬。'),type:'event',options:[
-  {key:'accept',label:tr('接受涨租'),description:tr('不用折腾，但每月更紧。'),effects:{cash:-1800,happiness:-2}},
-  {key:'move',label:tr('找更便宜的房子'),description:tr('搬家很累，但能省下一点。'),effects:{cash:-2500,social:-2,happiness:-1,knowledge:1}},
-  {key:'negotiate',label:tr('和房东谈谈'),description:tr('说明自己的情况，争取一个折中。'),effects:{cash:-700,happiness:1,social:1}}]})},
+  {key:'accept',label:tr('接受涨租'),description:tr('不用折腾，但每月更紧。'),effects:{cash:'-gdp:.12',happiness:-2}},
+  {key:'move',label:tr('找更便宜的房子'),description:tr('搬家很累，但能省下一点。'),effects:{cash:'-gdp:.16',social:-2,happiness:-1,knowledge:1}},
+  {key:'negotiate',label:tr('和房东谈谈'),description:tr('说明自己的情况，争取一个折中。'),effects:{cash:'-gdp:.045',happiness:1,social:1}}]})},
  {id:'health_scare',age:[30,75],weight:.7,cond:()=>true,build:l=>({title:tr('身体发出的信号'),text:tr('持续几周的疲惫和疼痛，让你开始想：要不要去医院查一查？'),type:'bad',options:[
-  {key:'check',label:tr('做一次全面检查'),description:tr('花钱买一个确定的答案。'),effects:{medical:true,cash:-2500,health:5,knowledge:2}},
+  {key:'check',label:tr('做一次全面检查'),description:tr('花钱买一个确定的答案。'),effects:{medical:true,cash:'-gdp:.16',health:5,knowledge:2}},
   {key:'wait',label:tr('再观察一阵'),description:tr('也许只是最近太累了。'),effects:{health:-3,happiness:-1}}]})},
  {id:'burnout',age:[25,55],weight:.6,cond:l=>!l.retired&&l.income>0,build:l=>({title:tr('提不起劲的早晨'),text:tr('闹钟响了三遍，你还是不想起床。工作没有出错，但你已经很久没有期待过周一。'),type:'bad',options:[
-  {key:'rest',label:tr('请一段假'),description:tr('把时间还给自己。'),effects:{cash:-2000,health:6,happiness:5}},
+  {key:'rest',label:tr('请一段假'),description:tr('把时间还给自己。'),effects:{cash:'-gdp:.13',health:6,happiness:5}},
   {key:'push',label:tr('再撑一阵'),description:tr('项目结束就好了。'),effects:{health:-5,incomePct:.03,happiness:-2}}]})},
  {id:'parent_illness',age:[25,60],weight:.6,cond:l=>l.family.mother?.alive||l.family.father?.alive,build:l=>{const p=l.family.mother?.alive?l.family.mother:l.family.father;return{title:tr('医院走廊'),text:tr('{name}住院了。医生说需要有人照顾，也需要一笔不算小的费用。', {name: p.name}),type:'bad',options:[
-  {key:'pay',label:tr('承担治疗费用'),description:tr('把积蓄拿出来，换一个安心。'),effects:{medical:true,cash:-6000,social:5,happiness:2}},
+  {key:'pay',label:tr('承担治疗费用'),description:tr('把积蓄拿出来，换一个安心。'),effects:{medical:true,cash:'-gdp:.4',social:5,happiness:2}},
   {key:'company',label:tr('请几天假去陪伴'),description:tr('钱可以再挣，时间不能。'),effects:{cash:'-gdp:.08',social:6,happiness:3,health:-1}},
   {key:'busy',label:tr('先忙完手上的事'),description:tr('你知道自己会为此难过很久。'),effects:{happiness:-6,social:-3}}]}}},
  {id:'child_school',age:[30,55],weight:.8,cond:l=>l.children.some(c=>c.age>=5&&c.age<=17),build:l=>{const c=l.children.find(c=>c.age>=5&&c.age<=17);return{title:tr('孩子的学校'),text:tr('{name}到了要选学校的年纪。公立学校近，私立学校资源更多，也更贵。', {name: c.name}),type:'event',options:[
-  {key:'public',label:tr('就近上公立学校'),description:tr('把省下的钱留给生活。'),effects:{cash:-1000,knowledge:2,happiness:2}},
+  {key:'public',label:tr('就近上公立学校'),description:tr('把省下的钱留给生活。'),effects:{cash:'-gdp:.065',knowledge:2,happiness:2}},
   {key:'private',label:tr('咬牙送私立'),description:tr('希望孩子有更多选择。'),effects:{cash:'-gdp:.3',knowledge:6,happiness:3}},
   {key:'home',label:tr('多花时间陪他学'),description:tr('学校之外，家庭也是课堂。'),effects:{social:5,knowledge:3,happiness:3}}]}}},
  {id:'reunion',age:[30,70],weight:.8,cond:()=>true,build:l=>({title:tr('多年后的重逢'),text:tr('你在街上遇见一个很久没见的人。你们站在路边，从近况聊到从前。'),type:'warm',effects:{happiness:5,social:4}})},
@@ -476,13 +649,13 @@ const EVENTS=[
  {id:'business_idea',age:[28,60],weight:.5,cond:l=>!l.retired&&l.money>3000,build:l=>({title:tr('一个开店的机会'),text:tr('朋友要转让一家小店。位置不错，但要先投入一笔钱，也不保证能赚回来。'),type:'event',options:[
   {key:'invest',label:tr('把钱投进去'),description:tr('自己当一次老板。'),resolve:l=>{const win=chance(l,.52);const gain=round(l.money*.5*(win?.8:-.5));return{text:win?tr('小店慢慢有了回头客。你第一次体会到“为自己工作”的重量。'):tr('生意没有撑过一年。你关掉店门，把剩下的货折价处理。'),effects:{cash:gain,incomePct:win?.12:0,happiness:win?6:-5,knowledge:3}}}},
   {key:'pass',label:tr('继续现在的工作'),description:tr('不做没有把握的冒险。'),effects:{happiness:1}}]})},
- {id:'home_repair',age:[30,80],weight:.4,cond:l=>!!l.house,build:l=>({title:tr('屋顶漏水了'),text:tr('一场大雨之后，天花板出现了一块水渍。维修师傅说，最好尽快处理。'),type:'event',effects:{cash:-3500,happiness:-2}})},
+ {id:'home_repair',age:[30,80],weight:.4,cond:l=>!!l.house,build:l=>({title:tr('屋顶漏水了'),text:tr('一场大雨之后，天花板出现了一块水渍。维修师傅说，最好尽快处理。'),type:'event',effects:{cash:'-gdp:.22',happiness:-2}})},
  {id:'travel_deal',age:[25,70],weight:.6,cond:l=>l.money>1500,build:l=>{const d=pick(l,DESTINATIONS.slice(1));return{title:tr('一张便宜的机票'),text:tr('朋友发来一张去{name}的折扣机票，只比他去年买的价格贵一点。', {name: d.name}),type:'event',options:[
   {key:'book',label:tr('订票去{place}', {place: d.place}),description:tr('大约 {minCost} 的机票和住宿。', {minCost: Math.round(d.minCost*.8)}),resolve:l=>{const r=travel(l,d.id,'solo',{discount:.8});return{text:r.ok?tr('你去了{place}。回来之后，手机里多了几百张照片。', {place: d.place}):tr('你翻了翻账户，最后还是把页面关掉了。'),effects:{happiness:r.ok?3:0}}}},
   {key:'skip',label:tr('把假期留到以后'),description:tr('以后也许会有更合适的时候。'),effects:{knowledge:1}}]}}},
  {id:'volunteer',age:[25,80],weight:.5,cond:()=>true,build:l=>({title:tr('社区在招志愿者'),text:tr('社区中心贴出通知，周末需要人帮忙整理旧书、陪老人聊天。'),type:'warm',options:[
   {key:'join',label:tr('去帮一天忙'),description:tr('做一些不赚钱但有用的事。'),effects:{social:6,happiness:4}},
-  {key:'donate',label:tr('捐一点钱'),description:tr('用另一种方式参与。'),effects:{cash:-500,social:2,happiness:2}}]})},
+  {key:'donate',label:tr('捐一点钱'),description:tr('用另一种方式参与。'),effects:{cash:'-gdp:.03',social:2,happiness:2}}]})},
  {id:'insurance_offer',age:[25,60],weight:.5,cond:l=>!l.insurance,build:l=>({title:tr('一份医疗保险'),text:tr('保险代理人打来电话，说一场大病可能让一个家庭很多年缓不过来。'),type:'event',options:[
   {key:'buy',label:tr('给自己买一份'),description:tr('每年交一笔保费，生病时少一点压力。'),effects:{insurance:true,cash:'-gdp:.05',happiness:2}},
   {key:'skip',label:tr('暂时不需要'),description:tr('先把钱用在眼前。'),effects:{knowledge:1}}]})},
@@ -491,9 +664,9 @@ const EVENTS=[
  {id:'late_learning',age:[50,82],weight:.5,cond:()=>true,build:l=>({title:tr('一直想学的事'),text:tr('社区大学开了一门课，是你年轻时一直想学、却总没有时间学的东西。'),type:'event',options:[
   {key:'enroll',label:tr('报名去上课'),description:tr('和比自己年轻很多的人坐进同一间教室。'),effects:{cash:'-gdp:.08',knowledge:8,happiness:4}},
   {key:'self',label:tr('自己找书看'),description:tr('按自己的节奏慢慢学。'),effects:{knowledge:4,happiness:2}}]})},
- {id:'natural_disaster',age:[10,85],weight:.3,cond:()=>true,build:l=>({title:tr('天气变得陌生'),text:tr('一场罕见的暴雨打乱了城市。你家的窗户进了水，附近的道路也断了。'),type:'bad',effects:{cash:-4200,health:-2,happiness:-4}})},
+ {id:'natural_disaster',age:[10,85],weight:.3,cond:()=>true,build:l=>({title:tr('天气变得陌生'),text:tr('一场罕见的暴雨打乱了城市。你家的窗户进了水，附近的道路也断了。'),type:'bad',effects:{cash:'-gdp:.27',health:-2,happiness:-4}})},
  {id:'windfall',age:[20,80],weight:.3,cond:()=>true,build:l=>({title:tr('一笔意外的钱'),text:tr('你整理旧物时，发现一张多年前的存单，金额比记忆里多了一点。'),type:'warm',effects:{cash:Math.round(l.country.gdp*.25),happiness:4}})},
- {id:'theft',age:[20,75],weight:.3,cond:()=>true,build:l=>({title:tr('空掉的口袋'),text:tr('在拥挤的车站，你的钱包不见了。补办证件比丢钱更让人疲惫。'),type:'bad',effects:{cash:-Math.min(2000,Math.round(l.money*.08)),happiness:-4}})},
+ {id:'theft',age:[20,75],weight:.3,cond:()=>true,build:l=>({title:tr('空掉的口袋'),text:tr('在拥挤的车站，你的钱包不见了。补办证件比丢钱更让人疲惫。'),type:'bad',effects:{cash:-Math.min(Math.round(l.country.gdp*.12),Math.round(l.money*.08)),happiness:-4}})},
  {id:'mentor',age:[20,40],weight:.5,cond:l=>!l.retired,build:l=>({title:tr('愿意带你的人'),text:tr('一位前辈说，愿意花时间教你做事，也会把一些机会交给你。'),type:'event',options:[
   {key:'follow',label:tr('认真跟着学'),description:tr('多做一些，也多学一些。'),effects:{knowledge:6,incomePct:.05,health:-1}},
   {key:'distance',label:tr('保持自己的节奏'),description:tr('不想把生活全部交给工作。'),effects:{happiness:2}}]})},
@@ -502,16 +675,43 @@ const EVENTS=[
   {key:'skip',label:tr('改天再说'),description:tr('最近实在太忙。'),effects:{health:-1}}]})},
  {id:'retire_plan',age:[55,66],weight:.5,cond:l=>!l.retired,build:l=>({title:tr('退休这件事'),text:tr('你开始认真算一笔账：还要工作几年，养老金够不够，房子和存款能不能撑住。'),type:'event',options:[
   {key:'save',label:tr('再多存一点'),description:tr('把一部分现金放进更稳的地方。'),effects:{cash:'-gdp:.15',invest:{bonds:1},happiness:-1}},
-  {key:'enjoy',label:tr('也给自己花一点'),description:tr('日子不是只为退休准备的。'),effects:{cash:'-gdp:.08',happiness:5}}]})}
+  {key:'enjoy',label:tr('也给自己花一点'),description:tr('日子不是只为退休准备的。'),effects:{cash:'-gdp:.08',happiness:5}}]})},
+ {id:'old_letters',age:[65,100],weight:.5,cond:l=>!l.retired||l.age>=65,build:l=>({title:tr('抽屉最底层的信'),text:tr('收拾柜子时，翻出一沓旧信。有的字迹已经淡了，落款的人有的还在，有的不在了。'),type:'warm',options:[
+  {key:'reread',label:tr('挑一个下午重读'),description:tr('把它们按年份摆好，看了一遍。'),effects:{happiness:6,knowledge:1}},
+  {key:'share',label:tr('挑一封念给家人听'),description:tr('有人坐下来听完，也问起写信的人。'),effects:{happiness:5,social:6}},
+  {key:'box',label:tr('原样放回去'),description:tr('有些东西还不到打开的时候。'),effects:{happiness:1}}]})},
+ {id:'old_revisit',age:[66,100],weight:.5,cond:()=>true,build:l=>({title:tr('门口的长椅'),text:tr('你常坐的那张长椅换了新漆。坐下来的时候，对面楼的老人朝你点头。'),type:'warm',options:[
+  {key:'chat',label:tr('聊一会儿'),description:tr('聊的都是小事，也聊到了各自的孩子。'),effects:{happiness:4,social:5}},
+  {key:'walk',label:tr('再走一段熟悉的路'),description:tr('慢慢地走完，回家时天还亮着。'),effects:{happiness:5,health:2}},
+  {key:'rest',label:tr('只是坐一坐'),description:tr('什么都不做也很好。'),effects:{happiness:3}}]})},
+ {id:'old_tell',age:[68,100],weight:.45,cond:()=>true,build:l=>({title:tr('有些话想说在前头'),text:tr('你想把几件事交代清楚：存折放在哪、希望的安排、以及不想让家里人争论的事。'),type:'family',options:[
+  {key:'tell',label:tr('和家里人好好说一次'),description:tr('说完了，屋里安静了一会儿，然后像平常一样吃了晚饭。'),effects:{happiness:4,social:7}},
+  {key:'write',label:tr('写在纸上收好'),description:tr('放在他们找得到的地方，没有说破。'),effects:{happiness:3,knowledge:2}},
+  {key:'later',label:tr('再等等，还不急'),description:tr('日子还长，这句话先留在心里。'),effects:{happiness:1}}]})},
 ];
+// expand country culture sets into pool entries, keyed per country
+CULTURE_EVENTS && Object.entries(CULTURE_EVENTS).forEach(([cid, list]) => list.forEach((c, i) => EVENTS.push({
+ id: `cul_${cid}_${i}`, age: c.age, weight: .45, cond: l => l.country?.id === cid,
+ build: () => ({ title: c.title, text: c.text, type: c.type, effects: (() => { const out = { ...c.effects }; if (typeof out.cash === 'string') out.cash = out.cash; return out; })() })
+})));
+ENVY_EVENTS.forEach(e => EVENTS.push(e));
+EVENTS.push({id:'early_marriage_ask',age:[14,17],weight:.9,cond:l=>['NG','IN','PK','BD','ET'].includes(l.country?.id)&&l.sex==='女'&&!(l.systems?.earlyMarriageAsked)&&!l.partner,build:l=>{
+  const par=[l.family?.mother,l.family?.father].filter(p=>p&&p.alive!==false);
+  if(!par.length)return null;
+  l.systems.earlyMarriageAsked=true;
+  const who=par.map(p=>p.name).join(tr('和'));
+  return{title:tr('家里提了一门亲事'),text:tr('{who}认为{name}年纪到了，托人来说了一门亲。对方家里催得紧。你还没有满十八岁。', {who, name: l.name}),type:'family',options:[
+   {key:'refuse',label:tr('说自己要继续读书'),description:tr('家里可能不高兴，但这门亲事会就此打住。'),effects:{knowledge:4,happiness:-3,social:-2}},
+   {key:'delay',label:tr('说再等两年'),description:tr('把话先接住，往后拖。'),effects:{happiness:-1}},
+   {key:'hear',label:tr('先见一面听听'),description:tr('见一面不代表答应，但话会传开。'),effects:{happiness:-2,social:2}}]}}});
 const EVENT_BY_ID=Object.fromEntries(EVENTS.map(e=>[e.id,e]));
 
 function maybeEvent(life){
  if(life.pending||life.dead||life.age<2)return;
  const since=life.lastEventAge==null?99:life.age-life.lastEventAge;
  let p=life.age<10?.12:.2;
- if(since>=4)p+=.12;
- if(since>=7)p+=.18;
+ if(since>=4)p+=.08;
+ if(since>=7)p+=.10;
  if(!chance(life,p))return;
  const pool=EVENTS.filter(e=>life.age>=e.age[0]&&life.age<=e.age[1]&&!life.recentEvents.includes(e.id)&&(!e.cond||e.cond(life)));
  if(!pool.length)return;
@@ -522,7 +722,7 @@ function maybeEvent(life){
  if(life.age<6&&data.options?.length)return;
  life.lastEventAge=life.age;life.recentEvents.push(event.id);if(life.recentEvents.length>8)life.recentEvents.shift();
  if(data.options?.length){
-  life.pending={kind:'event',eventId:event.id,buildState,title:data.title,text:data.text,options:data.options.map(o=>({key:o.key,label:o.label,description:o.description}))};
+  life.pending={kind:'event',eventId:event.id,buildState,mini:event.mini===true,title:data.title,text:data.text,options:data.options.map(o=>({key:o.key,label:o.label,description:o.description}))};
   log(life,data.title,data.text,'event');
  }else{
   const details=applyEffects(life,data.effects||{});
@@ -546,6 +746,8 @@ export function choose(life,index){
  life.decisions=(life.decisions||0)+1;
  const pending=life.pending;
  if(pending.kind==='education'){educationChoice(life,index);return life;}
+  if(isTemperament(pending)){temperamentAnswer(life,pending.options[index].key);return life;}
+  if(pending.kind==='reflection'){const opt=pending.options[index];if(opt.key==='write')life.awaitingReflectionText=true;life.pending=null;log(life,tr('这一句留到你落笔'),tr('答案会保存在这一生的纪念卡上。现在，日子继续。'),'memory');return life;}
  if(pending.kind==='system'){systemChoice(life,pending,index);return life;}
  life.pending=null;
  const option=pending.options[index];let outcome={effects:option.effects||{},text:option.description||''};
@@ -573,7 +775,8 @@ export function advanceYear(life,options={}){
  for(const [k,v] of Object.entries(focus))life.stats[k]=clamp(life.stats[k]+v);
  life.stats.health-=(age<40?.3:age<65?.75:1.6);
  if(age<18)life.stats.knowledge=clamp(life.stats.knowledge+((life.school?.basicProgress>0||life.school?.program)&&!life.school?.program?.paused?2:.4));
- careerYear(life);
+ if((life.lived?.leaveUntil||0)>=age&&life.lived.leaveCut!==age&&life.lived.leaveFull>0)life.income=life.lived.leaveFull;
+  careerYear(life);
   if(age>=18&&!life.retired&&life.income>0)life.income*=1+(life.focus==='work'?.045:.02);
  if(life.retired&&life.income<=0)life.income=Math.round(life.country.gdp*.2);
  marketStep(life);
@@ -583,7 +786,41 @@ export function advanceYear(life,options={}){
  if(options.events!==false&&!life.pending)setMilestone(life,age);
  systemsYear(life, options);
  financeYear(life);
- for(const p of life.companions){p.age=Math.min(age,p.life);p.dead=age>=p.life;p.job=p.dead?'人生已结束':age<18?'学生':age>=65?'退休':age>=22?'在自己的城市工作':'初入社会';}
+if(!life.pending){
+   const idleAsk=Math.max(2*life.country.gdp,(life.systems.lastIdleAsk||0)*1.6);
+   if(life.money>=idleAsk&&life.age>=20){
+    life.systems.lastIdleAsk=life.money;
+    const need=Math.round(idleAsk);
+    life.pending={kind:'system',system:'idle-cash',title:tr('一笔闲钱放在哪儿'),text:tr('你手上的现金超过了{need}（三倍于{name}的人均经济）。放在活期里不会生利息，也不会亏。要怎么安顿，你可以现在决定，也可以先放着。', {need: need.toLocaleString(numberLocale), name: life.country.name}),options:[
+     {key:'mix',label:tr('看投资面板再定'),description:tr('打开投资 / 资产，自己配置基金、债券或股票。')},
+     {key:'keep',label:tr('就放在手上'),description:tr('现金不动。以后想配置，随时可以从「投资」进入。')}]};
+    log(life,tr('一笔闲钱'),tr('现金过了{need}。放哪儿，这一次问你自己。', {need: need.toLocaleString(numberLocale)}),'finance');
+   }
+  }
+   for(const p of life.companions){
+ if(p.dead)continue;
+ p.age=Math.min(age,p.life);
+ if(age>=p.life){p.dead=true;p.job='人生已结束';log(life,tr('{name}离开了', {name: p.name}),tr('同一秒出生的{name}在{age}岁走完了一生，出身{band}人家，{path}。你们从未见面，但年份一直把你们并排往前推。你的这一页还在写。', {name: p.name, age: p.age, band: p.band || tr('普通'), path: p.path}),'world');continue;}
+ p.job=p.dead?'人生已结束':age<18?'学生':age>=65?'退休':age>=22?'在自己的城市工作':'初入社会';
+ if(age>=18&&age>=(p.milestoneAge||10)){p.milestoneAge=(p.milestoneAge||10)+10;log(life,tr('{name}的十年', {name: p.name}),tr('{name}今年{age}岁，出身{band}人家，{path}。你的{age2}岁：{x}。这是同一秒起跑的另一条人生，不是排行榜。', {name: p.name, age: p.age, band: p.band || tr('普通'), path: p.path, age2: age, x: [tr('还在写'),tr('正翻到新的一页'),tr('故事过了一半还没完')][age%3]}),'world');}
+}
+ if(!life.dead&&options.events!==false){
+  const month=[tr('三月'),tr('六月'),tr('九月'),tr('十一月')][life.age%4];
+  const pool=CULTURE_EVENTS[life.country?.id]||[];
+  const busyThisAge=life.log.some(l=>l.age===life.age&&(l.type==='warm'||l.type==='family'));
+  const fitting=pool.filter(c=>life.age>=c.age[0]&&life.age<=c.age[1]&&c.title!==life.systems.lastCul);
+  if(!busyThisAge&&fitting.length){
+   const c=fitting[(life.age+life.birthYear+Math.floor((life.systems.culIdx=(life.systems.culIdx||0)+1)*7))%fitting.length];
+   life.systems.lastCul=c.title;
+   log(life,`${month} · ${c.title}`,c.text,c.type);
+   if(c.effects)applyEffects(life,c.effects);
+  }else if(!busyThisAge&&life.age>=3){
+   const beats=[tr('楼下桂花开了，走过去时带了一身香。'),tr('傍晚的菜市场比白天热闹，你帮邻居挑了两个熟透的。'),tr('连着几天好天气，被子晒出了太阳的味道。'),tr('第一场冷空气来的那天，你翻出了厚衣服。')];
+   const avail=beats.filter(b=>b!==life.systems.lastBeat);const beat=avail[life.age%avail.length];
+   life.systems.lastBeat=beat;
+   log(life,tr('{month}的一天', {month}),beat,'warm');
+  }
+ }
  life.netWorthHistory.push({age,value:netWorth(life)});
  if(deathCheck(life))return life;
  if(options.events!==false){
@@ -741,7 +978,7 @@ export function setInsurance(life,on=true){
 }
 export function travelCost(life,destinationId,companion='solo'){
  const d=DESTINATIONS.find(x=>x.id===destinationId);if(!d)return null;
- const base=Math.max(d.minCost,life.country.gdp*d.costFactor);
+ const base=Math.max(d.minCost*(life.era==='past'?.42:life.era==='future'?1.35:1),life.country.gdp*d.costFactor);
  const mult=companion==='partner'?1.8:companion==='family'?(1+(life.partner?.8:0)+Math.min(3,life.children.filter(c=>c.age<18).length)*.5):companion==='friends'?1:1;
  return Math.round(base*mult);
 }
