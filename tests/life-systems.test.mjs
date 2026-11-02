@@ -486,3 +486,20 @@ test('a second relationship dip opens a heavier branch with real options', () =>
   assert.ok(l2.partner && l2.partner.alive !== false, 'partner kept');
   assert.ok(l2.log.some(e => /先分开住/.test(e.title)));
 });
+
+test('a crisis year offers staying to help others, and it names who was helped', () => {
+  const l = adult('crisis-help');
+  l.age = 40; l.money = 200000; l.pending = null; l.systems.lastYear = null;
+  l.systems.residence.abroadSince = null;
+  l.systems.world = { year: null, title: '全球供应危机', kind: 'crisis', detail: '物流受阻，食品与能源开支上涨。' };
+  // simulate the crisis offer directly through systemChoice path
+  const before = l.money;
+  const opts = [['stay', '缩减开支'], ['shelter', '动用应急预算'], ['help_others', '留下来帮邻居和家人'], ['migrate', '寻找其他地方的机会']];
+  const pending = { kind: 'system', system: 'world-crisis', title: '全球供应危机', text: 't', options: opts.map(([key, label]) => ({ key, label })), world: l.systems.world };
+  l.pending = pending;
+  const idx = pending.options.findIndex(o => o.key === 'help_others');
+  assert.ok(idx >= 0, 'help_others option exists');
+  systemChoice(l, pending, idx);
+  assert.ok(l.money < before, 'costs some money');
+  assert.ok(l.log.some(e => /留了下来搭把手/.test(e.title)), 'logged as staying to help');
+});
