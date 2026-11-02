@@ -326,7 +326,18 @@ export function systemChoice(l, p, index) {
  case 'divorce': if (key !== 'cancel' && l.age >= 18 && l.partner?.name === p.partnerName) settleSeparation(l, key); break;
  case 'relationship':
   if (!alive(l.partner)) break;
-  if (key === 'separate') divorceOffer(l);
+  if (key === 'rebuild') {
+   const ok = chance(l, .5);
+   l.partner.bond = clamp((l.partner.bond || 0) + (ok ? 10 : -3));
+   s.relationshipStrain = 0; s.relationshipAsked = null; s.relationshipHeavyAt = null;
+   log(l, ok ? `和${l.partner.name}把话说开了` : `话还是没有说到心里`, ok ? '冷战之后，你们坐下来把憋着的话讲完了。关系不一定回到从前，至少这一次接上了。' : '你把话说了，对方也说了，但两个人还是站在原来的位置上。冷了下来。');
+  } else if (key === 'cool') {
+   const cost = Math.round(gdp(l) * .06); spend(l, cost);
+   l.partner.bond = clamp((l.partner.bond || 0) - 4);
+   s.relationshipAsked = null; s.relationshipHeavyAt = null;
+   log(l, `和${l.partner.name}先分开住`, `你在外面租了一段，多出${cost}的开销。名义上还是伴侣，日子各过各的。往后是更远还是更近，还没有定。`);
+  } else if (key === 'divorce') divorceOffer(l);
+  else if (key === 'separate') divorceOffer(l);
   else if (key === 'later') { log(l, `和${l.partner.name}先这样过`, '你没有把这件事摊开。关系还是现在这样，同样的问题不会再自动出现。想谈的时候，可以自己去安排。'); }
   else { s.relationshipActions.contact = l.age; communicate(l, key); } break;
  case 'pet-care':
@@ -562,10 +573,20 @@ export function systemsYear(l, options = {}) {
  }
  if (alive(l.partner) && !l.pending) {
    const name = l.partner.name;
-   if ((l.partner.bond || 0) >= 45) s.relationshipRecovered = name;
+   if ((l.partner.bond || 0) >= 45) { s.relationshipRecovered = name; s.relationshipStrain = 0; s.relationshipHeavyAt = null; }
    if (s.relationshipAsked === name && s.relationshipRecovered === name && (l.partner.bond || 0) < 20) { s.relationshipAsked = null; s.relationshipRecovered = null; }
-   if ((l.partner.bond || 0) < 35 && s.relationshipAsked !== name) {
+   const strain = s.relationshipStrain || 0;
+   const askedOnce = s.relationshipAsked === name && s.relationshipRecovered !== name;
+   if (!askedOnce && (l.partner.bond || 0) < 20 && strain >= 1 && s.relationshipHeavyAt !== name) {
+    s.relationshipHeavyAt = name; s.relationshipAsked = name; s.lastRelationshipAge = l.age;
+    offer(l, 'relationship', `${name}和你之间已经冷了很久`, '谈过，也试过咨询，距离还是没有回来。这一次要往哪儿走，你自己定。', [
+     option('rebuild', '再认真试一次，把话说完', '不保证修好。关系可能回暖，也可能只是把话说清楚。'),
+     option('cool', '先分开住一段时间', '不算离婚，各自过一阵。开销会增加，关系可能变淡或变清。'),
+     option('divorce', '正式考虑分开生活', '要动到现金、住房和孩子。'),
+     option('later', '就这样过着', '不改变现状，也不再有自动的追问。')]);
+   } else if (!askedOnce && (l.partner.bond || 0) < 35 && s.relationshipAsked !== name) {
     s.relationshipAsked = name; s.lastRelationshipAge = l.age;
+    s.relationshipStrain = strain + 1;
     offer(l, 'relationship', `与${name}的距离`, '争执和沉默让关系变得脆弱。谈一次、去咨询，或者先这样过。先这样过，同样的问题不会再自动出现。', [option('talk', '认真沟通'), option('counsel', '接受伴侣咨询'), option('separate', '分开生活'), option('later', '先这样过', '不花钱，也不分开。想谈的时候自己去安排。')]);
    }
   }
