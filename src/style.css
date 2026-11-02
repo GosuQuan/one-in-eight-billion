@@ -115,6 +115,7 @@
  .ending-metrics.six div:nth-child(2n){border-right:0}
  .ending-metrics strong{font-size:19px}
 }
+.lang-select{appearance:none;-webkit-appearance:none;background:transparent;border:0;color:inherit;font:inherit;cursor:pointer;padding:0 2px}.lang-select:focus-visible{outline:1px solid currentColor;outline-offset:2px}
 @keyframes year-settle{from{opacity:.25;transform:translateY(8px)}to{opacity:1;transform:none}}
 @keyframes line-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @keyframes dialog-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
