@@ -115,6 +115,7 @@
  .ending-metrics.six div:nth-child(2n){border-right:0}
  .ending-metrics strong{font-size:19px}
 }
+.lang-select{appearance:none;-webkit-appearance:none;background:transparent;border:0;color:inherit;font:inherit;cursor:pointer;padding:0 2px}.lang-select:focus-visible{outline:1px solid currentColor;outline-offset:2px}
 @keyframes year-settle{from{opacity:.25;transform:translateY(8px)}to{opacity:1;transform:none}}
 @keyframes line-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @keyframes dialog-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
@@ -150,3 +151,12 @@
 .ending-pair .track{position:relative;display:block;height:6px;background:var(--line);border-radius:3px}
 .ending-pair .dot{position:absolute;top:-3px;width:12px;height:12px;border-radius:50%;background:var(--wine);transform:translateX(-50%)}
 .pair-note{margin:5px 0 0;font:11px var(--sans);color:var(--muted)}
+/* What moved this year: ▲▼ beside each number, a strip for the current year, a line above each finished year in the life story */
+.delta{margin-left:.45em;font:10px/1 var(--sans);font-variant-numeric:tabular-nums;white-space:nowrap}
+.asset-mini .delta{display:block;margin:3px 0 0}
+.money-block .balance .delta{font-size:11px;vertical-align:middle}
+.year-change{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 16px;border-left:3px solid var(--gold);background:var(--paper);box-shadow:var(--shadow);padding:11px 18px;font-size:11px}
+.year-change-kicker{font-size:10px;letter-spacing:2px;color:var(--wine)}
+.delta-item{white-space:nowrap}
+.feed-year{display:flex;flex-wrap:wrap;gap:2px 12px;margin-left:7px;padding:0 0 16px 24px;border-left:1px solid var(--line);font-size:10px;color:var(--muted)}
+.feed-year b{font-weight:500;color:var(--ink)}
