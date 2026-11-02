@@ -58,6 +58,32 @@
 CDP 驱动脚本：`scripts/cdp.mjs`（text/eval/click/shot）；端到端：`scripts/e2e-smoke.mjs`、`scripts/e2e-multi.mjs`。
 前置条件：静态服务 `:8811` + Chrome `--remote-debugging-port=9222`。
 
+## 七、最终交付（2026-11-03，第 24 轮）
+
+### 证据链
+
+| 项 | 证据位置 |
+|---|---|
+| 八次竞品观察原始记录 | `1in8b-knowledge.md` 第一至十二节 |
+| 竞品完整事件日志（可复核） | `scripts/competitor-run3.json` ~ `competitor-run8.json`（6 份，合计约 56KB） |
+| 十七项转化与提交号 | 本文件第三节表格 |
+| 单测 149 项 | `npm test` |
+| 单局端到端 | `npm run e2e`（`scripts/e2e-smoke.mjs`） |
+| 多局批量端到端 | `npm run e2e:multi`（`scripts/e2e-multi.mjs`，4 组合） |
+| 实机截图 | `scripts/shot-life-panel.png`、`scripts/shot-birth-cert.png`、`scripts/e2e-grain-v3.png` |
+| 不抄边界声明 | 本文件第五节 |
+
+### 已知限制（不声称完成的部分）
+
+1. **真人 30 分钟试玩未进行**：机器 e2e 覆盖了功能正确性与结局完整性，但无法替代真人的体感判断（节奏是否舒服、文案是否打动、是否愿意再来一局）。
+2. **竞品观察全部由机器执行**：通过 CDP 直读其状态机，覆盖了结构与文案形态，但不能声称代表"普通玩家的主观体验"。
+3. e2e 依赖本机 Chrome(`:9222`) 与静态服务(`:8811`)，非 CI 友好。
+
+### 后续可继续的方向
+- 真人试玩 30 分钟后，把结论按本知识库格式写入第四节，再迭代。
+- 文化事件池继续扩国（现十国 46 条）。
+- 微型层事件继续补充（现 7 个）。
+
 ## 六、交付验证记录（2026-11-03）
 
 | 验证 | 命令 | 结果 |
