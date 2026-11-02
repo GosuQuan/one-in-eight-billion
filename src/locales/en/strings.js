@@ -2988,4 +2988,10 @@ export default {
   "正在发生：{brief}": "Ongoing: {brief}",
   // added by hand
   "{risk} {mark}": "{risk}. {mark}",
+  // year-changes.js, app.js (what moved this year)
+  "年收入": "Annual income",
+  "今年的变化": "Changes this year",
+  "数字没有变化": "No numbers moved",
+  "{age} 岁这一年的变化": "Changes at {age}",
+  "▲▼ 今年的变化": "▲▼ this year",
 };
