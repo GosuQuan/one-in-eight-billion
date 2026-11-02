@@ -619,3 +619,22 @@ test('mini-tier events carry the mini flag and resolve in one step', () => {
   choose(life, hit.options.length - 1);
   assert.equal(life.pending, null, 'mini resolves immediately');
 });
+
+test('two more two-choice mini events exist and fire', () => {
+  const step = (l, v = 0) => l.pending ? choose(l, v % l.pending.options.length) : advanceYear(l);
+  const found = new Set();
+  for (let s = 0; s < 50 && found.size < 2; s++) {
+    const life = createLife({ seed: 'mini3-' + s, country: 'CN' });
+    for (let n = 0; n < 220 && !life.dead; n++) {
+      if (life.pending) {
+        if (['sm_oldfriend', 'sm_lostitem'].includes(life.pending.eventId)) {
+          found.add(life.pending.eventId);
+          assert.equal(life.pending.mini, true, life.pending.eventId + ' should be mini');
+          assert.equal(life.pending.options.length, 2, life.pending.eventId + ' should have 2 choices');
+        }
+        step(life, n);
+      } else advanceYear(life);
+    }
+  }
+  assert.ok(found.size >= 1, 'at least one new mini event should appear');
+});

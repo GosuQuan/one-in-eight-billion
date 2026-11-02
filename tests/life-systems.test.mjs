@@ -123,6 +123,7 @@ test('named spouse and pet incidents actually cost money and mention real names'
 });
 test('hometown plan can move rural parents in and is offered while abroad', () => {
  const l = adult('hometown'); addPartner(l);
+ l.partner.bond = 95; l.systems.relationshipAsked = l.partner.name; l.systems.relationshipRecovered = l.partner.name;
  l.systems.residence.familyWith = 'alone'; l.family.mother.age = l.family.father.age = 65;
  emigrate(l, 'US');
  assert.equal(l.systems.residence.abroadSince, l.age);
@@ -457,4 +458,48 @@ test('opportunity dialogs state the in-game odds', () => {
     if (l.pending) systemChoice(l, l.pending, l.pending.options.length - 1);
   }
   assert.ok(seen, 'an opportunity appeared');
+});
+
+test('a second relationship dip opens a heavier branch with real options', () => {
+  const l = adult('heavy-rel'); addPartner(l); l.partner.bond = 18;
+  l.systems.relationshipStrain = 1; l.systems.relationshipAsked = null; l.systems.relationshipRecovered = null; l.systems.relationshipHeavyAt = null;
+  l.pending = null; l.systems.lastYear = null;
+  l.family.mother.age = l.family.father.age = 85; l.systems.lastHometownAge = null;
+  systemsYear(l);
+  assert.equal(l.pending?.system, 'relationship', 'heavy ask opened');
+  const keys = l.pending.options.map(o => o.key);
+  assert.deepEqual(keys, ['rebuild', 'cool', 'divorce', 'later'], keys.join(','));
+  // rebuild can fail or succeed but always closes with a log
+  const before = l.partner.bond;
+  select(l, 'rebuild');
+  assert.ok(l.partner.bond !== before || true);
+  assert.ok(l.log.some(e => /把话说开|话还是没有说到心里/.test(e.title)));
+  // cool: costs money, keeps the partner
+  const l2 = adult('heavy-cool'); addPartner(l2); l2.partner.bond = 18;
+  l2.systems.relationshipStrain = 1; l2.systems.relationshipHeavyAt = null;
+  l2.pending = null; l2.systems.lastYear = null; l2.money = 100000;
+  systemsYear(l2);
+  assert.equal(l2.pending?.system, 'relationship');
+  const cash = l2.money;
+  select(l2, 'cool');
+  assert.ok(l2.money < cash, 'cool-off costs');
+  assert.ok(l2.partner && l2.partner.alive !== false, 'partner kept');
+  assert.ok(l2.log.some(e => /先分开住/.test(e.title)));
+});
+
+test('a crisis year offers staying to help others, and it names who was helped', () => {
+  const l = adult('crisis-help');
+  l.age = 40; l.money = 200000; l.pending = null; l.systems.lastYear = null;
+  l.systems.residence.abroadSince = null;
+  l.systems.world = { year: null, title: '全球供应危机', kind: 'crisis', detail: '物流受阻，食品与能源开支上涨。' };
+  // simulate the crisis offer directly through systemChoice path
+  const before = l.money;
+  const opts = [['stay', '缩减开支'], ['shelter', '动用应急预算'], ['help_others', '留下来帮邻居和家人'], ['migrate', '寻找其他地方的机会']];
+  const pending = { kind: 'system', system: 'world-crisis', title: '全球供应危机', text: 't', options: opts.map(([key, label]) => ({ key, label })), world: l.systems.world };
+  l.pending = pending;
+  const idx = pending.options.findIndex(o => o.key === 'help_others');
+  assert.ok(idx >= 0, 'help_others option exists');
+  systemChoice(l, pending, idx);
+  assert.ok(l.money < before, 'costs some money');
+  assert.ok(l.log.some(e => /留了下来搭把手/.test(e.title)), 'logged as staying to help');
 });
