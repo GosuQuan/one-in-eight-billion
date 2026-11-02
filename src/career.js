@@ -1,5 +1,6 @@
-import { tr, label } from './i18n.js';
-const record = (l, title, text) => l.log.push({ age: l.age, year: l.birthYear + l.age, title, text, type: 'work' });
+import { gateNewLocalJob, activeReference } from './lived.js';
+import { tr, label, logSource } from './i18n.js';
+const record = (l, title, text) => l.log.push({ age: l.age, year: l.birthYear + l.age, title, text, type: 'work', ...logSource(title, text) });
 function roll(l) { l.randomState = (l.randomState + 0x6D2B79F5) >>> 0; let t = l.randomState; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; }
 const rank = { none: 0, primary: 1, basic: 2, high: 3, vocational: 3, university: 4, masters: 5 };
 const JOBS = {
@@ -27,6 +28,10 @@ export function localIncome(l, kind, country = l.country) {
  const gdp = country?.gdp || l.country?.gdp || 1;
  return Math.max(0, Math.round(gdp * spec.factor * (1 + edu * .06) * (1 + exp * .018) * focus * interest));
 }
+export function jobOdds(l, kind, hasRef = false) {
+  const o = JOBS[kind] || JOBS.office;
+  return Math.min(.86, o.chance + (l.stats.knowledge || 0) * .002 + (l.stats.social || 0) * .001 + (l.focus === 'work' ? .08 : 0) + (kind === 'promotion' ? Math.min(.28, (l.careerYears || 0) * .02) : 0) + (hasRef ? .12 : 0));
+}
 export function careerOptions(l) {
  const r = rank[l.school?.credential] ?? 0;
  const fulltime = !!(l.school?.program && !l.school.program.paused && ['apply-university', 'apply-masters', 'apply-high', 'apply-vocational'].includes(l.school.program.id));
@@ -37,16 +42,25 @@ export function careerOptions(l) {
   { id: 'matched', label: tr('应聘专业对口岗位'), description: tr('要大学学历。学历对上了，也不保证有空位。'), ...JOBS.matched },
   { id: 'remote', label: tr('申请远程工作'), description: tr('做成以后换国家，这份收入还在；吃住仍按你脚下的地方计算。可能失败。'), ...JOBS.remote },
   { id: 'promotion', label: tr('提交晋升申请'), description: tr('经验越多越容易被看见，仍可能被拒绝，拒绝后留在原岗位。'), minimum: 0, chance: .18, factor: 0 }
- ].map(o => ({ ...o, disabled: l.age < 18 || l.dead || r < o.minimum || fulltime || l.careerLastAge === l.age || (o.id === 'promotion' && !employed(l)), reason: l.age < 18 ? tr('成年后开放') : l.careerLastAge === l.age ? tr('今年已经参加过招聘或晋升评估') : r < o.minimum ? tr('目前学历不满足岗位要求') : o.id === 'promotion' && !employed(l) ? tr('需要一份在职工作') : fulltime ? tr('全日制学习期间请先完成或暂停学业') : '', income: o.id === 'promotion' ? Math.round((l.income || 0) * 1.16) : localIncome(l, o.id) }));
+ ].map(o => ({ ...o, disabled: l.age < 18 || l.dead || (l.lived?.serviceUntil || 0) >= l.age || r < o.minimum || fulltime || l.careerLastAge === l.age || (o.id === 'promotion' && (!employed(l) || (l.lived?.leaveUntil || 0) >= l.age || (l.lived?.sickUntil || 0) >= l.age || (l.lived?.injuryUntil || 0) >= l.age)), reason: (l.lived?.serviceUntil || 0) >= l.age ? tr('这一年在社区服役，不能同时应聘。服役不是职位。') : o.id === 'promotion' && (l.lived?.leaveUntil || 0) >= l.age ? tr('育儿假还没结束，这次不能升职。假不会变成晋升。') : o.id === 'promotion' && (l.lived?.sickUntil || 0) >= l.age ? tr('病假这一年不能升职。回来仍是原来的工作。') : o.id === 'promotion' && (l.lived?.injuryUntil || 0) >= l.age ? tr('伤还没好，这一年不能升职。职位先留着。') : l.age < 18 ? tr('成年后开放') : l.careerLastAge === l.age ? tr('今年已经参加过招聘或晋升评估') : r < o.minimum ? tr('目前学历不满足岗位要求') : o.id === 'promotion' && !employed(l) ? tr('需要一份在职工作') : fulltime ? tr('全日制学习期间请先完成或暂停学业') : '', income: o.id === 'promotion' ? Math.round((l.income || 0) * 1.16) : localIncome(l, o.id) }));
 }
 export function careerAction(l, id) {
  const o = careerOptions(l).find(x => x.id === id);
  if (!o || l.pending) return { ok: false, message: tr('请先处理当前选择') };
  if (o.disabled) return { ok: false, message: o.reason || tr('当前不能申请') };
  l.careerLastAge = l.age;
- const probability = Math.min(.86, o.chance + (l.stats.knowledge || 0) * .002 + (l.stats.social || 0) * .001 + (l.focus === 'work' ? .08 : 0) + (id === 'promotion' ? Math.min(.28, (l.careerYears || 0) * .02) : 0));
+ if (id !== 'promotion') {
+  const gate = gateNewLocalJob(l, id);
+  if (!gate.ok) {
+   record(l, gate.title, tr('{text}你仍是{job}。', {text: gate.text, job: label(l.job)}));
+   l.stats.happiness = Math.max(0, l.stats.happiness - 2);
+   return { ok: true, message: gate.title };
+  }
+ }
+ const ref = id === 'promotion' ? null : activeReference(l);
+  const probability = Math.min(.86, o.chance + (l.stats.knowledge || 0) * .002 + (l.stats.social || 0) * .001 + (l.focus === 'work' ? .08 : 0) + (id === 'promotion' ? Math.min(.28, (l.careerYears || 0) * .02) : 0) + (ref ? .12 : 0));
  if (roll(l) >= probability) {
-  record(l, tr('没有等到那份录用通知'), tr('{label}之后，对方选了更贴近岗位的人。{x}{x2}你仍是{job}。这样的消息以后还会再出现。', {label: label(o.label), x: id === 'matched' ? tr('学历写在简历上，空位却要你还没有的项目经历。') : '', x2: id === 'promotion' ? tr('你已有{careerYears}年经验，这次评估仍没通过。', {careerYears: l.careerYears || 0}) : '', job: label(l.job)}));
+  record(l, tr('没有等到那份录用通知'), tr('{label}之后，对方选了更贴近岗位的人。{x}{x2}{x3}你仍是{job}。这样的消息以后还会再出现。', {label: label(o.label), x: id === 'matched' ? tr('学历写在简历上，空位却要你还没有的项目经历。') : '', x2: id === 'promotion' ? tr('你已有{careerYears}年经验，这次评估仍没通过。', {careerYears: l.careerYears || 0}) : '', x3: ref ? tr('{name}的名字在材料上，这次仍没有录用。推荐留到{until}岁，不是一张录用通知。', {name: ref.name, until: l.lived.reference.until}) : '', job: label(l.job)}));
   l.stats.happiness = Math.max(0, l.stats.happiness - 2);
   return { ok: true, message: tr('这次没有通过') };
  }
@@ -57,7 +71,8 @@ export function careerAction(l, id) {
   else { l.employerGdp = null; l.employerCountryId = l.country.id; }
   l.income = localIncome(l, id, l.remote ? { gdp: l.employerGdp } : l.country);
  }
- record(l, id === 'promotion' ? tr('名字出现在晋升名单上') : tr('收到录用通知'), tr('你现在是{job}，年收入{income}，按{x}的物价、你的学历和{careerYears}年经验计算。以后仍可能失业，换地方时收入和开销会重算。', {job: label(l.job), income: l.income, x: l.remote ? tr('雇主所在地') : l.country.name, careerYears: l.careerYears || 0}));
+ record(l, id === 'promotion' ? tr('名字出现在晋升名单上') : tr('收到录用通知'), tr('你现在是{job}，年收入{income}（游戏购买力单位），按{x}的物价、你的学历和{careerYears}年经验计算。{x2}以后仍可能失业，换地方时收入和开销会重算。', {job: label(l.job), income: l.income, x: l.remote ? tr('雇主所在地') : l.country.name, careerYears: l.careerYears || 0, x2: ref ? tr('{name}的名字在材料上，这句推荐到此用掉。', {name: ref.name}) : ''}));
+  if (ref) l.lived.reference = null;
  return { ok: true, message: tr('成为{job}，年收入{income}', {job: label(l.job), income: l.income}) };
 }
 export function careerYear(l) {

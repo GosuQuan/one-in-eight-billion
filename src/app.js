@@ -2,7 +2,8 @@ import {
   COUNTRIES, DESTINATIONS, STOCKS, STOCK_RISKS, PURCHASES,
   createLife, upgradeLife, advanceYear, choose, setFocus, summarize,
   netWorth, investedValue, invest, withdraw, investStocks, sellStock,
-  buyHouse, buyCar, buyItem, travel, travelCost, takeLoan, repayDebt
+  buyHouse, buyCar, buyItem, travel, travelCost, takeLoan, repayDebt,
+  incomePlace, lifeStage, improveLife
 } from './engine.js';
 import { educationOptions, educationAction } from './education.js';
 import { careerOptions, careerAction } from './career.js';
@@ -10,9 +11,11 @@ import { financeAction, familyAidQuote } from './finance.js';
 import { escape as e, worldMap, portrait } from './art.js';
 import { scene } from './scene.js';
 import { systemAction, getHousehold, getSceneState } from './life-systems.js';
+import { livedAction, livedCatalogHTML } from './lived.js';
 import { worldHTML as worldPanel, choiceResultHTML as resultPanel, familyHTML as familyPanel, systemsDialogHTML } from './system-ui.js';
 import { gachaCard, avatarSVG } from './art.js';
-import { tr, label, lang, LANGUAGES, setLanguage, numberLocale, setPlayer } from './i18n.js';
+import { memorialOf } from './memorial.js';
+import { tr, label, lang, LANGUAGES, setLanguage, numberLocale, setPlayer, recordText } from './i18n.js';
 const $ = s => document.querySelector(s);
 const KEY = 'one-in-eight-demo:v1';
 const app = $('#app'), overlay = $('#overlay');
@@ -22,7 +25,7 @@ let prefs = { era: 'now', mode: 'birth', pace: 'normal', ...store.prefs };
 let life = store.current ? upgradeLife(store.current) : null;
 if (life) setPlayer(life.sex);
 let history = Array.isArray(store.history) ? store.history.map(upgradeLife) : [];
-let view = 'home', paused = false, auto = false, speed = 1, music = false, modalKind = '', lastFocus, archived = false;
+let view = 'home', paused = false, auto = false, speed = 1, music = false, modalKind = '', lastFocus, archived = false, paintedAge = null, yearTurned = false;
 let gachaCountry = null, gachaFlipped = false;
 let investTab = 'overview', travelCompanion = 'solo';
 let startTime = Date.now(), stepTime = 0, toastTimer, timer, audio, audioTimer;
@@ -36,7 +39,8 @@ const pct = n => `${n >= 0 ? '+' : ''}${(n * 100).toFixed(1)}%`;
 // saves keep a copy of the country in the language it was played in; show the current language's names
 const countryOf = c => COUNTRIES.find(x => x.id === (typeof c === 'object' ? c?.id : c)) || (typeof c === 'object' && c) || COUNTRIES[0];
 const nameOf = n => typeof n === 'object' ? n.full || n.name || '' : n || '';
-const save = () => { store = { ...store, prefs, current: archived ? store.current : life, history }; try { localStorage.setItem(KEY, JSON.stringify(store)); } catch { toast(tr('浏览器暂时无法保存，请导出人生记录。')); } };
+function touchPlay(){if(!life)return;const now=Date.now();const mark=life.playMark||0;const gap=mark?now-mark:0;const counting=life.playView&&life.playView!=='home'&&!document.hidden;if(gap>0&&gap<30000&&counting)life.playMs=(life.playMs||0)+gap;life.playMark=now;life.playView=view;}
+const save = () => { touchPlay(); store = { ...store, prefs, current: archived ? store.current : life, history }; try { localStorage.setItem(KEY, JSON.stringify(store)); } catch { toast(tr('浏览器暂时无法保存，请导出人生记录。')); } };
 const homeLink = `<button class="wordmark" data-action="home" aria-label="${tr('返回首页')}">${tr('80亿分之<em>1</em>')}</button>`;
 const footer = () => `<footer class="footer section-rule"><span>${tr('80亿分之1')} <span style="display:inline">© ${new Date().getFullYear()}</span></span><span>${tr('灵感来自')} <a href="https://1in8b.life/${lang==='zh-CN'?'zh-hans':'en'}/" target="_blank" rel="noopener">1in8b.life ↗</a> · <button class="plain" data-action="about">${tr('关于')}</button> · <a href="https://github.com/GosuQuan/one-in-eight-billion" target="_blank" rel="noopener">GitHub ↗</a></span></footer>`;
 const nav = () => `<nav class="site-nav">${homeLink}<div class="nav-links"><button class="plain" data-action="history">${tr('前世纪录')} <span style="font:10px monospace">${history.length ? String(history.length).padStart(2,'0') : ''}</span></button><button class="plain nav-extra" data-action="about">${tr('关于人生')}</button><select class="tiny lang-select" data-lang aria-label="${tr('语言')}">${Object.entries(LANGUAGES).map(([k,v])=>`<option value="${k}"${k===lang?' selected':''}>${v}</option>`).join('')}</select><button class="plain theme" data-action="theme" aria-label="${tr('切换深色模式')}">◐</button></div></nav>`;
@@ -49,7 +53,7 @@ function renderHome() {
  app.innerHTML = `<div class="wrap">${nav()}<main>
   <section class="hero"><div class="hero-text"><div class="eyebrow"><span class="dot"></span> ${tr('ONE IN EIGHT BILLION')} <span style="margin-left:8px">${tr('人生模拟')}</span></div>
    <h1>${tr('<span>80亿</span><span class="title-bottom">分之<em>1</em></span>')}</h1>
-   <p class="lede">${tr('就在此刻，每秒都有新的生命降临。')}<br>${tr('随机出生，读书、工作、恋爱，投资、旅行、经历意外，')}<br>${tr('把世界交给偶然，把选择留给自己。')}</p>
+   <p class="lede">${tr('就在此刻，每秒都有新的生命降临。')}<br>${tr('随机出生，读书、工作、恋爱，投资、旅行、经历意外，')}<br>${tr('把世界交给偶然，把选择留给自己。')}<br><small>${tr('一段完整人生大约 20–30 分钟。8× 倍速更快，也可以「跳到下个选择」。')}</small></p>
    <div class="counters"><div class="counter"><strong id="birth-counter">0</strong><span>${tr('打开页面后，世界上新生的婴儿')}</span></div><div class="counter"><strong id="death-counter">0</strong><span>${tr('同一刻，向世界告别的人')}</span></div></div>
    <p class="live-line"><i class="live-dot"></i>${tr('每一段看似普通的人生，都只有一次。')}</p></div>
    <div class="hero-right">${worldMap()}<div class="odds paper"><h2>${tr('如果你是此刻出生的婴儿')}</h2><p class="tiny">${tr('全球出生分布参考 · 联合国《世界人口展望2024》')}</p>${odds.map(([n,v])=>`<div class="odds-row"><span>${n}</span><div class="track"><i style="width:${v/17.6*100}%"></i></div><span class="percent">${v.toFixed(1)}%</span></div>`).join('')}<div class="odds-row"><span>${tr('世界其他地方')}</span><div class="track"><i style="width:100%;opacity:.35"></i></div><span class="percent">58.1%</span></div><button class="text-link" data-action="countries">${tr('探索 {COUNTRIES} 个国家的出生资料', {COUNTRIES: COUNTRIES.length})} <span class="arrow">↗</span></button></div></div></section>
@@ -64,15 +68,16 @@ function renderHome() {
 function historyHTML(){return `<section class="history section-rule" id="history"><div class="section-heading"><h2>${tr('前世纪录')}</h2><span class="tiny">${tr('{history} 段曾经走过的人生 · 保存在此浏览器', {history: history.length})}</span></div><div class="history-list">${history.map((l,i)=>`<button class="history-card paper" data-history="${i}"><h3>${e(l.name)}</h3><p>${e(l.country.flag)} ${e(countryOf(l.country).name)} · ${l.birthYear} — ${l.birthYear+l.age}</p><div class="ribbon">${tr('{age} 岁 · {job} · {netWorth}', {age: l.age, job: e(label(l.job) || tr('平凡而独特的一生')), netWorth: money(netWorth(l))})} <span class="arrow">→</span></div></button>`).join('')}</div></section>`;}
 
 function renderBirth(){
- view='birth';const c=life.country;
- app.innerHTML=`<div class="wrap">${nav()}<main class="birth-wrap"><button class="back" data-action="home">${tr('← 回到世界')}</button><div class="cert paper"><div class="cert-band"><b>${tr('出生登记')}</b><small>${tr('NO.')} ${e(String(life.id).slice(-10).toUpperCase())}</small></div><div class="cert-body"><div class="cert-watermark">${tr('仅此一生')}</div><div class="avatar-hero" style="margin:0 auto 18px">${avatarSVG(life,{size:96})}<div class="hero-name">${e(life.name)}</div></div><span class="label">${tr('一个新生命的名字')}</span><h1>${e(life.name)}</h1><p class="cert-story">${e(life.log[0]?.text || tr('你在{name}的{city}出生了。窗外的世界很大，而你的人生才刚刚开始。', {name: c.name, city: c.city}))}</p><div class="cert-fields">${[[tr('出生地'),c.flag+' '+c.name],[tr('出生年份'),life.birthYear+tr(' 年')],[tr('性别'),label(life.sex)],[tr('城市'),c.city],[tr('当地平均寿命'),c.life+tr(' 岁')],[tr('家庭起点'),tr('{classBand} · 高于当地约{wealth}%', {classBand: label(life.classBand || life.family?.background) || tr('普通家庭'), wealth: Math.round((life.family?.wealth || 0) * 100)})]].map(([k,v])=>`<div class="cert-field"><span>${k}</span><strong>${e(v)}</strong></div>`).join('')}</div><p class="cert-quote">${tr('世界有八十亿人。')}<br>${tr('从此刻起，你是其中独一无二的一个。')}</p><div class="cert-companions">${tr('与你在同一秒出生的人')}<div class="people">${life.companions.map(p=>{const c=countryOf(p.country);return `<span>${e(c.flag)} ${e(nameOf(p.name))}</span>`}).join('')}</div></div></div><div class="cert-foot"><span class="tiny">${tr('你无法选择起点，')}<br>${tr('但故事还等着你来写。')}</span><button class="cta" data-action="begin">${tr('开始这一生')} <span>→</span></button></div></div></main>${footer()}</div>`;
+ view='birth';const c=life.country;const biggest=[...COUNTRIES].filter(x=>x.id!==c.id).sort((a,b)=>b.pop-a.pop)[0];const lifeGap=c.life-biggest.life;const gapWord=lifeGap>=0?tr('平均寿命比{name}长{lifeGap}岁', {name: biggest.name, lifeGap}):tr('平均寿命比{name}短{lifeGap}岁', {name: biggest.name, lifeGap: -lifeGap});
+ app.innerHTML=`<div class="wrap">${nav()}<main class="birth-wrap"><button class="back" data-action="home">${tr('← 回到世界')}</button><div class="cert paper"><div class="cert-band"><b>${tr('出生登记')}</b><small>${tr('NO.')} ${e(String(life.id).slice(-10).toUpperCase())}</small></div><div class="cert-body"><div class="cert-watermark">${tr('仅此一生')}</div><div class="avatar-hero" style="margin:0 auto 18px">${avatarSVG(life,{size:96})}<div class="hero-name">${e(life.name)}</div></div><span class="label">${tr('一个新生命的名字')}</span><h1>${e(life.name)}</h1><p class="cert-story">${e(life.log[0]?.text || tr('你在{name}的{city}出生了。窗外的世界很大，而你的人生才刚刚开始。', {name: c.name, city: c.city}))}</p><div class="cert-fields">${[[tr('出生地'),c.flag+' '+c.name],[tr('出生年份'),life.birthYear+tr(' 年')],[tr('性别'),label(life.sex)],[tr('城市'),c.city],[tr('当地平均寿命'),c.life+tr(' 岁')],[tr('家庭起点'),tr('{classBand} · 高于当地约{wealth}%', {classBand: label(life.classBand || life.family?.background) || tr('普通家庭'), wealth: Math.round((life.family?.wealth || 0) * 100)})],[tr('与人口大国的对照'),tr('{gapWord}（{life} 岁 / {life2} 岁，人均经济约 {gdp} 倍）· 游戏估算', {gapWord, life: c.life, life2: biggest.life, gdp: (c.gdp/biggest.gdp).toFixed(1)})]].map(([k,v])=>`<div class="cert-field"><span>${k}</span><strong>${e(v)}</strong></div>`).join('')}</div><p class="cert-quote">${tr('世界有八十亿人。')}<br>${tr('从此刻起，你是其中独一无二的一个。')}</p><div class="cert-companions">${tr('与你在同一秒出生的人')}<div class="people">${life.companions.map(p=>{const c=countryOf(p.country);return `<span>${e(c.flag)} ${e(nameOf(p.name))}</span>`}).join('')}</div></div></div><div class="cert-foot"><span class="tiny">${tr('你无法选择起点，')}<br>${tr('但故事还等着你来写。')}</span><button class="cta" data-action="begin">${tr('开始这一生')} <span>→</span></button></div></div></main>${footer()}</div>`;
  window.scrollTo(0,0);
 }
 
-const statHTML=()=>Object.entries(statNames).map(([k,[label,color]])=>`<div class="stat"><div class="stat-label"><span>${label}</span><b>${Math.round(life.stats[k])}</b></div><div class="stat-track"><i style="width:${life.stats[k]}%;background:${color}"></i></div></div>`).join('');
+const statWord=n=>n>=70?tr('不错'):n>=45?tr('平常'):n>=25?tr('偏低'):tr('很紧');
+const statHTML=()=>Object.entries(statNames).map(([k,[label,color]])=>`<div class="stat"><div class="stat-label"><span>${label}</span><b>${statWord(life.stats[k])}</b></div><div class="stat-track"><i style="width:${life.stats[k]}%;background:${color}"></i></div></div>`).join('');
 const lifeGrid=()=>Array.from({length:110},(_,i)=>`<span class="${i<life.age?'lived':i===life.age?'now':''}" title="${tr('{i} 岁', {i})}" aria-label="${tr('{i}岁{x}', {i, x: i<life.age?tr('，已走过'):''})}"></span>`).join('');
-const companionsHTML=()=>life.companions.map(p=>{const c=countryOf(p.country);const deathAge=p.deathAge??p.lifespan??p.life??85;const passed=life.age>=deathAge;return `<div class="companion ${passed?'passed':''}"><span class="flag">${e(c.flag)}</span><div class="info"><div class="name">${e(nameOf(p.name))}</div><p>${e(c.name)} · ${passed?tr('{deathAge} 岁，已告别', {deathAge}):tr('{age} 岁，仍在生活', {age: life.age})}</p></div><i class="alive-dot"></i></div>`;}).join('');
-const feedHTML=()=>[...life.log].reverse().slice(0,40).map(l=>`<li class="feed-item ${e(l.type)}"><span class="feed-age">${tr('{x}{age} 岁 / {year}', {x: {event:'✦ ',market:'↗ ',travel:'✈ ',family:'♡ ',finance:'$ ',consequence:'· '}[l.type]||'', age: l.age, year: l.year || life.birthYear+l.age})}</span><div class="feed-title">${e(l.title)}</div><p class="feed-text">${e(l.text)}</p></li>`).join('');
+const companionsHTML=()=>life.companions.map(p=>{const c=countryOf(p.country);const deathAge=p.deathAge??p.lifespan??p.life??85;const passed=life.age>=deathAge;return `<div class="companion ${passed?'passed':''}"><span class="flag">${e(c.flag)}</span><div class="info"><div class="name">${e(nameOf(p.name))}</div><p>${e(c.name)} · ${p.band || tr('普通人家')} · ${passed?tr('{deathAge} 岁，已告别', {deathAge}):tr('{age} 岁，仍在生活', {age: life.age})}</p></div><i class="alive-dot"></i></div>`;}).join('');
+const feedHTML=()=>[...life.log].reverse().slice(0,40).map((l,i)=>`<li class="feed-item ${e(l.type)}${i===0&&yearTurned?' feed-fresh':''}"><span class="feed-age">${tr('{x}{age} 岁 / {year}', {x: {event:'✦ ',market:'↗ ',travel:'✈ ',family:'♡ ',finance:'$ ',consequence:'· '}[l.type]||'', age: l.age, year: l.year || life.birthYear+l.age})}</span><div class="feed-title">${e(l.title)}</div><p class="feed-text">${e(l.text)}</p></li>`).join('');
 const familyHTML=()=>familyPanel(life);
 const worldHTML=()=>worldPanel(life);
 const choiceResultHTML=()=>resultPanel(life);
@@ -84,18 +89,19 @@ const travelHTML=()=>`<div class="travel-list">${life.travels.length?life.travel
 const holdingHTML=()=>{const rows=life.holdings.map(h=>{const s=STOCKS.find(x=>x.symbol===h.symbol),p=life.market.stocks[h.symbol]?.price||0;return `<div class="holding"><span>${e(s?.name||h.symbol)}</span><b>${tr('{shares} 股 · {shares2}', {shares: h.shares.toFixed(2), shares2: money(h.shares*p)})}</b></div>`;});return rows.length?rows.join(''):`<p class="empty-small">${tr('还没有持有股票。')}</p>`;};
 
 function renderLife(){
- view='life';const c=life.country;
- app.innerHTML=`<header class="topbar"><div class="wrap">${homeLink}<div class="age-display"><div class="age-number">${life.age}<small>${tr('岁')}</small></div><div class="age-year">${tr('{birthYear} 年', {birthYear: life.birthYear+life.age})}<div class="year-track"><i style="width:${life.age/110*100}%"></i></div></div></div><div class="controls"><button class="ghost" data-action="pause" aria-pressed="${paused}">${paused?tr('▶ 继续'):tr('Ⅱ 暂停')}</button><div class="speed-group" role="group" aria-label="${tr('播放速度')}">${[1,2,4,8].map(s=>`<button data-speed="${s}" class="${speed===s?'active':''}" aria-pressed="${speed===s}">${s}×</button>`).join('')}</div><button class="ghost" data-action="next">${tr('下一年 ›')}</button><button class="ghost ${auto?'active':''}" data-action="auto" aria-pressed="${auto}">${tr('自动抉择')}</button><button class="ghost" data-action="study">${tr('学习与生计')}</button><button class="ghost" data-action="invest">${tr('投资')}</button><button class="ghost" data-action="travel">${tr('旅行')}</button><button class="ghost" data-action="systems">${tr('家与人生')}</button><button class="plain theme" data-action="menu" aria-label="${tr('更多选项')}">⋯</button></div></div></header>
+ view='life';const c=life.country;const place=incomePlace(life);const stage=lifeStage(life);const placeLine=place.income>0?tr('年收入大约高于当地 {local}% 的人，高于世界 {world}% 的人。这是游戏估算，不是官方统计。', {local: place.local, world: place.world}):tr('还没有年收入，谈不上在当地或世界的位置。');
+ yearTurned=paintedAge!=null&&paintedAge!==life.age;paintedAge=life.age;
+ app.innerHTML=`<header class="topbar"><div class="wrap">${homeLink}<div class="age-display"><div class="age-number${yearTurned?' year-turn':''}">${life.age}<small>${tr('岁')}</small></div><div class="age-year">${tr('{birthYear} 年', {birthYear: life.birthYear+life.age})}<div class="year-track"><i style="width:${life.age/110*100}%"></i></div></div></div><div class="controls"><button class="ghost" data-action="pause" aria-pressed="${paused}">${paused?tr('▶ 继续'):tr('Ⅱ 暂停')}</button><div class="speed-group" role="group" aria-label="${tr('播放速度')}">${[1,2,4,8].map(s=>`<button data-speed="${s}" class="${speed===s?'active':''}" aria-pressed="${speed===s}">${s}×</button>`).join('')}</div><button class="ghost" data-action="next">${tr('下一年 ›')}</button><button class="ghost" data-action="skip" title="${tr('快速推进到下一个需要你拍板的时刻；反思提问仍会停下')}">${tr('跳到下个选择 »»')}</button><button class="ghost ${auto?'active':''}" data-action="auto" aria-pressed="${auto}">${tr('自动抉择')}</button><button class="ghost" data-action="study">${tr('学习与生计')}</button><button class="ghost" data-action="invest">${tr('投资')}</button><button class="ghost" data-action="travel">${tr('旅行')}</button><button class="ghost" data-action="systems">${tr('家与人生')}</button><button class="plain theme" data-action="menu" aria-label="${tr('更多选项')}">⋯</button></div></div></header>
  <main class="wrap">${worldHTML()}<div class="life-layout">
   <aside class="column">
-   <section class="panel identity"><div class="id-band"><span>${e(c.flag)} ${e(c.name)}</span><span>${tr('人生档案')}</span></div><div class="id-body">${avatarSVG(life,{size:84})}<div class="id-info"><h2>${e(life.name)}</h2><p>${tr('{sex} · {birthYear} 年生 · {age} 岁', {sex: e(label(life.sex)), birthYear: life.birthYear, age: life.age})}</p><p>${e(c.city)} · ${e(label(life.education) || tr('尚未入学'))}</p><p>${e(label(life.job) || tr('还在慢慢长大'))}</p></div></div><div class="mrz">LIFE&lt;${e(c.id)}&lt;${String(life.birthYear)}&lt;${e(String(life.id).slice(-12))}<br>ONE&lt;IN&lt;EIGHT&lt;BILLION&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</div></section>
-   <section class="panel stats-panel"><h3>${tr('此刻的你')} <small>0 — 100</small></h3>${statHTML()}<div class="money-block"><span class="tiny">${tr('净资产 · 购买力平价美元')}</span><strong class="balance">${money(netWorth(life))}</strong>${assetHTML()}<p class="tiny">${tr('年收入 {income} · {job} · {classBand}', {income: money(life.income), job: e(label(life.job) || tr('还没有职业')), classBand: e(label(life.classBand))})}</p><div class="money-actions"><button class="ghost sm" data-action="study">${tr('学习 / 求职 / 债务')}</button><button class="ghost sm" data-action="invest">${tr('投资 / 资产')}</button><button class="ghost sm" data-action="travel">${tr('去旅行')}</button></div></div></section>
+   <section class="panel identity"><div class="id-band"><span>${e(c.flag)} ${e(c.name)}</span><span>${tr('人生档案')}</span></div><div class="id-body">${avatarSVG(life,{size:84})}<div class="id-info"><h2>${e(life.name)}</h2><p>${tr('{sex} · {birthYear} 年生 · {age} 岁', {sex: e(label(life.sex)), birthYear: life.birthYear, age: life.age})}</p><p>${e(c.city)} · ${e(label(life.education) || tr('尚未入学'))}</p><p>${e(label(life.job) || tr('还在慢慢长大'))}</p><p class="tiny">${e(stage.line)}</p><p class="tiny">${e(placeLine)}</p></div></div><div class="mrz">LIFE&lt;${e(c.id)}&lt;${String(life.birthYear)}&lt;${e(String(life.id).slice(-12))}<br>ONE&lt;IN&lt;EIGHT&lt;BILLION&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</div></section>
+   <section class="panel stats-panel"><h3>${tr('此刻的你')}</h3>${statHTML()}<div class="money-block"><span class="tiny">${tr('净资产 · 游戏购买力单位（PPP）')}</span><strong class="balance">${money(netWorth(life))}</strong>${assetHTML()}<p class="tiny">${tr('年收入 {income}（按{name}的物价计） · {job} · {classBand}', {income: money(life.income), name: e(life.country?.name || ''), job: e(label(life.job) || tr('还没有职业')), classBand: e(label(life.classBand))})}</p><div class="money-actions"><button class="ghost sm" data-action="study">${tr('学习 / 求职 / 债务')}</button><button class="ghost sm" data-action="invest">${tr('投资 / 资产')}</button><button class="ghost sm" data-action="travel">${tr('去旅行')}</button><button class="ghost sm" data-action="ease">${tr('用余钱改善生活')}</button></div></div></section>
    <section class="panel family-panel"><h3>${tr('家人与生活')} <small>${tr('与你相连的人')}</small></h3>${familyHTML()}</section>
   </aside>
   <div class="column">
    ${choiceResultHTML()}
    <section class="panel scene-panel">${scene(life)}</section>
-   <section class="panel focus-panel"><h3>${tr('今年的重心')} <small>${tr('每一种选择，都有自己的意义')}</small></h3><p class="life-status">${e(label(life.job) || tr('成长中'))} · ${e(label(life.education) || tr('探索世界'))} · ${life.partner?tr('有爱相伴'):tr('按照自己的步调生活')}</p><div class="focus-chips">${Object.entries(focusNames).map(([k,n])=>`<button class="focus-chip ${life.focus===k?'active':''}" data-focus="${k}" aria-pressed="${life.focus===k}">${{study:'⌘',work:'◇',health:tr('＋'),family:'♡',joy:'☼'}[k]} ${n}</button>`).join('')}</div></section>
+   <section class="panel focus-panel"><h3>${tr('今年的重心')} <small>${tr('每一种选择，都有自己的意义')}</small></h3><p class="life-status">${e(label(life.job) || tr('成长中'))} · ${e(label(life.education) || tr('探索世界'))} · ${life.partner?tr('有爱相伴'):tr('按照自己的步调生活')}</p><p class="tiny">${e(stage.line)}</p><div class="focus-chips">${Object.entries(focusNames).map(([k,n])=>`<button class="focus-chip ${life.focus===k?'active':''}" data-focus="${k}" aria-pressed="${life.focus===k}">${{study:'⌘',work:'◇',health:tr('＋'),family:'♡',joy:'☼'}[k]} ${n}</button>`).join('')}</div></section>
    <section class="panel feed-panel"><h3>${tr('人生纪录')} <small>${tr('最新的一页，写在最前面')}</small></h3><ol class="feed">${feedHTML()}</ol></section>
   </div>
   <aside class="column">
@@ -109,6 +115,19 @@ function renderLife(){
  if(life.pending && !auto) showChoice();
 }
 function updateCounters(){const secs=(Date.now()-startTime)/1000;if($('#birth-counter'))$('#birth-counter').textContent=num(secs*4.18);if($('#death-counter'))$('#death-counter').textContent=num(secs*1.95);}
+function skipToChoice(){
+ if(!life||life.dead||view!=='life')return;
+ let guard=0;
+ while(!life.pending&&!life.dead&&guard++<90){
+  advanceYear(life);
+  if(life.pending&&life.pending.kind==='reflection')break;
+  if(life.pending)break;
+ }
+ save();
+ if(life.dead){finish();return;}
+ renderLife();
+ if(life.pending)showChoice();
+}
 function step(){
  if(!life||life.dead||view!=='life')return;
  if(life.pending){if(auto){choose(life,Math.floor(Math.random()*life.pending.options.length));save();renderLife();}else showChoice();return;}
@@ -121,8 +140,8 @@ function finish(){
  save();closeModal();renderEnding();window.scrollTo(0,0);
 }
 function renderEnding(){
- view='ending';const c=life.country;const important=life.log.filter(l=>l.type==='consequence'||l.type==='travel'||l.type==='market'||l.age===0||l.type==='death');const chosen=important.length>2?important:life.log;
- app.innerHTML=`<div class="wrap">${nav()}<main class="ending paper"><header class="ending-header"><div class="eyebrow"><span class="dot"></span> ${tr('A LIFE, ONCE LIVED')}</div><h1>${e(life.name)}</h1><div class="years">${life.birthYear} — ${life.birthYear+life.age}</div><p class="epitaph">${tr('从{name}出发，一个生命用 {age} 年写完了自己的故事。', {name: e((life.birthCountry||c).name), age: life.age})}<br>${tr('{deathCause}。', {deathCause: e(life.deathCause || tr('生命最终自然走到了终点'))})}<br>${tr('没有哪一生是标准答案，而这一生，曾经真实地属于你。')}</p></header>${scene(life,{ending:true})}<section class="ending-metrics six"><div><strong>${life.age}</strong><span>${tr('走过的年岁')}</span></div><div><strong>${life.log.filter(l=>l.type==='consequence').length}</strong><span>${tr('做过的重要选择')}</span></div><div><strong>${life.travels.length}</strong><span>${tr('次出发旅行')}</span></div><div><strong>${money(netWorth(life))}</strong><span>${tr('最后的净资产')}</span></div><div><strong>${life.children?.length || 0}</strong><span>${tr('下一代的生命')}</span></div><div><strong>${Math.round(life.stats.happiness)}</strong><span>${tr('最终的幸福感')}</span></div></section><div class="ending-body"><div class="section-heading"><h2>${tr('这一生，值得记住的片刻')}</h2><span class="tiny">${e(c.flag)} ${e(c.name)}</span></div><div class="record-list">${chosen.filter((_,i,a)=>i===0||i===a.length-1||i%Math.max(1,Math.floor(a.length/8))===0).slice(0,10).map(l=>`<article class="record"><small>${tr('{age} 岁 · {birthYear}', {age: l.age, birthYear: life.birthYear+l.age})}</small><strong>${e(l.title)}</strong><p>${e(l.text)}</p></article>`).join('')}</div>${life.travels.length?`<div class="ending-travels"><span class="label">${tr('去过的地方')}</span><div>${life.travels.map(t=>`<span class="travel-pill">${e(t.flag)} ${e(t.place||t.name)}</span>`).join('')}</div></div>`:''}<div class="ending-note">${life.farewell?e(life.farewell):tr('“如果能对这一生的自己说一句话，你想说什么？”')}</div><button class="text-link" data-action="farewell">${life.farewell?tr('修改留给自己的话'):tr('✎ 留给这一生一句话')} →</button><p class="tiny" style="margin-top:22px">${tr('人生记录已保存在此浏览器。你可以导出完整记录，或下载一张人生纪念卡。')}</p></div><div class="ending-actions"><button class="cta" data-action="new">${tr('再活一次')} <span>↗</span></button><button class="ghost" data-action="card">${tr('↓ 人生纪念卡')}</button><button class="ghost" data-action="export">${tr('↓ 完整记录')}</button><button class="ghost" data-action="home">${tr('回到世界')}</button></div></main>${footer()}</div>`;
+ view='ending';const c=life.country;const mood=life.stats.happiness>=60?tr('还稳得住'):life.stats.happiness>=35?tr('平平常常'):tr('往下走了');const important=life.log.filter(l=>l.type!=='market'&&(l.type==='consequence'||l.type==='travel'||l.type==='family'||l.type==='life'||l.type==='health'||l.age===0||l.type==='death'||(l.age>=65&&/身体|陪|家人|伴侣/.test(recordText(l)))));const chosen=important.length>2?important:life.log.filter(l=>l.type!=='market');
+ app.innerHTML=`<div class="wrap">${nav()}<main class="ending paper"><header class="ending-header"><div class="eyebrow"><span class="dot"></span> ${tr('A LIFE, ONCE LIVED')}</div><h1>${e(life.name)}</h1><div class="years">${life.birthYear} — ${life.birthYear+life.age}</div><p class="epitaph">${tr('从{name}出发，一个生命用 {age} 年写完了自己的故事。', {name: e((life.birthCountry||c).name), age: life.age})}<br>${tr('{deathCause}。', {deathCause: e(life.deathCause || tr('生命最终自然走到了终点'))})}<br>${tr('没有哪一生是标准答案，而这一生，曾经真实地属于你。')}</p></header>${scene(life,{ending:true})}${memorialBlock(life)}<section class="ending-metrics six"><div><strong>${life.age}</strong><span>${tr('走过的年岁')}</span></div><div><strong>${life.log.filter(l=>l.type==='consequence').length}</strong><span>${tr('做过的重要选择')}</span></div><div><strong>${life.travels.length}</strong><span>${tr('次出发旅行')}</span></div><div><strong>${money(netWorth(life))}</strong><span>${tr('最后的净资产')}</span></div><div><strong>${life.children?.length || 0}</strong><span>${tr('下一代的生命')}</span></div><div><strong>${mood}</strong><span>${tr('晚年的心情')}</span></div></section><div class="ending-body"><div class="section-heading"><h2>${tr('这一生，值得记住的片刻')}</h2><span class="tiny">${e(c.flag)} ${e(c.name)}</span></div><div class="record-list">${chosen.filter((_,i,a)=>i===0||i===a.length-1||i%Math.max(1,Math.floor(a.length/8))===0).slice(0,10).map(l=>`<article class="record"><small>${tr('{age} 岁 · {birthYear}', {age: l.age, birthYear: life.birthYear+l.age})}</small><strong>${e(l.title)}</strong><p>${e(l.text)}</p></article>`).join('')}</div>${life.travels.length?`<div class="ending-travels"><span class="label">${tr('去过的地方')}</span><div>${life.travels.map(t=>`<span class="travel-pill">${e(t.flag)} ${e(t.place||t.name)}</span>`).join('')}</div></div>`:''}<div class="ending-note">${life.farewell?e(life.farewell):tr('“如果能对这一生的自己说一句话，你想说什么？”')}</div><button class="text-link" data-action="farewell">${life.farewell?tr('修改留给自己的话'):tr('✎ 留给这一生一句话')} →</button><p class="tiny" style="margin-top:22px">${tr('人生记录已保存在此浏览器。你可以导出完整记录，或下载一张人生纪念卡。')}</p></div><div class="ending-actions"><button class="cta" data-action="new">${tr('再活一次')} <span>↗</span></button><button class="ghost" data-action="card">${tr('↓ 人生纪念卡')}</button><button class="ghost" data-action="export">${tr('↓ 完整记录')}</button><button class="ghost" data-action="home">${tr('回到世界')}</button></div></main>${footer()}</div>`;
 }
 
 function showModal(html,kind='info',wide=false){
@@ -131,7 +150,9 @@ function showModal(html,kind='info',wide=false){
  setTimeout(()=>overlay.querySelector('textarea,button')?.focus(),30);
 }
 function closeModal(){overlay.hidden=true;overlay.innerHTML='';modalKind='';document.body.style.overflow='';lastFocus?.isConnected&&lastFocus.focus();stepTime=Date.now();}
-function showChoice(){if(!life.pending||modalKind==='choice')return;const p=life.pending;showModal(`<div class="dialog-kicker">${tr('{age} 岁 / {birthYear} · {x}', {age: life.age, birthYear: life.birthYear+life.age, x: p.kind==='event'?tr('一件没有预料到的事'):p.kind==='system'?tr('人生还在继续'):tr('人生的岔路口')})}</div><h2 id="dialog-title">${e(p.title)}</h2><p>${e(p.text)}</p><div class="choice-list">${p.options.map((o,i)=>`<button class="choice-btn" data-choice="${i}"><strong>${e(label(o.label))} <span>↗</span></strong><small>${e(o.description || tr('选择属于你的方向'))}</small></button>`).join('')}</div><p class="tiny" style="margin:16px 0 0">${p.system==='thread'||p.system==='thread-start'?tr('你是在跟一个具体的人相处。选完以后，这条故事还会再找上门，也可能在这里停住。'):tr('没有最优解，只有你愿意走的路。选择后时间会继续。')}</p>`,'choice');}
+function showChoice(){if(!life.pending||modalKind==='choice')return;const p=life.pending;const mini=p.mini===true;showModal(`<div class="dialog-kicker">${tr('{age} 岁 / {birthYear} · {x}', {age: life.age, birthYear: life.birthYear+life.age, x: mini?tr('一件小事'):p.kind==='event'?tr('一件没有预料到的事'):p.kind==='system'?tr('人生还在继续'):tr('人生的岔路口')})}</div><h2 id="dialog-title">${e(p.title)}</h2><p>${e(p.text)}</p><div class="choice-list">${p.options.map((o,i)=>`<button class="choice-btn ${mini?'mini':''}" data-choice="${i}"><strong>${e(label(o.label))}${mini?'':' <span>↗</span>'}</strong><small>${e(o.description || tr('选择属于你的方向'))}</small></button>`).join('')}</div>${mini?'':`<p class="tiny" style="margin:16px 0 0">${p.system==='thread'||p.system==='thread-start'?tr('你是在跟一个具体的人相处。选完以后，这条故事还会再找上门，也可能在这里停住。'):p.system==='lived'?tr('这件事不会每年都打断你。做与不做，时间都会继续，只是后果会留下。'):tr('没有最优解，只有你愿意走的路。选择后时间会继续。')}</p>`}`,'choice');}
+
+function noteDialogReflection(){const q=life.log.filter(l=>l.type==='choice'&&l.title===tr('停下来想一句')).at(-1);showModal(`<div class="dialog-kicker">${tr('{age} 岁 · 留给纪念卡', {age: life.age})}</div><h2 id="dialog-title">${e(q?.text||tr('这一刻，你想说什么？'))}</h2><p>${tr('这句话只写在你的纪念卡上，不发布到任何地方。留空也可以。')}</p><textarea id="note-text" maxlength="60" placeholder="${tr('写下一句话……')}" aria-label="${tr('你的答案')}">${e((life.reflections||{})[life.age]||'')}</textarea><button class="cta" data-action="save-reflection">${tr('写好，继续人生 →')}</button>`,'reflection');setTimeout(()=>document.getElementById('note-text')?.focus(),60);}
 
 function noteDialog(farewell=false){showModal(`<div class="dialog-kicker">${farewell?tr('写给这一生'):tr('在时间里，暂停片刻')}</div><h2 id="dialog-title">${farewell?tr('你想对自己说些什么？'):tr('把此刻的想法，留在这里。')}</h2><p>${tr('只保存在你的浏览器里，不会发布到任何地方。')}</p><textarea id="note-text" maxlength="300" placeholder="${tr('写下一句话……')}" aria-label="${tr('你的想法')}">${e(farewell?life.farewell||'':'')}</textarea><button class="cta" data-action="${farewell?'save-farewell':'save-note'}">${tr('留下这句话 →')}</button>`,farewell?'farewell':'note');}
 
@@ -161,16 +182,43 @@ function renderGacha(){
 }
 function exportLife(){download(new Blob([JSON.stringify(life,null,2)],{type:'application/json'}),tr('人生记录-{name}.json', {name: life.name}));toast(tr('完整人生记录已导出'));}
 function download(blob,name){const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);}
-function downloadCard(){
- const canvas=document.createElement('canvas');canvas.width=1000;canvas.height=1280;const ctx=canvas.getContext('2d');
- ctx.fillStyle='#edf1eb';ctx.fillRect(0,0,1000,1280);ctx.strokeStyle='#cbd4c9';ctx.strokeRect(48,48,904,1184);ctx.fillStyle='#8c2946';ctx.fillRect(48,48,904,12);
- ctx.textAlign='center';ctx.fillStyle='#8c2946';ctx.font='20px Georgia';ctx.fillText(tr('ONE IN EIGHT BILLION'),500,145,860);ctx.fillStyle='#263a3b';ctx.font='64px "Microsoft YaHei", sans-serif';ctx.fillText(life.name,500,280,850);
- ctx.font='32px Georgia';ctx.fillStyle='#74817b';ctx.fillText(`${life.birthYear} — ${life.birthYear+life.age}`,500,345);ctx.font='24px "Microsoft YaHei"';ctx.fillText(tr('{name}出生 · {sex} · {age} 岁', {name: countryOf(life.birthCountry||life.country).name, sex: label(life.sex), age: life.age}),500,415,860);
- ctx.strokeStyle='#cbd4c9';ctx.beginPath();ctx.moveTo(130,475);ctx.lineTo(870,475);ctx.stroke();ctx.fillStyle='#263a3b';ctx.font='28px "Microsoft YaHei"';ctx.fillText(tr('走过 {age} 年，成为独一无二的自己。', {age: life.age}),500,565,860);ctx.font='22px "Microsoft YaHei"';ctx.fillStyle='#74817b';ctx.fillText(tr('最后的职业：{job}', {job: label(life.job) || tr('生活的探索者')}),500,630,860);ctx.fillText(tr('幸福 {happiness} / 100 · {children} 个孩子 · {travels} 次旅行', {happiness: Math.round(life.stats.happiness), children: life.children.length, travels: life.travels.length}),500,680,860);
- const quote=life.farewell||tr('每一段普通的人生，都有自己的微光。');ctx.fillStyle='#8c2946';ctx.font='30px "Microsoft YaHei"';// wrap Chinese by character and other scripts by word
- const chars=quote.match(/[\u3400-\u9fff\u3000-\u303f\uff00-\uffef]|[^\s\u3400-\u9fff\u3000-\u303f\uff00-\uffef]+|\s+/g)||[];let line='',lines=[];for(const ch of chars){if(line&&ctx.measureText(line+ch).width>720){lines.push(line.trimEnd());line=ch.trimStart();}else line+=ch;}if(line)lines.push(line);lines.slice(0,4).forEach((l,i)=>ctx.fillText(l,500,830+i*50));ctx.fillStyle='#74817b';ctx.font='18px "Microsoft YaHei"';ctx.fillText(tr('80亿分之1 · 人生模拟'),500,1140);ctx.font='16px Georgia';ctx.fillText('github.com/GosuQuan/one-in-eight-billion',500,1180);canvas.toBlob(blob=>blob&&download(blob,tr('人生纪念卡-{name}.png', {name: life.name})));
+function memorialBlock(life){
+ touchPlay();
+ const card=memorialOf(life);
+ const mark=(k,v)=>`<article class="ending-mark"><small>${e(k)}</small><p>${e(v)}</p></article>`;
+ return `<section class="ending-walk" aria-label="${tr('这一生的纪念')}"><p class="ending-age">${tr('{age} 岁，你走完了这一生', {age: life.age})}</p><p class="ending-days">${e(card.lifespan.body)}</p><div class="ending-marks">${mark(card.playTitle,card.playBody)}${mark(card.pathTitle,card.pathBody)}${mark(card.sceneTitle,card.sceneBody)}${mark(card.regionTitle,card.regionBody)}${mark(tr('生育'),card.fertility)}${mark(tr('社会地位'),card.status)}${mark(tr('社会贡献'),card.contribution)}${mark(card.peopleTitle,card.peopleBody)}${card.ownWords?`<p class="ending-ownwords">${tr('{age}岁时你写下：{ownWords}', {age: life.age, ownWords: e(card.ownWords)})}</p>`:''}</div><p class="ending-philosophy">${e(card.philosophy)}</p><section class="ending-grain"><p class="ending-grain-title">${e(card.grain.title)}</p><p class="ending-grain-body">${tr('{body}。四对词都来自这一年的纪录，偏向哪边都不是更好的活法。', {body: e(card.grain.body)})}</p>${card.grain.pairs.map(g=>{const pos=Math.round((g.lean+100)/2);return `<div class="ending-pair"><span>${e(g.a)}</span><span class="track"><span class="dot" style="left:${pos}%"></span></span><em>${tr('{x}{lean} 偏{x2}', {x: g.lean>0?'+':'', lean: g.lean, x2: g.lean>30?g.a:g.lean<-30?g.b:tr('两侧')})}</em><span>${e(g.b)}</span></div>`;}).join('')}</section>${card.questions.map(q=>`<p class="ending-question">${e(q)}</p>`).join('')}</section>`;
 }
-
+// Chinese wraps by character, other scripts by word.
+function wrapText(ctx,text,width){const out=[];let line='';for(const ch of String(text||'').match(/[\u3400-\u9fff\u3000-\u303f\uff00-\uffef]|[^\s\u3400-\u9fff\u3000-\u303f\uff00-\uffef]+|\s+/g)||[]){if(line&&ctx.measureText(line+ch).width>width){out.push(line.trimEnd());line=ch.trimStart();}else line+=ch;}if(line)out.push(line);return out;}
+function downloadCard(){
+ touchPlay();
+ const card=memorialOf(life);
+ const canvas=document.createElement('canvas');canvas.width=1080;canvas.height=2480;const ctx=canvas.getContext('2d');
+ ctx.fillStyle='#f3efe4';ctx.fillRect(0,0,1080,2480);ctx.fillStyle='#8c2946';ctx.fillRect(0,0,1080,16);
+ ctx.fillStyle='#8c2946';ctx.font='22px Georgia';ctx.textAlign='left';ctx.fillText(tr('ONE IN EIGHT BILLION'),72,78,936);
+ ctx.fillStyle='#263a3b';ctx.font='64px "Microsoft YaHei"';ctx.fillText(life.name,72,156,936);
+ ctx.fillStyle='#74817b';ctx.font='28px Georgia';ctx.fillText(`${life.birthYear} — ${life.birthYear+life.age}`,72,204);
+ ctx.font='22px "Microsoft YaHei"';ctx.fillText(tr('{name} · {sex} · {age} 岁走完 · 约 {age2} 天', {name: countryOf(life.birthCountry||life.country).name, sex: label(life.sex), age: life.age, age2: Math.round((life.age||0)*365.25).toLocaleString(numberLocale)}),72,244,936);
+ let y=300;
+ const head=title=>{ctx.fillStyle='#8c2946';ctx.font='18px "Microsoft YaHei"';ctx.fillText(title,72,y,936);y+=36;};
+ const body=text=>{ctx.fillStyle='#263a3b';ctx.font='26px "Microsoft YaHei"';for(const line of wrapText(ctx,text,936).slice(0,4)){ctx.fillText(line,72,y);y+=38;}y+=18;};
+ head(card.playTitle);body(card.playBody);
+ head(card.pathTitle);body(card.pathBody);
+ head(card.sceneTitle);body(card.sceneBody);
+ head(card.regionTitle);body(card.regionBody);
+ head(tr('人物的轨迹'));body(card.peopleBody);
+ head(tr('生育'));body(card.fertility);
+ head(tr('社会地位'));body(card.status);
+ head(tr('社会贡献'));body(card.contribution);
+ y+=8;ctx.fillStyle='#8c2946';ctx.font='30px "Microsoft YaHei"';
+ for(const line of wrapText(ctx,card.philosophy,936).slice(0,3)){ctx.fillText(line,72,y);y+=44;}
+ if(card.ownWords){ctx.fillStyle='#7a4a2e';ctx.font='italic 26px "Microsoft YaHei"';for(const line of wrapText(ctx,tr('{ownWordsAge}岁的你写下：{ownWords}', {ownWordsAge: card.ownWordsAge, ownWords: card.ownWords}),936).slice(0,2)){ctx.fillText(line,72,y);y+=40;}}
+ y+=12;ctx.fillStyle='#3e534e';ctx.font='24px "Microsoft YaHei"';
+ for(const q of card.questions){for(const line of wrapText(ctx,q,936).slice(0,3)){ctx.fillText(line,72,y);y+=36;}y+=16;}
+ y+=20;ctx.fillStyle='#74817b';ctx.font='18px "Microsoft YaHei"';ctx.fillText(tr('80亿分之1 · 这一张只属于这场游玩'),72,y,936);
+ ctx.font='16px Georgia';ctx.fillText('github.com/GosuQuan/one-in-eight-billion',72,y+32);
+ canvas.toBlob(blob=>blob&&download(blob,tr('人生纪念卡-{name}.png', {name: life.name})));
+}
 function toggleMusic(){
  music=!music;
  if(music){try{audio ||= new (window.AudioContext||window.webkitAudioContext)();audio.resume();const notes=[261.63,329.63,392,523.25,440,392,329.63,293.66];let i=0;const play=()=>{if(!music)return;const osc=audio.createOscillator(),gain=audio.createGain();osc.type='sine';osc.frequency.value=notes[i++%notes.length]/2;gain.gain.setValueAtTime(0,audio.currentTime);gain.gain.linearRampToValueAtTime(.035,audio.currentTime+.2);gain.gain.exponentialRampToValueAtTime(.001,audio.currentTime+2.7);osc.connect(gain);gain.connect(audio.destination);osc.start();osc.stop(audio.currentTime+3);};play();audioTimer=setInterval(play,1400);}catch{music=false;toast(tr('当前浏览器无法播放音乐'));}}
@@ -224,7 +272,7 @@ function optionButtons(items,attr){return items.map(o=>`<button class="choice-bt
 function openStudy(){
  if(life.pending){toast(tr('请先处理眼前的选择'));return;}
  const school=life.school||{},program=school.program,bill=life.finance?.lastBill,aid=familyAidQuote(life);
- showModal(`<div class="dialog-kicker">${tr('{age} 岁 · {education} · {job}', {age: life.age, education: e(label(life.education)||tr('尚未入学')), job: e(label(life.job)||tr('尚未工作'))})}</div><h2 id="dialog-title">${tr('学习、求职与债务')}</h2><p>${tr('申请、缴费、考核和录用分开计算。费用和录取机会是游戏平衡假设，不是官方统计。学费和申请费不会自动借债。')}</p><div class="metric-grid"><div><span>${tr('学历')}</span><strong style="font-size:13px">${e(label(life.education)||tr('尚未入学'))}</strong></div><div><span>${tr('在读')}</span><strong style="font-size:13px">${program?e(`${program.label} ${program.progress}/${program.duration}${program.paused?tr(' · 休学'):''}`):tr('没有')}</strong></div><div><span>${tr('欠款')}</span><strong style="font-size:13px">${money(life.debt)}</strong></div><div><span>${tr('家人可助')}</span><strong style="font-size:13px">${aid.eligible?money(aid.amount):tr('暂不可用')}</strong></div></div>${bill?`<p class="small-note">${tr('上一期账单：利息 {interest}，应还 {due}，实还 {paid}，尚欠 {balance}。', {interest: money(bill.interest), due: money(bill.due), paid: money(bill.paid), balance: money(bill.balance)})}</p>`:''}<h3>${tr('教育')}</h3><div class="choice-list">${optionButtons(educationOptions(life),'edu')}</div><h3>${tr('求职')}</h3><div class="choice-list">${optionButtons(careerOptions(life),'job')}</div><div class="choice-list" style="margin-top:14px"><button class="choice-btn" data-fin="family-aid"><strong>${tr('请家人帮忙还一部分')} <span>↗</span></strong><small>${tr('按家庭积蓄和关系决定能还多少，不是全额代偿；至少隔三年。')}</small></button><button class="choice-btn" data-fin="austerity"><strong>${tr('缩减三年日常开支')} <span>↗</span></strong><small>${tr('生活费减少两成，债务、学费和抚养费仍要付。')}</small></button><button class="choice-btn" data-fin="repayment-plan"><strong>${tr('协商三年还款')} <span>↗</span></strong><small>${tr('利率降到 4%，期间不能再借新债。')}</small></button></div>`,'study',true);
+ showModal(`<div class="dialog-kicker">${tr('{age} 岁 · {education} · {job}', {age: life.age, education: e(label(life.education)||tr('尚未入学')), job: e(label(life.job)||tr('尚未工作'))})}</div><h2 id="dialog-title">${tr('学习、求职与债务')}</h2><p>${tr('申请、缴费、考核和录用分开计算。费用和录取机会是游戏平衡假设，不是官方统计。学费和申请费不会自动借债。')}</p><div class="metric-grid"><div><span>${tr('学历')}</span><strong style="font-size:13px">${e(label(life.education)||tr('尚未入学'))}</strong></div><div><span>${tr('在读')}</span><strong style="font-size:13px">${program?e(`${program.label} ${program.progress}/${program.duration}${program.paused?tr(' · 休学'):''}`):tr('没有')}</strong></div><div><span>${tr('欠款')}</span><strong style="font-size:13px">${money(life.debt)}</strong></div><div><span>${tr('家人可助')}</span><strong style="font-size:13px">${aid.eligible?money(aid.amount):tr('暂不可用')}</strong></div></div>${bill?`<p class="small-note">${tr('上一期账单：利息 {interest}，应还 {due}，实还 {paid}，尚欠 {balance}。', {interest: money(bill.interest), due: money(bill.due), paid: money(bill.paid), balance: money(bill.balance)})}</p>`:''}<h3>${tr('教育')}</h3><div class="choice-list">${optionButtons(educationOptions(life),'edu')}</div><h3>${tr('求职')}</h3><div class="choice-list">${optionButtons(careerOptions(life),'job')}</div><div class="choice-list" style="margin-top:14px"><button class="choice-btn" data-fin="family-aid"><strong>${tr('请家人帮忙还一部分')} <span>↗</span></strong><small>${tr('现金够自己还的时候，不会再请家里人。不够时也只还一部分，至少隔三年。')}</small></button><button class="choice-btn" data-fin="austerity"><strong>${tr('缩减三年日常开支')} <span>↗</span></strong><small>${tr('生活费减少两成，债务、学费和抚养费仍要付。')}</small></button><button class="choice-btn" data-fin="repayment-plan"><strong>${tr('协商三年还款')} <span>↗</span></strong><small>${tr('利率降到 4%，期间不能再借新债。')}</small></button></div>`,'study',true);
 }
 
 app.addEventListener('click',handleClick);app.addEventListener('change',event=>{const s=event.target.closest('[data-lang]');if(s){save();setLanguage(s.value);}});overlay.addEventListener('click',handleClick);
@@ -233,8 +281,9 @@ function handleClick(event){
  if(b.dataset.pref){prefs[b.dataset.pref]=b.dataset.value;save();renderHome();return;}
  if(b.dataset.speed){speed=Number(b.dataset.speed);renderLife();return;}
  if(b.dataset.focus){setFocus(life,b.dataset.focus);save();renderLife();return;}
- if(b.dataset.choice!==undefined){const selected=life.pending?.options[Number(b.dataset.choice)];choose(life,Number(b.dataset.choice));life.lastChoiceResult={age:life.age,title:selected?.label||tr('新的选择'),text:life.log.at(-1)?.text||'',id:Date.now()};closeModal();save();if(life.dead)finish();else renderLife();return;}
+ if(b.dataset.choice!==undefined){const selected=life.pending?.options[Number(b.dataset.choice)];const wasReflection=life.pending?.kind==='reflection'&&selected?.key==='write';choose(life,Number(b.dataset.choice));life.lastChoiceResult={age:life.age,title:selected?.label||tr('新的选择'),text:life.log.at(-1)?.text||'',id:Date.now()};closeModal();save();if(wasReflection){renderLife();noteDialogReflection();return;}if(life.dead)finish();else renderLife();return;}
  if(b.dataset.system){const action=b.dataset.system;closeModal();const r=systemAction(life,action,{});save();renderLife();toast(r?.message||tr('生活有了新的安排'));return;}
+ if(b.dataset.lived){const r=livedAction(life,b.dataset.lived);save();toast(r?.message||tr('这件事有了结果'));if(view==='life')showModal(livedCatalogHTML(life),'lived',true);return;}
   if(b.dataset.edu){const r=educationAction(life,b.dataset.edu);save();toast(r.message);if(view==='life')openStudy();return;}
   if(b.dataset.job){const r=careerAction(life,b.dataset.job);save();toast(r.message);if(view==='life')openStudy();return;}
   if(b.dataset.fin){const r=financeAction(life,b.dataset.fin);save();toast(r.message);if(view==='life')openStudy();return;}
@@ -263,6 +312,7 @@ function handleClick(event){
   case 'begin':view='life';paused=false;stepTime=Date.now();save();renderLife();window.scrollTo(0,0);break;
   case 'resume':paused=false;stepTime=Date.now();renderLife();window.scrollTo(0,0);break;
   case 'next':step();stepTime=Date.now();break;
+  case 'skip':skipToChoice();stepTime=Date.now();break;
   case 'pause':paused=!paused;stepTime=Date.now();renderLife();break;
   case 'auto':auto=!auto;toast(auto?tr('自动抉择已开启'):tr('自动抉择已关闭'));renderLife();break;
   case 'theme':store.dark=!store.dark;document.body.classList.toggle('dark',store.dark);save();break;
@@ -273,9 +323,12 @@ function handleClick(event){
   case 'note':noteDialog();break;
   case 'farewell':noteDialog(true);break;
   case 'systems':showModal(systemsDialogHTML(life),'systems',true);break;
+  case 'lived':showModal(livedCatalogHTML(life),'lived',true);break;
    case 'study':openStudy();break;
   case 'invest':openInvest();break;
   case 'travel':openTravel();break;
+   case 'ease':{const r=improveLife(life);save();toast(r.message);if(view==='life')renderLife();break;}
+  case 'save-reflection':{const text=$('#note-text').value.trim();life.reflections=life.reflections||{};if(text)life.reflections[life.age]=text;save();closeModal();toast(text?tr('这句话会出现在纪念卡上'):tr('留了空白，也很好'));renderLife();break;}
   case 'save-note':{const text=$('#note-text').value.trim();if(text){life.notes ||= [];life.notes.push({age:life.age,text});save();}closeModal();toast(text?tr('此刻的想法已留下'):tr('留一点空白，也很好'));break;}
   case 'save-farewell':life.farewell=$('#note-text').value.trim();{const idx=history.findIndex(l=>l.id===life.id);if(idx>=0)history[idx]=JSON.parse(JSON.stringify(life));}save();closeModal();renderEnding();break;
   case 'export':exportLife();break;
@@ -295,4 +348,4 @@ window.addEventListener('beforeunload',save);
 document.body.classList.toggle('dark',!!store.dark);
 document.documentElement.lang=lang==='pseudo'?'en':lang;document.title=tr('80亿分之1 · 人生模拟');document.querySelector('meta[name="description"]')?.setAttribute('content',tr('八十亿种可能，仅此一次的人生。随机出生，做出选择，走过属于你的完整一生。'));
 renderHome();
-timer=setInterval(()=>{updateCounters();if(view!=='life'||paused||document.hidden||modalKind)return;const duration=({slow:8000,normal:5200,fast:2400}[prefs.pace]||5200)/speed;if(Date.now()-stepTime>=duration){stepTime=Date.now();step();}},150);
+timer=setInterval(()=>{touchPlay();updateCounters();if(view!=='life'||paused||document.hidden||modalKind)return;const duration=({slow:9600,normal:6800,fast:2800}[prefs.pace]||6800)/speed;if(Date.now()-stepTime>=duration){stepTime=Date.now();step();}},150);

@@ -13,7 +13,7 @@ const SEEDS = Number(process.env.SEEDS || 240);
 const [mode = 'compare', arg] = process.argv.slice(2);
 const CJK = /[\u3400-\u9fff\u3000-\u303f\uff00-\uffef]/;
 // Fields whose values are internal identifiers, kept in Chinese on purpose and shown through label().
-const INTERNAL = new Set((process.env.I18N_INTERNAL || 'sex,role,job,education,regime,background,classBand').split(','));
+const INTERNAL = new Set((process.env.I18N_INTERNAL || 'sex,role,job,education,regime,background,classBand,source,key').split(','));
 // Job titles from career.js JOBS: careerOptions() copies them into option.label, and the UI shows them with label().
 const INTERNAL_VALUES = new Set(['维修学徒', '行政职员', '技术人员', '专业对口岗位', '远程职员']);
 
@@ -23,6 +23,8 @@ async function dump() {
   const { careerOptions, careerAction } = await import('../src/career.js');
   const { financeAction, familyAidQuote } = await import('../src/finance.js');
   const { systemAction, getHousehold, getSceneState } = await import('../src/life-systems.js');
+  const { LIVED_ACTS, livedAction, livedCatalogHTML } = await import('../src/lived.js');
+  const { memorialOf } = await import('../src/memorial.js');
   const { COUNTRIES, DESTINATIONS, STOCKS, STOCK_RISKS, PURCHASES, createLife, advanceYear, choose, setFocus, summarize,
     invest, withdraw, investStocks, buyHouse, buyCar, buyItem, travel, travelCost, takeLoan, repayDebt, netWorth } = engine;
   const SYSTEM = ['plan-child', 'child-care', 'adopt-dog', 'adopt-cat', 'start-business', 'business-manage', 'checkup', 'medical',
@@ -31,12 +33,13 @@ async function dump() {
   const FOCUS = ['study', 'work', 'health', 'family', 'joy'];
   const safe = f => { try { return f(); } catch (err) { return { error: String(err.message) }; } };
   const out = { static: { COUNTRIES, DESTINATIONS, STOCKS, STOCK_RISKS, PURCHASES }, lives: [] };
-  for (let seed = 1; seed <= SEEDS; seed++) {
+  const first = Number(process.env.FIRST || 1), last = Number(process.env.LAST || SEEDS);
+  for (let seed = first; seed <= last; seed++) {
     const life = createLife({ seed, era: ['now', 'past', 'future', 'any'][seed % 4], mode: seed % 2 ? 'birth' : 'pop' });
     const results = [];
     for (let n = 0; n < 240 && !life.dead; n++) {
       if (life.pending) { results.push(safe(() => choose(life, (seed + n) % life.pending.options.length))); continue; }
-      const k = (seed * 7 + n) % 19;
+      const k = (seed * 7 + n) % 21;
       if (k === 0) setFocus(life, FOCUS[(seed + n) % 5]);
       else if (k === 1) results.push(safe(() => invest(life, ['index', 'bonds', 'property'][n % 3], Math.round((life.money || 0) * .3))));
       else if (k === 2) results.push(safe(() => withdraw(life, ['index', 'bonds', 'property'][n % 3], 100)));
@@ -48,19 +51,20 @@ async function dump() {
       else if (k === 8) { const o = safe(() => educationOptions(life)); results.push(o); const pick = Array.isArray(o) && o.find(x => !x.disabled); if (pick) results.push(safe(() => educationAction(life, pick.id))); }
       else if (k === 9) { const o = safe(() => careerOptions(life)); results.push(o); const pick = Array.isArray(o) && o.find(x => !x.disabled); if (pick) results.push(safe(() => careerAction(life, pick.id))); }
       else if (k === 10) results.push(safe(() => [familyAidQuote(life), financeAction(life, 'family-aid')]));
+      else if (k >= 19) results.push(safe(() => [livedCatalogHTML(life), livedAction(life, LIVED_ACTS[(seed + n * 5) % LIVED_ACTS.length].id)]));
       else if (k >= 11) results.push(safe(() => systemAction(life, SYSTEM[(seed + n * 3) % SYSTEM.length], {})));
       if (life.pending) continue;
       results.push(safe(() => [getHousehold(life), getSceneState(life)]));
       advanceYear(life);
     }
-    out.lives.push({ seed, life, results, summary: safe(() => summarize(life)), worth: safe(() => netWorth(life)) });
+    out.lives.push({ seed, life, results, summary: safe(() => summarize(life)), memorial: safe(() => memorialOf(life)), worth: safe(() => netWorth(life)) });
   }
   const json = JSON.stringify(out);
   if (arg) writeFileSync(arg, json); else process.stdout.write(json);
 }
 
-function run(lang) {
-  const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), 'dump'], { env: { ...process.env, LIFE_LANG: lang }, maxBuffer: 1 << 30, encoding: 'utf8' });
+function run(lang, first, last) {
+  const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), 'dump'], { env: { ...process.env, LIFE_LANG: lang, FIRST: String(first), LAST: String(last) }, maxBuffer: 1 << 30, encoding: 'utf8' });
   if (r.status !== 0) { console.error(r.stderr); process.exit(1); }
   return JSON.parse(r.stdout);
 }
@@ -69,7 +73,6 @@ function run(lang) {
 const unpseudo = s => s.replace(/~([0-9a-z]+);/g, (_, c) => String.fromCharCode(parseInt(c, 36)));
 
 function compare(lang = 'en') {
-  const zh = run('zh-CN'), other = run(lang);
   const structural = [], leaks = new Map();
   const walk = (a, b, path, key) => {
     if (structural.length > 40) return;
@@ -84,14 +87,21 @@ function compare(lang = 'en') {
     if (typeof a !== typeof b || Array.isArray(a) !== Array.isArray(b) || (a === null) !== (b === null)) { structural.push(`${path}: type ${typeof a} became ${typeof b}`); return; }
     if (Array.isArray(a)) { if (a.length !== b.length) structural.push(`${path}: length ${a.length} became ${b.length}`); a.forEach((x, i) => walk(x, b[i], `${path}[${i}]`, key)); return; }
     if (a && typeof a === 'object') {
-      const ka = Object.keys(a).join(), kb = Object.keys(b).join();
-      if (ka !== kb) structural.push(`${path}: keys {${ka}} became {${kb}}`);
-      for (const k of Object.keys(a)) walk(a[k], b[k], `${path}.${k}`, k);
+      // keys may hold shown text such as a person's name ("母亲:陈芳"), which follows the language
+      // outside Chinese a log entry also carries its Chinese wording as `source`
+      const ka = Object.keys(a), kb = Object.keys(b).filter(k => k !== 'source' || 'source' in a);
+      const sameKey = (x, y) => x === y || (CJK.test(x) && (lang === 'pseudo' ? unpseudo(y) === x : true));
+      if (ka.length !== kb.length || !ka.every((k, i) => sameKey(k, kb[i]))) structural.push(`${path}: keys {${ka}} became {${kb}}`);
+      ka.forEach((k, i) => walk(a[k], b[kb[i]], `${path}.${k}`, k));
       return;
     }
     if (a !== b) structural.push(`${path}: ${a} became ${b}`);
   };
-  walk(zh, other, '$', '');
+  // in batches, so the JSON of long lives (and the much longer pseudo text) stays under the string size limit
+  for (let first = 1; first <= SEEDS; first += 40) {
+    const last = Math.min(SEEDS, first + 39);
+    walk(run('zh-CN', first, last), run(lang, first, last), `$[seeds ${first}-${last}]`, '');
+  }
   console.log(`${SEEDS} lives compared, zh-CN vs ${lang}`);
   console.log(structural.length ? `\nSTRUCTURAL DIFFERENCES (translation changed game logic):\n${structural.slice(0, 40).join('\n')}` : 'structure: identical');
   console.log(`untranslated strings: ${leaks.size}`);

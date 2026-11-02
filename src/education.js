@@ -1,4 +1,4 @@
-import { tr, label } from './i18n.js';
+import { tr, label, logSource } from './i18n.js';
 // Original simulation. All costs, thresholds, durations and probabilities are
 // GAME BALANCE ASSUMPTIONS, not official national statistics or tuition quotes.
 const cap=n=>Math.max(0,Math.min(100,n));
@@ -6,7 +6,7 @@ const rank={none:0,primary:1,basic:2,high:3,vocational:3,university:4,masters:5}
 const labels={none:tr('尚未入学'),primary:tr('小学'),basic:tr('初中'),high:tr('高中'),vocational:tr('职业教育'),university:tr('大学'),masters:tr('研究生')};
 const hash=value=>{let h=2166136261;for(const c of String(value))h=Math.imul(h^c.charCodeAt(0),16777619);return h>>>0;};
 function roll(l){const s=l.school;s.randomState=(s.randomState+0x6D2B79F5)>>>0;let t=s.randomState;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;}
-const note=(l,title,text)=>(l.log||=[]).push({age:l.age,year:l.birthYear+l.age,title,text,type:'education'});
+const note=(l,title,text)=>(l.log||=[]).push({age:l.age,year:l.birthYear+l.age,title,text,type:'education',...logSource(title,text)});
 const result=(l,ok,message)=>{note(l,ok?tr('教育进展'):tr('教育申请未完成'),message);return{ok,message};};
 const cash=l=>Math.max(0,Number(l.money)||0);
 const gdp=l=>Math.max(1000,Number(l.country?.gdp)||15000);
@@ -45,7 +45,7 @@ function specs(l){const p=educationPolicy(l);return{
  'adult-basic':{label:tr('成人基础学历'),credential:'basic',required:0,minAge:16,threshold:0,duration:l.school.credential==='primary'?2:3,factor:.012,adult:true},
  'adult-high':{label:tr('夜校高中'),credential:'high',required:2,minAge:18,threshold:24,duration:3,factor:.018,adult:true},
  'adult-university':{label:tr('成人大学'),credential:'university',required:3,minAge:20,threshold:46,duration:5,factor:p.universityFactor*.55,adult:true}};}
-function admissionReason(l,spec){const s=l.school;if(l.dead)return tr('这一生已结束');if(s.program)return tr('已有在读或休学项目，请先完成或退出');if(l.age<spec.minAge)return tr('至少{minAge}岁可申请', {minAge: spec.minAge});if(rank[s.credential]<spec.required)return tr('需要先完成{x}', {x: spec.required===4?tr('大学'):spec.required===3?tr('高中或职业学校'):tr('初中或成人基础学历')});if(rank[s.credential]>=rank[spec.credential])return tr('已取得同级或更高学历');if(s.lastApplicationAge===l.age)return tr('今年已经参加过录取，明年可重新申请');if((l.stats.knowledge||0)+s.preparation<spec.threshold)return tr('成绩准备不足：学识加备考准备需达到{threshold}，当前{knowledge}', {threshold: spec.threshold, knowledge: Math.round((l.stats.knowledge||0)+s.preparation)});if(s.preparation<(spec.prep||0))return tr('研究生申请需至少{prep}点专项备考准备', {prep: spec.prep});const cost=Math.round(gdp(l)*spec.factor),fee=Math.max(10,Math.round(cost*.04));if(cash(l)<cost+fee)return tr('现金不足：首年学费${cost} + 申请费${fee}，需现金${cost2}；不自动借债', {cost, fee, cost2: cost+fee});return'';}
+function admissionReason(l,spec){const s=l.school;if(l.dead)return tr('这一生已结束');if(s.program)return tr('已有在读或休学项目，请先完成或退出');if(l.age<spec.minAge)return tr('至少{minAge}岁可申请', {minAge: spec.minAge});if(rank[s.credential]<spec.required)return tr('需要先完成{x}', {x: spec.required===4?tr('大学'):spec.required===3?tr('高中或职业学校'):tr('初中或成人基础学历')});if(rank[s.credential]>=rank[spec.credential])return tr('已取得同级或更高学历');if(s.lastApplicationAge===l.age)return tr('今年已经参加过录取，明年可重新申请');if((l.lived?.examWait||0)>l.age)return tr('你说过至少等到{examWait}岁再申请。这一年的新申请被自己挡下，等待不会变成录取。', {examWait: l.lived.examWait});if((l.lived?.gapUntil||0)>l.age)return tr('这一年你空着，新的申请先不递。空到{gapUntil}岁再问。空年不会变成录取。', {gapUntil: l.lived.gapUntil});if((l.stats.knowledge||0)+s.preparation<spec.threshold)return tr('成绩准备不足：学识加备考准备需达到{threshold}，当前{knowledge}', {threshold: spec.threshold, knowledge: Math.round((l.stats.knowledge||0)+s.preparation)});if(s.preparation<(spec.prep||0))return tr('研究生申请需至少{prep}点专项备考准备', {prep: spec.prep});const cost=Math.round(gdp(l)*spec.factor),fee=Math.max(10,Math.round(cost*.04));if(cash(l)<cost+fee)return tr('现金不足：首年学费${cost} + 申请费${fee}，需现金${cost2}；不自动借债', {cost, fee, cost2: cost+fee});return'';}
 export function educationOptions(l){
  initEducation(l);const s=l.school,cost=Math.max(10,Math.round(gdp(l)*.003));
  const reason=l.dead?tr('这一生已结束'):l.age<12?tr('12岁起可专项备考'):s.lastPreparationAge===l.age?tr('本年已备考，明年继续'):cash(l)<cost?tr('需现金${cost}', {cost}):'';
@@ -72,12 +72,12 @@ export function educationYear(l){
  if(roll(l)<passChance){p.progress++;l.stats.knowledge=cap((l.stats.knowledge||0)+4);}else note(l,tr('学年考核未通过'),tr('{label}课程或考核未完成，保留{progress}/{duration}年进度；下一学年需要重修并缴费。', {label: p.label, progress: p.progress, duration: p.duration}));
  if(p.progress>=p.duration){s.credential=p.credential;if(rank[s.credential]>=2)s.basicProgress=9;s.program=null;sync(l);note(l,tr('完成学业'),tr('经过逐年学习与考核，你获得{labels}学历。', {labels: labels[s.credential]}));return l;}
  if(cash(l)<p.annualCost){p.paused=true;sync(l);note(l,tr('学费不足，暂时休学'),tr('{label}已完成{progress}/{duration}年；续读需现金${annualCost}，当前${cash}。未新增债务；攒钱后可缴费复学。', {label: p.label, progress: p.progress, duration: p.duration, annualCost: p.annualCost, cash: Math.round(cash(l))}));}else{l.money-=p.annualCost;p.paidAge=l.age;note(l,tr('继续学业'),tr('{label}进度{progress}/{duration}年，支付下一学年学费${annualCost}。', {label: p.label, progress: p.progress, duration: p.duration, annualCost: p.annualCost}));}return l;}
- if(rank[s.credential]>=2||l.age<6||l.age>18)return l;const policy=educationPolicy(l);
+ if(rank[s.credential]>=2||l.age<6)return l;const policy=educationPolicy(l);
  if(l.age===6&&s.basicProgress===0){s.basicStarted=true;l.education='小学在读';note(l,tr('进入基础教育'),tr('{description}学费0；家庭用品交通估计每年{householdCost}（由家庭生活预算承担，此处不重复扣款）。九年进度从下一学年累计。{caveat}', {description: policy.description, householdCost: policy.householdCost, caveat: policy.caveat}));return l;}
  if(l.age<7)return l;
  if(roll(l)>=policy.access){note(l,tr('基础教育暂时中断'),tr('当地学校距离、交通或教学资源限制使本学年未完成；这不是学识不足。下一年继续尝试，成年后也可补读成人基础学历。'));return l;}
  s.basicProgress=Math.min(9,s.basicProgress+1);l.stats.knowledge=cap((l.stats.knowledge||0)+2);
- if(s.basicProgress>=9){s.credential='basic';sync(l);note(l,tr('完成基础教育'),tr('完成九个学年，取得初中阶段学历；高中、职业学校需另行申请。'));}else if(s.basicProgress>=6){s.credential='primary';l.education='初中在读';}else l.education='小学在读';return l;
+ if(s.basicProgress>=9){s.credential='basic';sync(l);note(l,tr('完成基础教育'),tr('完成九个学年，取得初中阶段学历；高中、职业学校需另行申请。'));}else if(l.age>=19){l.education=s.basicProgress>=6?'校外（初中学业未完成）':'校外（小学学业未完成）';if(l.age===19)note(l,tr('学业停在校门外'),tr('基础教育的九个学年一直没有凑齐，成年后仍可用成人基础学历或夜校把它补完。'));}else if(s.basicProgress>=6){s.credential='primary';l.education='初中在读';}else l.education='小学在读';return l;
 }
 export function educationMilestone(l,age=l.age){initEducation(l);if(l.dead||l.pending||![6,12,15,18,22].includes(age)||l.school.milestones.includes(age))return false;l.school.milestones.push(age);const policy=educationPolicy(l);l.pending={kind:'education',title:tr('教育与下一步'),text:tr('{description}当前：{education}。{caveat}', {description: policy.description, education: label(l.education), caveat: policy.caveat}),options:[...educationOptions(l).filter(o=>!o.disabled).map(o=>({...o,key:o.id})),{id:'continue',key:'continue',label:age>=18?tr('暂不升学，继续生活或前往求职'):tr('按当前安排继续'),description:tr('继续当前学习或生活；教育面板保留备考、重试和成人教育入口。成年后可从职业面板求职。')}]};return true;}
 export function educationChoice(l,index){if(l.pending?.kind!=='education')return{ok:false,message:tr('当前不是教育选择')};if(!Number.isInteger(index)||!l.pending.options[index])throw new RangeError(tr('选择不存在'));const option=l.pending.options[index];l.pending=null;if(option.id==='continue'||option.key==='continue')return result(l,true,tr('继续当前安排；成年后可在职业面板求职，之后仍可在教育面板申请学习。'));return educationAction(l,option.id||option.key);}
