@@ -614,7 +614,7 @@ test('mini-tier events carry the mini flag and resolve in one step', () => {
   }
   assert.ok(hit, 'no mini event across 30 lives');
   assert.equal(hit.kind, 'event');
-  assert.ok(['first_crush', 'online_link', 'side_hustle'].includes(hit.eventId), 'known mini id: ' + hit.eventId);
+  assert.ok(['first_crush', 'online_link', 'side_hustle', 'school_praise', 'wedding'].includes(hit.eventId), 'known mini id: ' + hit.eventId);
   assert.ok(hit.options.length === 2, 'mini has two choices');
   choose(life, hit.options.length - 1);
   assert.equal(life.pending, null, 'mini resolves immediately');

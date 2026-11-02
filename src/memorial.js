@@ -58,9 +58,13 @@ export function memorialOf(life) {
   const father = life.family?.father?.name;
   const kids = (life.children || []).filter(c => c?.name);
   const partner = life.partner?.name;
+  // partnership length and aging-parent care, both derived from the record
+  const since = life.partner?.togetherSince;
+  const partnerYears = partner && since != null && life.age != null ? Math.max(1, life.age - since) : 0;
+  const caredParents = (life.log || []).some(l => /照护|探望|陪.*医院|照顾.*(父亲|母亲|爸|妈)/.test(`${l.title || ''}${l.text || ''}`));
   const people = [
     [mother, father].filter(Boolean).length ? `父母 ${[mother, father].filter(Boolean).join('、')}` : '',
-    partner ? `伴侣 ${partner}` : (life.formerPartners || [])[0]?.name ? `曾经的伴侣 ${(life.formerPartners || [])[0].name}` : '没有结成长期的伴侣',
+    partner ? `伴侣 ${partner}${partnerYears ? `（共同度过 ${partnerYears} 年）` : ''}` : (life.formerPartners || [])[0]?.name ? `曾经的伴侣 ${(life.formerPartners || [])[0].name}` : '没有结成长期的伴侣',
     kids.length ? `孩子 ${kids.map(c => c.name).join('、')}` : '没有把孩子带到世上',
     `最后的事 ${life.job || '没有固定的职业'}`
   ].filter(Boolean);
@@ -71,7 +75,8 @@ export function memorialOf(life) {
     life.careerYears ? `工作大约 ${life.careerYears} 年` : '没有一段稳定的受雇年限',
     kids.length ? `把 ${kids.map(c => c.name).slice(0, 3).join('、')} 带在身边` : '',
     life.systems?.business?.name ? `经营过 ${life.systems.business.name}` : '',
-    helped ? '做过不拿工资的帮忙或陪伴' : ''
+    helped ? '做过不拿工资的帮忙或陪伴' : '',
+    caredParents ? '照顾过年迈的父母' : ''
   ].filter(Boolean).join('。') || '没有一份可计的功绩，日子被身边的人记住。';
 
   // ---- the grain: four pairs, derived from the record ----

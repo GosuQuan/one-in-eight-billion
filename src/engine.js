@@ -249,7 +249,7 @@ function applyStats(life,effects,details){
 }
 function ensurePartner(life){
  if(life.partner)return life.partner;
- const p=person(life,life.country,life.sex==='男'?'女':'男');life.partner={...p,age:life.age,countryId:life.country.id,distanceYears:0,bond:72,income:Math.round(life.country.gdp*.35),job:'职员'};return life.partner;
+ const p=person(life,life.country,life.sex==='男'?'女':'男');life.partner={...p,age:life.age,countryId:life.country.id,distanceYears:0,bond:72,income:Math.round(life.country.gdp*.35),job:'职员',togetherSince:life.age};return life.partner;
 }
 function ensureChild(life){
  const c=person(life,life.country,chance(life,.5)?'男':'女');life.children.push({...c,birthYear:life.birthYear+life.age,age:0,bond:70});return life.children.at(-1);

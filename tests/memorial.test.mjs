@@ -82,3 +82,19 @@ test('the grain derives four word-pairs from the record', () => {
   const pair2 = card2.grain.pairs[1];
   assert.ok(pair2.lean < 0, `mover leans away from 守在这里: ${pair2.lean}`);
 });
+
+test('memorial names how long the partnership lasted and whether parents were cared for', () => {
+  const life = createLife({ seed: 'py-1', country: 'CN' });
+  life.age = 60; life.dead = true; life.deathAge = 60; life.deathCause = '身体逐渐衰老';
+  life.partner = { name: '林夏', sex: '女', age: 58, alive: true, bond: 80, togetherSince: 24 };
+  life.log.push({ age: 40, title: '陪母亲去医院', text: '你陪母亲去医院复查，来回花了一整天。', type: 'family' });
+  const card = memorialOf(life);
+  assert.ok(card.peopleBody.includes('林夏'), 'partner named');
+  assert.ok(card.peopleBody.includes('共同度过 36 年'), `partner years: ${card.peopleBody}`);
+  assert.ok(card.contribution.includes('照顾过年迈的父母'), `cared parents: ${card.contribution}`);
+  // no partner: no years phrase
+  const solo = createLife({ seed: 'py-2', country: 'CN' });
+  solo.age = 50; solo.dead = true; solo.deathAge = 50; solo.deathCause = '身体逐渐衰老'; solo.partner = null;
+  const c2 = memorialOf(solo);
+  assert.ok(!c2.peopleBody.includes('共同度过'), 'no years without partner');
+});
