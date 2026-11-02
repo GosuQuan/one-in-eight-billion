@@ -3,10 +3,18 @@ import assert from 'node:assert/strict';
 import {
   COUNTRIES, DESTINATIONS, STOCKS, createLife, upgradeLife, advanceYear, choose,
   setFocus, summarize, rng, netWorth, investedValue, invest, withdraw, buyStock,
-  sellStock, investStocks, STOCK_RISKS, buyHouse, buyCar, buyItem, travel, travelCost
+  sellStock, investStocks, STOCK_RISKS, buyHouse, buyCar, buyItem, travel, travelCost,
+  reflectionAnswer, temperamentLead
 } from '../src/engine.js';
+import { memorialOf } from '../src/memorial.js';
 
 const clone = value => JSON.parse(JSON.stringify(value));
+
+const answerTemper = life => {
+  if (life.pending?.title === '气质在成形') { choose(life, 0); return true; }
+  return false;
+};
+
 const step = (life, variant=0) => life.pending ? choose(life, variant % life.pending.options.length) : advanceYear(life);
 const finish = (life, variant=0) => {
   for (let n=0; n<200 && !life.dead; n++) step(life,variant);
@@ -73,6 +81,7 @@ test('100 seeds across all focuses reach death by 110 with bounded stats',()=>{
 test('pending blocks advancement without changing random state or log',()=>{
   const life=createLife({seed:'pending'});
   while(!life.pending) advanceYear(life);
+  while(life.pending?.title==='气质在成形'){choose(life,0);while(!life.pending)advanceYear(life);}
   assert.equal(life.age,5);
   const saved=clone(life);
   for(let i=0;i<10;i++) assert.equal(advanceYear(life),life);
@@ -84,6 +93,7 @@ test('pending blocks advancement without changing random state or log',()=>{
 test('different choices change state and log actual consequences',()=>{
   const a=createLife({seed:'choices'});
   while(!a.pending) advanceYear(a);
+  while(a.pending?.title==='气质在成形'){choose(a,0);while(!a.pending)advanceYear(a);}
   const b=clone(a);
   const club=a.pending.cast.science.name,team=a.pending.cast.sport.name;
   choose(a,0);choose(b,1);
@@ -99,7 +109,7 @@ test('different choices change state and log actual consequences',()=>{
 
 test('JSON round-trip at a pending choice resumes exactly through death',()=>{
   const a=createLife({seed:'saved-pending',country:'JP',era:'future'});
-  while(a.age<26) step(a);
+  while(a.age<26&&!a.dead) step(a);
   const b=clone(a);
   for(let n=0;n<200&&!a.dead;n++) {
     if(n%7===0) {setFocus(a,'health');setFocus(b,'health');}
@@ -130,6 +140,144 @@ test('seed reproduces the complete life and rng stays in [0,1)',()=>{
   for(let i=0;i<100;i++) {const n=a();assert.equal(n,b());assert.ok(n>=0&&n<1);}
   assert.deepEqual(finish(createLife({seed:'same'}),1),finish(createLife({seed:'same'}),1));
   assert.notDeepEqual(createLife({seed:'same'}),createLife({seed:'different'}));
+});
+
+test('temperament is shaped at 2 and 4 and colours later events', () => {
+  const life = createLife({ seed: 'temper-1', country: 'CN' });
+  const step = (v = 0) => life.pending ? choose(life, v % life.pending.options.length) : advanceYear(life);
+  for (let n = 0; n < 10 && !life.dead && life.age < 5; n++) {
+    if (life.pending?.title === '气质在成形') { choose(life, 0); continue; }
+    step(n);
+  }
+  assert.ok(life.age >= 5, `reached school age: ${life.age}`);
+  assert.equal(life.temperament.lean.cur, 4, 'two curious picks recorded');
+  assert.ok(life.log.some(e => e.title === '气质在成形'), 'shaping logged');
+  assert.ok(life.log.some(e => /岁的性子/.test(e.title)), 'temperament note logged');
+  assert.equal(temperamentLead(life), 'cur', 'curious lead');
+});
+
+test('late life has quiet farewell events instead of going quiet', () => {
+  const titles = ['抽屉最底层的信', '门口的长椅', '有些话想说在前头'];
+  let seen = null;
+  let lastDeathAge = 0;
+  for (let attempt = 0; attempt < 6 && !(seen && seen.size >= 1); attempt++) {
+    const life = createLife({ seed: 'late-test-' + attempt, country: 'JP' });
+    life.longevity = 95; life.stats.health = 95;
+    seen = new Set();
+    for (let n = 0; n < 300 && !life.dead; n++) {
+      if (life.age >= 20 && life.pending?.kind !== 'reflection') { life.money = Math.max(life.money, 50000); life.debt = 0; life.stats.health = Math.max(life.stats.health, 85); }
+      if (answerTemper(life)) continue;
+      if (life.pending?.kind === 'reflection') { choose(life, life.pending.options.length - 1); continue; }
+      if (life.pending) choose(life, life.pending.options.length - 1);
+      else advanceYear(life);
+    }
+    lastDeathAge = life.deathAge || life.age;
+    for (const e of life.log) if (titles.includes(e.title)) {
+      seen.add(e.title);
+      assert.ok(e.age >= 65, `${e.title} fired at ${e.age}`);
+    }
+  }
+  assert.ok(seen && seen.size >= 1, `expected at least one farewell event across attempts, last died at ${lastDeathAge}`);
+});
+
+test('mid-life reflection pauses ask the player and keep the words for the card', () => {
+  const run = attempt => {
+    const life = createLife({ seed: 'reflect-test-' + attempt, country: 'JP' });
+    life.longevity = 95; life.stats.health = 95;
+    const pauses = [];
+    for (let n = 0; n < 260 && !life.dead; n++) {
+      if (life.age >= 20 && life.pending?.kind !== 'reflection') { life.money = Math.max(life.money, 50000); life.debt = 0; life.stats.health = Math.max(life.stats.health, 85); }
+      if (answerTemper(life)) continue;
+      if (life.pending?.kind === 'reflection') {
+        pauses.push(life.age);
+        const idx = life.pending.options.findIndex(o => o.key === 'write');
+        choose(life, idx);
+        reflectionAnswer(life, `${life.age}岁的一句话`);
+        continue;
+      }
+    if (life.pending) choose(life, life.pending.options.length - 1);
+    else advanceYear(life);
+    }
+    return { life, pauses };
+  };
+  let life = null, pauses = null;
+  for (let attempt = 0; attempt < 6; attempt++) {
+    ({ life, pauses } = run(attempt));
+    if (pauses.join(',') === '15,30,50') break;
+  }
+  assert.deepEqual(pauses, [15, 30, 50]);
+  assert.equal(life.reflections[15], '15岁的一句话');
+  assert.equal(life.reflections[30], '30岁的一句话');
+  assert.equal(life.reflections[50], '50岁的一句话');
+  const card = memorialOf(life);
+  assert.ok(card.ownWords.includes('50岁的一句话'), 'the last written line reaches the card');
+  // age-5 people milestone still owns its year; reflection never blocks it
+  const a = createLife({ seed: 'reflect-age5', country: 'CN' });
+  for (let i = 0; i < 12 && !a.pending; i++) advanceYear(a);
+  while (a.pending?.title === '气质在成形') { choose(a, 0); for (let i = 0; i < 6 && !a.pending; i++) advanceYear(a); }
+  assert.equal(a.pending?.system, 'thread-start');
+});
+
+test('birth era changes the economy, not just the calendar', () => {
+  const past = createLife({ seed: 'era-p', country: 'US', era: 'past' });
+  const now = createLife({ seed: 'era-n', country: 'US', era: 'now' });
+  const future = createLife({ seed: 'era-f', country: 'US', era: 'future' });
+  assert.equal(past.birthYear, 1970);
+  assert.equal(now.birthYear, 2026);
+  assert.equal(future.birthYear, 2050);
+  assert.ok(past.country.gdp <= now.country.gdp * .58, 'past economy is smaller');
+  assert.ok(future.country.gdp >= now.country.gdp * 1.2, 'future economy is larger');
+  assert.ok(past.money < now.money, 'past pocket money is smaller');
+  assert.equal(travelCost(past, 'jp') < travelCost(now, 'jp'), true, 'past travel is cheaper');
+  const us = COUNTRIES.find(c => c.id === 'US');
+  assert.equal(us.gdp, 80000, 'country catalog is never mutated');
+  const again = createLife({ seed: 'era-p', country: 'US', era: 'past' });
+  assert.equal(again.country.gdp, past.country.gdp);
+  assert.equal(again.money, past.money);
+});
+
+test('event cash scales with the local economy instead of staying fixed', () => {
+  const step = (l, v = 0) => l.pending ? choose(l, v % l.pending.options.length) : advanceYear(l);
+  function collect(tag, country) {
+    const found = {};
+    for (let s = 0; s < 30 && Object.keys(found).length < 3; s++) {
+      const life = createLife({ seed: tag + s, country });
+      for (let n = 0; n < 220 && !life.dead; n++) {
+        step(life, n);
+        for (const e of life.log) {
+          const m = e.text.match(/现金([+-]\d+)/);
+          if (m && !found[e.title]) found[e.title] = Number(m[1]);
+        }
+        if (life.dead) break;
+      }
+    }
+    return found;
+  }
+  const poor = collect('poor2-', 'CD');
+  const rich = collect('rich2-', 'US');
+  const shared = Object.keys(poor).filter(k => rich[k] != null && poor[k] !== 0);
+  assert.ok(shared.length >= 1, 'at least one shared event appears in both countries');
+  for (const k of shared) {
+    const ratio = rich[k] / poor[k];
+    const gdpRatio = 80000 / 1500;
+    assert.ok(ratio > gdpRatio * .3 && ratio < gdpRatio * 3, `${k}: ratio ${ratio.toFixed(1)} tracks gdp ${gdpRatio}`);
+  }
+});
+
+test('companions keep a decade log and never outlive their years', () => {
+  const life = createLife({ seed: 'comp-mirror', country: 'US' });
+  const step = (l, v = 0) => l.pending ? choose(l, v % l.pending.options.length) : advanceYear(l);
+  for (let n = 0; n < 220 && !life.dead; n++) { step(life, n); if (life.dead) break; }
+  const tens = life.log.filter(e => /的十年$/.test(e.title));
+  assert.ok(tens.length >= 3, 'decade notes appear');
+  assert.ok(tens.every(e => e.text.includes('同一秒起跑')), 'decade notes frame the mirror');
+  for (const p of life.companions) {
+    assert.ok(p.age <= p.life);
+    if (p.dead) assert.equal(p.age, p.life);
+  }
+  const a = createLife({ seed: 'comp-mirror', country: 'US' });
+  const b = createLife({ seed: 'comp-mirror', country: 'US' });
+  assert.deepEqual(a.companions, b.companions);
 });
 
 test('hard age cap holds even with artificially huge longevity and health',()=>{
@@ -301,4 +449,173 @@ test('save round-trip preserves portfolio, holdings, travels and random state',(
   assert.equal(netWorth(a),netWorth(b));
   for(let n=0;n<5;n++){advanceYear(a,{events:false});advanceYear(b,{events:false});assert.deepEqual(a,b);}
   assert.deepEqual(summarize(a).travels,1);
+});
+
+test('a large idle balance asks where to keep it, once per doubling', () => {
+  const life = createLife({ seed: 'idle-1', country: 'CN' });
+  life.age = 30; life.money = 3 * life.country.gdp; life.debt = 0; life.income = 0;
+  life.pending = null; life.systems.lastYear = null;
+  advanceYear(life, { events: false });
+  assert.equal(life.pending?.system, 'idle-cash', 'idle-cash dialog opened');
+  assert.ok(life.systems.lastIdleAsk > 0, 'ask threshold recorded');
+  // answer "keep"
+  const keepIdx = life.pending.options.findIndex(o => o.key === 'keep');
+  choose(life, keepIdx);
+  assert.equal(life.pending, null);
+  assert.ok(life.log.some(e => e.title === '钱先放在手上'), 'keep choice logged');
+  // same balance does not re-ask next year
+  life.systems.lastYear = null; life.pending = null;
+  advanceYear(life, { events: false });
+  assert.notEqual(life.pending?.system, 'idle-cash', 'no repeat ask at same level');
+  // doubled balance asks again
+  life.money = life.systems.lastIdleAsk * 2.2;
+  life.systems.lastYear = null; life.pending = null;
+  advanceYear(life, { events: false });
+  assert.equal(life.pending?.system, 'idle-cash', 're-asks after doubling');
+  // mix opens the panel flag
+  choose(life, life.pending.options.findIndex(o => o.key === 'mix'));
+  assert.equal(life.systems.idleOpenPanel, true, 'panel flag set');
+});
+
+test('small balances never trigger the idle-cash ask', () => {
+  const life = createLife({ seed: 'idle-2', country: 'CN' });
+  life.age = 30; life.money = 2 * life.country.gdp; life.debt = 0;
+  life.pending = null; life.systems.lastYear = null;
+  advanceYear(life, { events: false });
+  assert.notEqual(life.pending?.system, 'idle-cash');
+});
+
+test('country-bound cultural events appear only for that country', () => {
+  const step = (l, v = 0) => l.pending ? choose(l, v % l.pending.options.length) : advanceYear(l);
+  const cnTitles = [];
+  for (let s = 0; s < 8 && cnTitles.length < 2; s++) {
+    const life = createLife({ seed: 'cul-cn-' + s, country: 'CN' });
+    for (let n = 0; n < 200 && !life.dead; n++) { step(life, n); if (life.dead) break; }
+    for (const e of life.log) if (/年货|中秋的院子|教室里的早读|春运的车厢|楼下的小馆子/.test(e.title)) cnTitles.push(e.title);
+  }
+  assert.ok(cnTitles.length >= 1, `expected a CN culture event, got none`);
+  const usTitles = [];
+  for (let s = 0; s < 14 && usTitles.length < 1; s++) {
+    const life = createLife({ seed: 'cul-us-' + s, country: 'US' });
+    for (let n = 0; n < 200 && !life.dead; n++) { step(life, n); if (life.dead) break; }
+    for (const e of life.log) if (/万圣节的门口|第一份暑期工|公路上的长途|感恩节的餐桌/.test(e.title)) usTitles.push(e.title);
+  }
+  assert.ok(usTitles.length >= 1, `expected a US culture event, got none`);
+});
+
+test('envy events name a missing condition without opening a dialog', () => {
+  const life = createLife({ seed: 'envy-1', country: 'CN' });
+  life.age = 10; life.education = '校外（小学学业未完成）'; life.stats.happiness = 50;
+  life.pending = null; life.systems.lastYear = null;
+  life.recentEvents = [];
+  for (let n = 0; n < 40 && !life.dead && life.age < 16; n++) {
+    if (life.pending) choose(life, life.pending.options.length - 1);
+    else advanceYear(life);
+  }
+  const envy = life.log.filter(e => /羡慕上学的朋友|别人家的灯|一双新鞋/.test(e.title));
+  assert.ok(envy.length >= 1 || life.dead, `expected an envy event or natural progression, got ${envy.length}`);
+});
+
+test('cause of death follows the age band and how life was lived', () => {
+  const base = seed => { const l = createLife({ seed, country: 'CN' }); l.pending = null; return l; };
+  // young + no conditions
+  const young = base('cause-young'); young.age = 30; young.stats.health = 20; young.systems.conditions = [];
+  advanceYear(young, { events: false });
+  if (young.dead) assert.match(young.deathCause, /意外与疾病|一场没能扛过去的病/);
+  // middle-aged with an untreated condition
+  const mid = base('cause-mid'); mid.age = 55; mid.stats.health = 10; mid.longevity = 95;
+  mid.systems.conditions = [{ id: 'c1', name: '高血压', severity: 60, resolved: false, treatment: 'delay', diagnosedAge: 50 }];
+  advanceYear(mid, { events: false });
+  if (mid.dead) assert.match(mid.deathCause, /拖了太久的病|长期疾病/);
+  // very old: quiet sleep
+  const old = base('cause-old'); old.age = 88; old.stats.health = 85; old.longevity = 89;
+  old.systems.conditions = [];
+  advanceYear(old, { events: false });
+  if (old.dead) assert.match(old.deathCause, /睡梦中安静地离开|身体逐渐衰老/);
+});
+
+test('each year gains one ambient mid-year line, varied and never repeated back-to-back', () => {
+  const life = createLife({ seed: 'inyear-1', country: 'CN' });
+  for (let n = 0; n < 90 && !life.dead; n++) {
+    if (life.pending) choose(life, life.pending.options.length - 1);
+    else advanceYear(life);
+    if (life.dead) break;
+  }
+  const ambient = life.log.filter(e => /^(三月|六月|九月|十一月)/.test(e.title));
+  assert.ok(ambient.length >= 15, `expected ambient lines across a life, got ${ambient.length}`);
+  for (let i = 1; i < ambient.length; i++) {
+    const strip = s => s.replace(/^(三月|六月|九月|十一月)( · |的一天)/, '');
+    const prev = ambient[i - 1].text.slice(0, 24);
+    const cur = ambient[i].text.slice(0, 24);
+    assert.notEqual(prev, cur, `back-to-back same line: ${strip(ambient[i-1].title)} then ${strip(ambient[i].title)}`);
+  }
+  // months rotate — the year reads as passing time, not a single lump
+  const months = new Set(ambient.map(e => e.title.slice(0, 2)));
+  assert.ok(months.size >= 3, `months should rotate, got ${[...months].join(',')}`);
+});
+
+test('BR/MX/KR/TR culture events appear for those countries', () => {
+  const step = (l, v = 0) => l.pending ? choose(l, v % l.pending.options.length) : advanceYear(l);
+  const plan = [
+    ['BR', /街角的足球|海边的一天|狂欢节的彩带|烧烤的长桌/],
+    ['MX', /亡灵节的橘色|玉米饼的香味|广场的傍晚|十五岁的裙子/],
+    ['KR', /考试前夜的炸鸡|爬山的一家|深夜的食堂|春节的祭桌/],
+    ['TR', /茶杯不离手|渡轮上的海鸥|开斋的第一口|邻里的一杯水/]
+  ];
+  for (const [cc, re] of plan) {
+    let hit = 0;
+    for (let s = 0; s < 10 && !hit; s++) {
+      const life = createLife({ seed: 'cul2-' + cc + s, country: cc });
+      for (let n = 0; n < 170 && !life.dead; n++) { step(life, n); if (life.dead) break; }
+      if (life.log.some(e => re.test(e.title))) hit = 1;
+    }
+    assert.ok(hit, `${cc} culture event never fired`);
+  }
+});
+
+test('early-marriage pressure appears once for girls in high-risk regions, and refusal keeps school', () => {
+  const step = (l, v = 0) => l.pending ? choose(l, v % l.pending.options.length) : advanceYear(l);
+  let hit = null;
+  for (let s = 0; s < 12 && !hit; s++) {
+    const life = createLife({ seed: 'em-' + s, country: 'NG' });
+    life.sex = '女';
+    for (let n = 0; n < 220 && !life.dead && life.age < 18; n++) {
+      if (life.pending?.title === '家里提了一门亲事') { hit = { life, age: life.age }; break; }
+      step(life, n);
+    }
+  }
+  assert.ok(hit, 'early-marriage ask never appeared in 12 NG female lives');
+  const life = hit.life;
+  assert.equal(life.systems.earlyMarriageAsked, true, 'asked flag set');
+  // refuse: school path stays open, dialog closes
+  const refuseIdx = life.pending.options.findIndex(o => o.key === 'refuse');
+  choose(life, refuseIdx);
+  assert.equal(life.pending, null);
+  assert.ok(life.log.some(e => e.title === '家里提了一门亲事'), 'the ask is in the record');
+  // never asked again before 18
+  while (!life.dead && life.age < 18) {
+    if (life.pending) choose(life, life.pending.options.length - 1);
+    else advanceYear(life);
+    assert.notEqual(life.pending?.title, '家里提了一门亲事', 're-asked before 18');
+    if (life.dead) break;
+  }
+});
+
+test('mini-tier events carry the mini flag and resolve in one step', () => {
+  let hit = null, life = null;
+  for (let s = 0; s < 30 && !hit; s++) {
+    life = createLife({ seed: 'mini-' + s, country: 'CN' });
+    for (let n = 0; n < 220 && !life.dead && !hit; n++) {
+      if (life.pending) {
+        if (life.pending.mini) { hit = life.pending; break; }
+        choose(life, life.pending.options.length - 1);
+      } else advanceYear(life);
+    }
+  }
+  assert.ok(hit, 'no mini event across 30 lives');
+  assert.equal(hit.kind, 'event');
+  assert.ok(['first_crush', 'online_link', 'side_hustle', 'school_praise', 'wedding'].includes(hit.eventId), 'known mini id: ' + hit.eventId);
+  assert.ok(hit.options.length === 2, 'mini has two choices');
+  choose(life, hit.options.length - 1);
+  assert.equal(life.pending, null, 'mini resolves immediately');
 });

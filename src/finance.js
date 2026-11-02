@@ -1,9 +1,10 @@
-import { tr } from './i18n.js';
+import { tr, logSource } from './i18n.js';
 // Monetary amounts and thresholds are game rules in PPP units, not credit law.
 const clamp=n=>Math.max(0,Math.min(100,n));
 function roll(l){l.randomState=(l.randomState+0x6D2B79F5)>>>0;let t=l.randomState;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296;}
-const record=(l,title,text)=>l.log.push({age:l.age,year:l.birthYear+l.age,title,text,type:'finance'});
+const record=(l,title,text)=>l.log.push({age:l.age,year:l.birthYear+l.age,title,text,type:'finance',...logSource(title,text)});
 const alive=p=>p&&p.alive!==false&&!p.dead;
+function kinLine(l){const kin=[l.family?.mother,l.family?.father].filter(p=>alive(p)&&p.name);return kin.length?tr('{kin}知道你很难，这一次没有赶到。', {kin: kin.map(p=>p.name).join(tr('和'))}):tr('没有能赶到的家人。');}
 export function initFinance(l){
  const f=l.finance ||= {};
  f.arrears ??= 0; f.lastYear ??= null; f.lastAidAge ??= null; f.repaymentUntil ??= -1; f.austerityUntil ??= -1;
@@ -17,7 +18,7 @@ export function familyAidQuote(l){
  const bond=parents.length?parents.reduce((s,p)=>s+(p.bond??60),0)/parents.length:0;
  const proportion=Math.max(.05,Math.min(.35,.08+(l.family?.wealth??.4)*.22+(bond-50)*.001));
  const amount=Math.min(Math.round((l.debt||0)*proportion),f.familyReserve,Math.round((l.birthCountry||l.country).gdp*(.025+.12*(l.family?.wealth??.4))));
- return {amount:parents.length&&bond>=25?amount:0,proportion,parents,eligible:l.age>=18&&l.debt>0&&parents.length>0&&(f.lastAidAge==null||l.age-f.lastAidAge>=3)};
+ const covered=(l.debt||0)>0&&(l.money||0)>=l.debt;return {amount:parents.length&&bond>=25&&!covered?amount:0,proportion,parents,covered,eligible:l.age>=18&&l.debt>0&&!covered&&parents.length>0&&(f.lastAidAge==null||l.age-f.lastAidAge>=3)};
 }
 export function financeAction(l,id){
  const f=initFinance(l);
@@ -25,7 +26,8 @@ export function financeAction(l,id){
  if(l.pending)return {ok:false,message:tr('请先处理眼前的选择')};
  if(id==='family-aid'){
   const q=familyAidQuote(l);
-  if(!q.eligible)return {ok:false,message:q.parents.length?tr('家人也需要缓一缓，每隔三年才能再次求助'):tr('已经没有可以承担这笔援助的父母')};
+  if(q.covered)return {ok:false,message:tr('手上的钱够自己还，不必再请家里人')};
+   if(!q.eligible)return {ok:false,message:q.parents.length?tr('家人也需要缓一缓，每隔三年才能再次求助'):tr('已经没有可以承担这笔援助的父母')};
   f.lastAidAge=l.age;
   if(!q.amount){record(l,tr('电话另一端的账本'),tr('{parents}听你说完了欠款，但家里的积蓄和你们目前的关系不足以支持这次求助。债务仍是{debt}。', {parents: q.parents.map(p=>p.name).join(tr('和')), debt: Math.round(l.debt)}));return {ok:true,message:tr('这次家人无法拿出钱，债务没有减少')};}
   const before=l.debt;l.debt-=q.amount;f.familyReserve-=q.amount;f.familyAidTotal+=q.amount;
@@ -48,6 +50,14 @@ export function financeAction(l,id){
  }
  return {ok:false,message:tr('没有这项债务安排')};
 }
+function runwayYears(l){
+ const ageDrain=l.age<40?.3:l.age<65?.75:1.6;
+ const arrears=l.finance?.arrears||0;
+ const yearly=4+ageDrain+(arrears>=2?1:0);
+ const health=l.stats?.health||0;
+ if(health<=0||yearly<=0)return 0;
+ return Math.floor(health/yearly);
+}
 export function financeYear(l){
  const f=initFinance(l);if(l.dead||l.age<18||f.lastYear===l.age)return;f.lastYear=l.age;
  if(l.debt<=0){f.arrears=0;f.lastBill=null;return;}
@@ -68,7 +78,7 @@ export function financeYear(l){
   if(f.arrears>=3){
    const n=roll(l);
    if(l.house&&n<.25){l.house=null;record(l,tr('房子保不住了'),tr('欠着{debt}，收入又撑不住账单。房子被处理掉，你失去了这个住处。', {debt: Math.round(l.debt)}));}
-   else if(n<.58){const lost=Math.round(l.money||0);l.money=0;l.stats.health=clamp(l.stats.health-12);record(l,tr('有人在路上拦住你'),tr('欠着{debt}、手里没有稳定收入，你在{city}被抢走了身上的{lost}。没有家人及时把你接走，也没有新的工作出现。', {debt: Math.round(l.debt), city: l.country.city, lost}));}
+   else if(n<.58){const lost=Math.round(l.money||0);l.money=0;l.stats.health=clamp(l.stats.health-12);record(l,tr('有人在路上拦住你'),tr('欠着{debt}、手里没有稳定收入，你在{city}被抢走了身上的{lost}。{kinLine}也没有新的工作出现。', {debt: Math.round(l.debt), city: l.country.city, lost, kinLine: kinLine(l)}));}
    else if(l.systems?.residence?.abroadSince!=null&&l.systems.residency!=='permanent'&&l.birthCountry&&l.country.id!==l.birthCountry.id){
     const from=l.country.name,home=JSON.parse(JSON.stringify(l.birthCountry));
     l.country=home;const r=l.systems.residence;r.countryId=home.id;r.city=home.city;r.abroadSince=null;r.familyCountryId=home.id;l.systems.residency='citizen';
@@ -76,9 +86,15 @@ export function financeYear(l){
     if(!l.remote){l.income=0;l.job='待业';l.jobKind=null;}
     l.stats.health=clamp(l.stats.health-8);
     record(l,tr('居留没有保住'),tr('临时居留因欠款和没有稳定收入被取消。你被要求离开{from}，回到{name}。原来的本地工作没有跟回来，开销改按{name}计算。', {from, name: home.name}));
-   }else{l.stats.health=clamp(l.stats.health-8);record(l,tr('夜里没有一个稳妥的地方'),tr('账单压过了房租。你在{city}辗转借住，健康和心情都往下掉。', {city: l.country.city}));}
+   }else{l.stats.health=clamp(l.stats.health-8);record(l,tr('夜里没有一个稳妥的地方'),tr('账单压过了房租。你在{city}辗转借住。{kinLine}健康和心情都往下掉。', {city: l.country.city, kinLine: kinLine(l)}));}
    if(l.stats.health<=8&&f.arrears>=5)l.stats.health=0;
   }else record(l,tr('债压着日子'),tr('还在还，但欠款已经高过当地生活水平，收入又跟不上。心情不会停在满格。'));
+  const left=runwayYears(l);
+  if(left>0&&left<=4){
+   const parents=[l.family?.mother,l.family?.father].filter(alive).map(p=>p.name);
+   const kin=parents.length?tr('{parents}最多帮一部分', {parents: parents.join(tr('和'))}):tr('家里若还有人，也只能帮一部分');
+   record(l,tr('这笔债还能撑一阵'),tr('这是身体和账单一起算的粗略估计：照目前的健康下滑和拖欠情况，大约还能再过{left}年，不是债务还清的时间。{x}缩减开支还在。{kin}，不会一次还清。去找工作也不保证有回音，这一年不会凭空多出收入。', {left, x: f.arrears>=3?tr('拖欠已经连着，某一年会更快。'):'', kin}));
+  }
  }
 
 }
