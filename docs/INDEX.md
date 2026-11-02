@@ -58,6 +58,20 @@
 CDP 驱动脚本：`scripts/cdp.mjs`（text/eval/click/shot）；端到端：`scripts/e2e-smoke.mjs`、`scripts/e2e-multi.mjs`。
 前置条件：静态服务 `:8811` + Chrome `--remote-debugging-port=9222`。
 
+## 六、交付验证记录（2026-11-03）
+
+| 验证 | 命令 | 结果 |
+|---|---|---|
+| 单元/集成 | `npm test` | **149 / 149 通过** |
+| 单局端到端 | `npm run e2e` | **PASS**（30 岁终局，8 项纪念信息 + 4 对词 + 哲学句 + 2 提问齐全，无 undefined/NaN） |
+| 多局批量端到端 | `npm run e2e:multi` | **4 / 4 PASS**（过去×出生、现在×人口、未来×出生、任意×人口） |
+
+已知限制：
+- 真实 30 分钟**人工**试玩尚未进行（机器 e2e 覆盖功能，不覆盖人的体感）。
+- e2e 依赖本机 Chrome `--remote-debugging-port=9222` 与静态服务 `:8811`。
+
+下一轮可做：最终交付说明与遗留事项清单。
+
 ## 五、立场（不抄的边界）
 
 - **不做真实统计背书**：竞品标 WHO/OECD 来源，我们用「游戏估算」明示 + 收入位次 + GDP 折算。

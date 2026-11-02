@@ -53,10 +53,22 @@ const ev = async expr => {
 console.log('1) navigate', TARGET);
 await ev(`location.href=${JSON.stringify(TARGET)}`);
 await sleep(4000);
+// clean up any leftover state from a previous run (open dialog, mid-life view)
+await ev(`(() => {
+  const close = [...document.querySelectorAll('[data-action=close]')];
+  close.forEach(b => b.click());
+  const back = [...document.querySelectorAll('[data-action=home]')][0];
+  if (back) back.click();
+  return 1;
+})()`);
+await sleep(1200);
 
 console.log('2) start a life');
 await ev(`[...document.querySelectorAll('button')].find(b=>b.className.includes('cta'))?.click(); 1`);
 await sleep(1200);
+// if a "start new life?" confirmation appeared, accept it
+await ev(`(() => { const b=[...document.querySelectorAll('.dialog button')].find(x=>x.textContent.includes('开始新的人生')); if(b){ b.click(); return 1; } return 0; })()`);
+await sleep(900);
 await ev(`[...document.querySelectorAll('button')].find(b=>b.textContent.includes('翻开命运之卡'))?.click(); 1`);
 await sleep(900);
 await ev(`[...document.querySelectorAll('button')].find(b=>b.textContent.includes('这是你的一生'))?.click(); 1`);
