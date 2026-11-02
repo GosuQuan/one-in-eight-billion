@@ -783,7 +783,7 @@ export function livedCatalogHTML(l) {
  initLived(l);
  const cards = LIVED_ACTS.map(a => {
   const ok = l.age >= a.ages[0] && l.age <= a.ages[1] && open(l, a.id) && !l.pending && !l.dead;
-  return `<button class="choice-btn lived-card" data-lived="${a.id}" ${ok ? '' : 'disabled'}><strong>${e(a.title)} <span>${ok ? '↗' : '—'}</span></strong><small>${tr('{ages}–{ages2}岁 · {cost} · {time}', {ages: a.ages[0], ages2: a.ages[1], cost: e(a.cost), time: e(a.time)})}</small><small>${e(a.risk)} ${e(a.mark)}</small></button>`;
+  return `<button class="choice-btn lived-card" data-lived="${a.id}" ${ok ? '' : 'disabled'}><strong>${e(a.title)} <span>${ok ? '↗' : '—'}</span></strong><small>${tr('{ages}–{ages2}岁 · {cost} · {time}', {ages: a.ages[0], ages2: a.ages[1], cost: e(a.cost), time: e(a.time)})}</small><small>${tr('{risk} {mark}', {risk: e(a.risk), mark: e(a.mark)})}</small></button>`;
  }).join('');
  const brief = livedBrief(l);
  return `<div class="dialog-kicker">${tr('{age} 岁 · 生活的节奏', {age: l.age})}</div><h2 id="dialog-title">${tr('五十件不会一下子跳过的事')}</h2><p>${tr('成年以后，每隔几年，若这一年没有别的事挡着，会直接摆出两三件适龄的小事。这里仍是全部目录，可以自己来找。做成与否都不发放学历、签证、孩子或永久的工作。费用是游戏假设，不是官方统计。')}</p>${brief ? `<p class="small-note">${tr('正在发生：{brief}', {brief: e(brief)})}</p>` : ''}<div class="choice-list lived-list">${cards}</div>`;
