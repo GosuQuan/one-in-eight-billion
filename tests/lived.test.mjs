@@ -1312,7 +1312,7 @@ test('lived acts come in two tiers: most years pass quietly, some still ask', ()
       if (life.dead) break;
     }
     const dialog = life.log.filter(e => e.title === '这一年有几件小事');
-    const ambient = life.log.filter(e => e.title.includes('的机会') && e.text.includes('从日子里经过'));
+    const ambient = life.log.filter(e => e.text.includes('从日子里经过'));
     const overlap = dialog.filter(d => ambient.some(a => a.age === d.age)).length;
     if (dialog.length + ambient.length > bestPairs) {
       bestPairs = dialog.length + ambient.length;

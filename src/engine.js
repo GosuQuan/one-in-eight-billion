@@ -824,6 +824,8 @@ if(!life.pending){
   }
  }
  life.netWorthHistory.push({age,value:netWorth(life)});
+ life.happyHistory=life.happyHistory||[];life.happyHistory.push({age,happiness:Math.round(life.stats.happiness||0)});
+ life.focusYears=life.focusYears||{};if(age>=18)life.focusYears[life.focus||'joy']=(life.focusYears[life.focus||'joy']||0)+1;
  if(deathCheck(life))return life;
  if(options.events!==false){
   if(!life.pending)maybeEvent(life);

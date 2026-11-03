@@ -1,0 +1,322 @@
+{
+ "decisions": [
+  {
+   "age": 2,
+   "id": "temper",
+   "title": "Two years old, among other children",
+   "body": "Rangga can walk quite well now. Where the neighborhood children play together, what does the child do first? What you pick leans the child's temperament that way; moments like these add up, and it settles by about age five.",
+   "fact": "Temperament comes from what we are born with and what happens as we grow. Twin studies put about 40% of the differences in personality down to genes (Vukasović & Bratko 2015)",
+   "choices": [
+    {
+     "k": "cur",
+     "txt": ""
+    },
+    {
+     "k": "act",
+     "txt": ""
+    },
+    {
+     "k": "warm",
+     "txt": ""
+    },
+    {
+     "k": "grit",
+     "txt": ""
+    }
+   ]
+  },
+  {
+   "age": 2,
+   "id": "temper",
+   "title": "Two years old, and a new toy",
+   "body": "Yasmina can walk quite well now. With a new toy in hand, what does the child do first? What you pick leans the child's temperament that way; moments like these add up, and it settles by about age five.",
+   "fact": "Temperament comes from what we are born with and what happens as we grow. Twin studies put about 40% of the differences in personality down to genes (Vukasović & Bratko 2015)",
+   "choices": [
+    {
+     "k": "cur",
+     "txt": ""
+    },
+    {
+     "k": "act",
+     "txt": ""
+    },
+    {
+     "k": "warm",
+     "txt": ""
+    },
+    {
+     "k": "grit",
+     "txt": ""
+    }
+   ]
+  },
+  {
+   "age": 2,
+   "id": "temper",
+   "title": "Two years old, among other children",
+   "body": "Ruth can walk quite well now. Where the neighborhood children play together, what does the child do first? What you pick leans the child's temperament that way; moments like these add up, and it settles by about age five.",
+   "fact": "Temperament comes from what we are born with and what happens as we grow. Twin studies put about 40% of the differences in personality down to genes (Vukasović & Bratko 2015)",
+   "choices": [
+    {
+     "k": "cur",
+     "txt": ""
+    },
+    {
+     "k": "act",
+     "txt": ""
+    },
+    {
+     "k": "warm",
+     "txt": ""
+    },
+    {
+     "k": "grit",
+     "txt": ""
+    }
+   ]
+  },
+  {
+   "age": 5,
+   "id": "reflect",
+   "title": "A pause · age 5",
+   "body": "In Indonesia, 2.0% of children never reach their fifth birthday. This child did.",
+   "fact": "",
+   "choices": [
+    {
+     "k": "write",
+     "txt": ""
+    },
+    {
+     "k": "skip",
+     "txt": ""
+    }
+   ]
+  },
+  {
+   "age": 5,
+   "id": "reflect",
+   "title": "A pause · age 5",
+   "body": "In Russia, 0.5% of children never reach their fifth birthday. This child did.",
+   "fact": "",
+   "choices": [
+    {
+     "k": "write",
+     "txt": ""
+    },
+    {
+     "k": "skip",
+     "txt": ""
+    }
+   ]
+  },
+  {
+   "age": 5,
+   "id": "reflect",
+   "title": "A pause · age 5",
+   "body": "In Côte d'Ivoire, 6.1% of children never reach their fifth birthday. This child did.",
+   "fact": "",
+   "choices": [
+    {
+     "k": "write",
+     "txt": ""
+    },
+    {
+     "k": "skip",
+     "txt": ""
+    }
+   ]
+  }
+ ],
+ "logs": [
+  {
+   "a": 0,
+   "k": "big",
+   "t": "In January undefined, you were born a boy in rural West Java, Indonesia, into a family in the bottom 20–40%. You are the firstborn. Your family's religion is Islam."
+  },
+  {
+   "a": 0,
+   "k": "ev",
+   "t": "You got your basic vaccinations (DTP and measles)."
+  },
+  {
+   "a": 1,
+   "k": "ev",
+   "t": "You took your first steps. The whole family clapped."
+  },
+  {
+   "a": 1,
+   "k": "ev",
+   "t": "You said your first word: ‘Mama’."
+  },
+  {
+   "a": 2,
+   "k": "ev",
+   "t": "You spent Eid al-Adha (the Feast of Sacrifice) with your family."
+  },
+  {
+   "a": 2,
+   "k": "big",
+   "t": "You fell more than once, and in the end you caught up with the older children."
+  },
+  {
+   "a": 2,
+   "k": "ev",
+   "t": "Your paternal grandmother told you stories from long ago."
+  },
+  {
+   "a": 3,
+   "k": "ev",
+   "t": "You started preschool."
+  },
+  {
+   "a": 3,
+   "k": "ev",
+   "t": "You played in the mud and got your clothes filthy."
+  },
+  {
+   "a": 3,
+   "k": "ev",
+   "t": "A younger brother was born."
+  },
+  {
+   "a": 4,
+   "k": "ev",
+   "t": "Sitting next to your parents, you watched a video on the internet for the first time."
+  },
+  {
+   "a": 5,
+   "k": "ev",
+   "t": "You played with the neighborhood kids until the sun went down."
+  },
+  {
+   "a": 5,
+   "k": "ev",
+   "t": "You sat beside your maternal grandfather looking at old photographs for a long time."
+  },
+  {
+   "a": 0,
+   "k": "big",
+   "t": "In January undefined, you were born a girl in rural Central Russia, Russia, into a family in the top 20–40%. You have an older sister aged 2. Your family's religion is Islam. Your family's roots: Tatar."
+  },
+  {
+   "a": 0,
+   "k": "ev",
+   "t": "You got your basic vaccinations (DTP and measles)."
+  },
+  {
+   "a": 0,
+   "k": "ev",
+   "t": "The war between Russia and Ukraine that began in 2022 was still going on the year you were born."
+  },
+  {
+   "a": 1,
+   "k": "ev",
+   "t": "You said your first word: ‘Mama’."
+  },
+  {
+   "a": 1,
+   "k": "ev",
+   "t": "You took your first steps. The whole family clapped."
+  },
+  {
+   "a": 2,
+   "k": "ev",
+   "t": "Your paternal grandmother told you stories from long ago."
+  },
+  {
+   "a": 2,
+   "k": "big",
+   "t": "You tried again and again, and at last you did it by yourself."
+  },
+  {
+   "a": 2,
+   "k": "ev",
+   "t": "Every night before bed, your parents read you picture books."
+  },
+  {
+   "a": 3,
+   "k": "ev",
+   "t": "You played with the neighborhood kids until the sun went down."
+  },
+  {
+   "a": 3,
+   "k": "ev",
+   "t": "You started preschool."
+  },
+  {
+   "a": 4,
+   "k": "ev",
+   "t": "Sitting next to your parents, you watched a video on the internet for the first time."
+  },
+  {
+   "a": 4,
+   "k": "ev",
+   "t": "A younger brother was born."
+  },
+  {
+   "a": 5,
+   "k": "ev",
+   "t": "You spent the New Year holiday with your family."
+  },
+  {
+   "a": 5,
+   "k": "ev",
+   "t": "You sat beside your maternal grandfather looking at old photographs for a long time."
+  },
+  {
+   "a": 0,
+   "k": "big",
+   "t": "In January undefined, you were born a girl in rural southern areas, Côte d'Ivoire, into one of the richest 20% of families. You have 4 older siblings. Your family has no particular religion."
+  },
+  {
+   "a": 0,
+   "k": "ev",
+   "t": "You got your basic vaccinations (DTP and measles)."
+  },
+  {
+   "a": 1,
+   "k": "ev",
+   "t": "You said your first word: ‘Mama’."
+  },
+  {
+   "a": 1,
+   "k": "ev",
+   "t": "You took your first steps. The whole family clapped."
+  },
+  {
+   "a": 2,
+   "k": "ev",
+   "t": "You spent the New Year holiday with your family."
+  },
+  {
+   "a": 2,
+   "k": "big",
+   "t": "You fell more than once, and in the end you caught up with the older children."
+  },
+  {
+   "a": 2,
+   "k": "ev",
+   "t": "Every night before bed, your parents read you picture books."
+  },
+  {
+   "a": 2,
+   "k": "ev",
+   "t": "A younger brother was born."
+  },
+  {
+   "a": 3,
+   "k": "ev",
+   "t": "You played in the mud and got your clothes filthy."
+  },
+  {
+   "a": 3,
+   "k": "ev",
+   "t": "You started preschool."
+  },
+  {
+   "a": 4,
+   "k": "ev",
+   "t": "At home, meals were cooked over a smoky fire. When smoke filled the kitchen, your eyes stung and you coughed."
+  }
+ ]
+}

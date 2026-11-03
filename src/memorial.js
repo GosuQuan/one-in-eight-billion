@@ -69,6 +69,28 @@ export function memorialOf(life) {
     `最后的事 ${life.job || '没有固定的职业'}`
   ].filter(Boolean);
 
+  // happiest year + where the adult years went + hobbies (facts already tracked)
+  const happyList = (life.happyHistory || []).filter(h => h && h.age >= 18);
+  const happiest = happyList.length ? happyList.reduce((a, b) => (b.happiness > a.happiness ? b : a)) : null;
+  const happiestYear = happiest ? `${happiest.age} 岁那一年（心情 ${happiest.happiness} 上下）` : '没有特别记下的一年';
+  const FOCUS_CN = { study: '学习', work: '工作', health: '养身体', family: '家人', joy: '生活体验' };
+  const focusRows = Object.entries(life.focusYears || {}).sort((a, b) => b[1] - a[1]);
+  const focusTotal = focusRows.reduce((s, [, n]) => s + n, 0);
+  const focusBody = focusTotal
+    ? focusRows.map(([k, n]) => `${FOCUS_CN[k] || k} ${n} 年`).join(' · ') + `（成年后共 ${focusTotal} 年）`
+    : '成年后的年份没有被记录下来';
+  // only real hobby acts (lived.js hobby/stop-exercise/smoke 等) count as 兴趣
+  const HOBBY_WORDS = ['读书','画画','唱歌','跑步','养花','做饭','钓鱼','拍照','爬山','下棋','游泳','骑车','种地','写字','乐器'];
+  const hobbyHits = [];
+  const named = life.lived?.hobbyName;
+  if (named && HOBBY_WORDS.includes(named)) hobbyHits.push(named);
+  for (const l of life.log || []) {
+    const m = String(l?.title || '').match(/^开始(.+)$/);
+    if (m && HOBBY_WORDS.includes(m[1]) && !hobbyHits.includes(m[1])) hobbyHits.push(m[1]);
+    if (hobbyHits.length >= 4) break;
+  }
+  const hobbyBody = hobbyHits.length ? hobbyHits.join('、') : '没有留下固定的爱好';
+
   const standing = classStanding(life);
   const helped = (life.log || []).some(l => /志愿|社区|帮忙|陪伴/.test(`${l.title || ''}${l.text || ''}`));
   const contribution = [
@@ -143,6 +165,9 @@ export function memorialOf(life) {
     status: `${standing.band} · ${life.job || '没有固定职业'} · ${life.education || '学历停在原处'}`,
     contribution,
     philosophy,
+    happiest: { title: '最幸福的一年', body: happiestYear },
+    focus: { title: '成年后时间花在哪里', body: focusBody },
+    hobbies: { title: '兴趣', body: hobbyBody },
     grain: { title: grainTitle, body: grainBody, pairs: grain },
     ownWords: reflectionQuote,
     ownWordsAge: reflections.length ? Number(reflections[reflections.length - 1][0]) : null,

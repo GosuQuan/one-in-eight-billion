@@ -17,7 +17,8 @@ const RUNS = Number(getArg('--runs', '4'));
 
 async function connect() {
   const tabs = await (await fetch(`${DEBUG}/json`)).json();
-  const tab = tabs.find(t => t.type === 'page');
+  const own = tabs.filter(t => t.type === 'page' && /127\.0\.0\.1:8811/.test(t.url || ''));
+  const tab = own[0] || tabs.find(t => t.type === 'page');
   if (!tab) throw new Error('no Chrome page tab');
   const WebSocket = (await import('ws')).default;
   const ws = new WebSocket(tab.webSocketDebuggerUrl, { maxPayload: 64 * 1024 * 1024 });

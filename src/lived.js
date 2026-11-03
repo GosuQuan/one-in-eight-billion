@@ -541,7 +541,8 @@ function run(l, id) {
    return { ok: true, message: eased ? `守过${pet.name}这一夜。` : `${pet.name}没有好起来。` };
   }
   case 'hobby': {
-   if (!v.hobby) { v.hobby = true; v.hobbyYears = 0; log(l, '爱好又做了一年', '从现在起按年累计。做满八年，才可能换到一笔钱，而且多半换不到。它不会变成职业。'); return { ok: true, message: '爱好开始累计。' }; }
+   if (!v.hobby) { v.hobby = true; v.hobbyYears = 0; v.hobbyName = pick(l, ['读书','画画','唱歌','跑步','养花','做饭','钓鱼','拍照','爬山','下棋']); log(l, `开始${v.hobbyName}`, '你把这件事定成了每周的固定节目。第一年谈不上什么成果，只是每周都留出那段时间。'); return { ok: true, message: `爱好记成了${v.hobbyName}。` }; }
+   if (!v.hobbyName) { log(l, '爱好又做了一年', '从现在起按年累计。做满八年，才可能换到一笔钱，而且多半换不到。它不会变成职业。'); return { ok: true, message: '爱好开始累计。' }; }
    if ((v.hobbyYears || 0) < 8) { log(l, '爱好还在', `才 ${v.hobbyYears} 年。不满八年，没有收入可谈。`); return { ok: true, message: '还早。' }; }
    v.hobbyTried = true;
    if (!chance(l, .25)) { log(l, '爱好还是爱好', '你试过让它养活一个角落。没有入账。它仍然不是职业。'); return { ok: true, message: '没有入账。' }; }
@@ -706,7 +707,7 @@ export function livedYear(l, options = {}) {
   if (l.age % 3 !== 1 || l.lived.lastOfferAge === l.age) {
     const act = choices[(l.age + 1) % choices.length];
     l.lived.lastAmbientAge = l.age;
-    log(l, `${act.title}的机会`, `${act.mark}。这一年你没有专门去做，它只是从日子里经过。想认真做一件，可以在「家与人生」的目录里找。`);
+    log(l, `${['三月','六月','九月','十一月'][l.age % 4]} · ${act.title}`, `${act.mark}。这一年你没有专门去做，它只是从日子里经过。想认真做一件，可以在「家与人生」的目录里找。`);
     return l;
   }
   const want = Math.min(choices.length, l.age % 2 === 0 ? 2 : 3);
