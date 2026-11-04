@@ -3,7 +3,7 @@ import {
   createLife, upgradeLife, advanceYear, choose, setFocus, summarize,
   netWorth, investedValue, invest, withdraw, investStocks, sellStock,
   buyHouse, buyCar, buyItem, travel, travelCost, takeLoan, repayDebt,
-  incomePlace, lifeStage, improveLife
+  incomePlace, lifeStage, improveLife, stageExtras
 } from './engine.js';
 import { educationOptions, educationAction } from './education.js';
 import { careerOptions, careerAction } from './career.js';
@@ -84,6 +84,12 @@ const wealthChartHTML=()=>{const p=life.netWorthHistory.slice(-30);if(p.length<2
 const travelHTML=()=>`<div class="travel-list">${life.travels.length?life.travels.slice(-3).reverse().map(t=>`<div class="travel-item"><span>${e(t.flag)}</span><div><b>${e(t.place||t.name)}</b><small>${t.age}岁 · ${e(t.companion==='solo'?'独自':t.companion==='family'?'与家人':t.companion==='partner'?'与伴侣':'与朋友')} · ${money(t.cost)}</small></div></div>`).join(''):'<p class="empty-small">还没有出过远门。攒一点钱，去看看别处的生活。</p>'}</div>`;
 const holdingHTML=()=>{const rows=life.holdings.map(h=>{const s=STOCKS.find(x=>x.symbol===h.symbol),p=life.market.stocks[h.symbol]?.price||0;return `<div class="holding"><span>${e(s?.name||h.symbol)}</span><b>${h.shares.toFixed(2)} 股 · ${money(h.shares*p)}</b></div>`;});return rows.length?rows.join(''):'<p class="empty-small">还没有持有股票。</p>';};
 
+function stagePanelHTML(stage){
+ const rows=stageExtras(life,stage);
+ if(!rows.length) return '';
+ return `<section class="panel stage-panel"><h3>这个阶段 <small>${e(stage.line||'')}</small></h3><dl class="stage-dl">${rows.map(([k,v])=>`<div><dt>${e(k)}</dt><dd>${e(v)}</dd></div>`).join('')}</dl></section>`;
+}
+
 function renderLife(){
  view='life';const c=life.country;const place=incomePlace(life);const stage=lifeStage(life);const placeLine=place.income>0?`年收入大约高于当地 ${place.local}% 的人，高于世界 ${place.world}% 的人。这是游戏估算，不是官方统计。`:'还没有年收入，谈不上在当地或世界的位置。';
  yearTurned=paintedAge!=null&&paintedAge!==life.age;paintedAge=life.age;
@@ -92,6 +98,7 @@ function renderLife(){
   <aside class="column">
    <section class="panel identity"><div class="id-band"><span>${e(c.flag)} ${e(c.name)}</span><span>人生档案</span></div><div class="id-body">${avatarSVG(life,{size:84})}<div class="id-info"><h2>${e(life.name)}</h2><p>${e(life.sex)} · ${life.birthYear} 年生 · ${life.age} 岁</p><p>${e(c.city)} · ${e(life.education || '尚未入学')}</p><p>${e(life.job || '还在慢慢长大')}</p><p class="tiny">${e(stage.line)}</p><p class="tiny">${e(placeLine)}</p></div></div><div class="mrz">LIFE&lt;${e(c.id)}&lt;${String(life.birthYear)}&lt;${e(String(life.id).slice(-12))}<br>ONE&lt;IN&lt;EIGHT&lt;BILLION&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</div></section>
    <section class="panel stats-panel"><h3>此刻的你</h3>${statHTML()}<div class="money-block"><span class="tiny">净资产 · 游戏购买力单位（PPP）</span><strong class="balance">${money(netWorth(life))}</strong>${assetHTML()}<p class="tiny">年收入 ${money(life.income)}（按${e(life.country?.name || '')}的物价计） · ${e(life.job || '还没有职业')} · ${e(life.classBand || '')}</p><div class="money-actions"><button class="ghost sm" data-action="study">学习 / 求职 / 债务</button><button class="ghost sm" data-action="invest">投资 / 资产</button><button class="ghost sm" data-action="travel">去旅行</button><button class="ghost sm" data-action="ease">用余钱改善生活</button></div></div></section>
+   ${stagePanelHTML(stage)}
    <section class="panel family-panel"><h3>家人与生活 <small>与你相连的人</small></h3>${familyHTML()}</section>
   </aside>
   <div class="column">

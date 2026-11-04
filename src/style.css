@@ -151,3 +151,7 @@
 .ending-pair .dot{position:absolute;top:-3px;width:12px;height:12px;border-radius:50%;background:var(--wine);transform:translateX(-50%)}
 .pair-note{margin:5px 0 0;font:11px var(--sans);color:var(--muted)}
 .feed-choice{font:11px var(--sans);color:var(--muted);letter-spacing:.04em;margin:2px 0 1px}
+.stage-dl{margin:0;display:grid;gap:8px}
+.stage-dl div{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.stage-dl dt{color:var(--muted);font-size:12px;white-space:nowrap}
+.stage-dl dd{margin:0;font-size:13px;text-align:right}

@@ -1028,3 +1028,37 @@ export function summarize(life){
  education:life.education,job:life.job,children:life.children.length,travels:life.travels.length,house:!!life.house,
  highlights:life.log.filter(e=>['birth','consequence','death','travel','market'].includes(e.type)).slice(-8),dead:life.dead,deathCause:life.deathCause};
 }
+
+/** 阶段化面板：同样的位置，不同人生阶段露出不同的东西。 */
+export function stageExtras(life, stage){
+ if(!life||!stage)return [];
+ const s=life.systems||{};
+ const rows=[];
+ if(stage.id==='home'){
+  // 童年：家庭构成、家里怎么过日子
+  const sibs=(life.family?.siblings||[]).filter(x=>x&&x.alive!==false);
+  const adults=[life.family?.mother,life.family?.father].filter(p=>p&&p.alive!==false).length;
+  rows.push(['一起住的人', sibs.length ? `${adults} 位大人、${sibs.length} 个兄弟姐妹` : `${adults} 位大人`]);
+  if(sibs.length){
+   const role=x=>{const d=(x.age??0)-(life.age||0);return d>=2?'哥哥姐姐':d<=-2?'弟弟妹妹':'同龄';};
+   rows.push(['兄弟姐妹', sibs.map(x=>`${x.name}（${role(x)}）`).join('、')]);
+  }
+  rows.push(['家里的日子', life.family?.background||'普通']);
+ } else if(stage.id==='school'){
+  rows.push(['现在在读', life.education||'尚未入学']);
+  if(life.school?.program) rows.push(['学业进度', `${life.school.program.label} ${life.school.program.progress}/${life.school.program.duration}${life.school.program.paused?' · 休学':''}`]);
+  const p=incomePlace(life);
+  rows.push(['家里的位置', life.classBand||'普通']);
+ } else if(stage.id==='late'){
+  rows.push(['身体', life.stats.health>=70?'还算稳':life.stats.health>=40?'有些小毛病':'需要人照应']);
+  rows.push(['身边还有人', life.partner&&life.partner.alive!==false?life.partner.name:(life.children||[]).filter(c=>c.alive!==false).map(c=>c.name).join('、')||'大多时候一个人']);
+  rows.push(['退休', life.retired?'已经退了':'还在做事']);
+ } else {
+  const p=incomePlace(life);
+  if(p.income>0){ rows.push(['收入的位次',`高于当地 ${p.local}% · 高于世界 ${p.world}%`]); }
+  else rows.push(['收入','这一年没有进项']);
+  rows.push(['做的事', life.job||'还没有固定的工作']);
+  if(s.business) rows.push(['自己的事', `${s.business.name} · ${s.business.sector}`]);
+ }
+ return rows;
+}

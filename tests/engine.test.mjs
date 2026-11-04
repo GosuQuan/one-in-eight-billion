@@ -4,7 +4,7 @@ import {
   COUNTRIES, DESTINATIONS, STOCKS, createLife, upgradeLife, advanceYear, choose,
   setFocus, summarize, rng, netWorth, investedValue, invest, withdraw, buyStock,
   sellStock, investStocks, STOCK_RISKS, buyHouse, buyCar, buyItem, travel, travelCost,
-  reflectionAnswer, temperamentLead
+  reflectionAnswer, temperamentLead, lifeStage, stageExtras
 } from '../src/engine.js';
 import { memorialOf } from '../src/memorial.js';
 
@@ -638,4 +638,25 @@ test('two more two-choice mini events exist and fire', () => {
     }
   }
   assert.ok(found.size >= 1, 'at least one new mini event should appear');
+});
+
+test('the left panel changes with the life stage', () => {
+  
+  const l = createLife({ seed: 'stage-panel', country: 'CN' });
+  const keys = (age, mut) => {
+    const c = JSON.parse(JSON.stringify(l));
+    c.age = age; if (mut) mut(c);
+    return stageExtras(c, lifeStage(c)).map(([k]) => k);
+  };
+  const child = keys(3);
+  assert.ok(child.includes('一起住的人'), 'childhood shows household size: ' + child.join(','));
+  const school = keys(12);
+  assert.ok(school.includes('现在在读'), 'school shows current study: ' + school.join(','));
+  const adult = keys(30, c => { c.income = 30000; c.job = '职员'; });
+  assert.ok(adult.some(k => k.includes('位次')), 'adult shows income standing: ' + adult.join(','));
+  const late = keys(66, c => { c.retired = true; });
+  assert.ok(late.includes('身体'), 'late shows health: ' + late.join(','));
+  assert.ok(late.includes('退休'), 'late shows retirement: ' + late.join(','));
+  // every stage returns at least one row
+  for (const age of [3, 12, 30, 66]) assert.ok(keys(age).length >= 1, 'stage ' + age + ' empty');
 });
