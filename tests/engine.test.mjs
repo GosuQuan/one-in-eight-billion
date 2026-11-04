@@ -325,6 +325,7 @@ test('stock_tip offers risk tolerance choices, settles distinct gains and losses
    const gain=life.money-100000;gains.push(gain);
    assert.ok(gain>=25000*risk.minReturn-1&&gain<=25000*risk.maxReturn+1);
    assert.equal(life.log.at(-1).type,'consequence');
+   assert.ok(life.log.at(-1).choice, 'consequence keeps the chosen label');
    assert.match(life.log.at(-1).text,/投入 25000.*系统.*(盈利|亏损).*收回/);
    assert.ok(life.log.at(-1).text.includes(risk.name));
    const restored=clone(pending);restored.money=100000;restored.randomState=randomState;choose(restored,index);
@@ -337,7 +338,7 @@ test('stock_tip offers risk tolerance choices, settles distinct gains and losses
  });
  assert.ok(outcomes.some(g=>g<0)&&outcomes.some(g=>g>0),'risk can genuinely lose and gain money');
  const skipped=clone(pending),before=skipped.money;choose(skipped,3);
- assert.equal(skipped.money,before);assert.match(skipped.log.at(-1).title,/不投/);
+ assert.equal(skipped.money,before);assert.match(skipped.log.at(-1).choice,/不投/);
 });
 
 test('stock risk allocation creates distinct portfolios, preserves legacy holdings and rejects invalid orders',()=>{

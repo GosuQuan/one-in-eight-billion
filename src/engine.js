@@ -104,7 +104,7 @@ const pick=(life,xs)=>xs[Math.floor(roll(life)*xs.length)];
 const pickWeighted=(life,xs,weight=x=>x.weight||1)=>{const total=xs.reduce((s,x)=>s+weight(x),0);let n=roll(life)*total;for(const x of xs){n-=weight(x);if(n<0)return x;}return xs[xs.length-1];};
 const countryFor=(life,mode)=>{const key=mode==='pop'||mode==='population'?'pop':'birth';let n=roll(life)*COUNTRIES.reduce((sum,c)=>sum+c[key],0);return COUNTRIES.find(c=>(n-=c[key])<0)||COUNTRIES.at(-1);};
 const person=(life,c,sex=roll(life)<.5?'男':'女')=>{const taken=new Set([life.name,life.family?.mother?.name,life.family?.father?.name,life.partner?.name,...(life.family?.siblings||[]).map(x=>x&&x.name),...(life.children||[]).map(x=>x&&x.name)].filter(Boolean));const pool=c.names[sex==='男'?'male':'female'];let nm='';for(let i=0;i<9;i++){nm=pick(life,c.names.surnames)+pick(life,pool);if(!taken.has(nm))return{name:nm,sex};}for(const sur of c.names.surnames)for(const giv of pool)if(!taken.has(sur+giv))return{name:sur+giv,sex};return{name:nm+'·',sex};};
-const log=(life,title,text,type='life')=>life.log.push({age:life.age,year:life.birthYear+life.age,title,text,type});
+const log=(life,title,text,type='life',extra={})=>life.log.push({age:life.age,year:life.birthYear+life.age,title,text,type,...extra});
 const statLabels={health:'健康',happiness:'幸福',knowledge:'学识',social:'人际'};
 const FOCUS_EFFECTS={study:{knowledge:4},work:{knowledge:1,health:-1,happiness:-1},health:{health:3,happiness:1},family:{social:3,happiness:2},joy:{happiness:3,social:1}};
 export const FOCUS_NAMES={study:'学习',work:'事业',health:'健康',family:'家人',joy:'体验生活'};
@@ -490,66 +490,66 @@ export function temperamentLead(life){
 // Each set is our own writing about ordinary life in that place; no source text is reused.
 const CULTURE_EVENTS = {
  CN: [
-  { age: [3, 12], title: '第一次跟着去买年货', text: '市场里挂满了红纸和腊味。大人挑对联，你被塞了一串糖葫芦。', type: 'warm', effects: { happiness: 5 } },
-  { age: [5, 16], title: '中秋的院子', text: '一家人在院子里摆开小桌，月饼切成小块。月亮很圆，长辈说起从前的事。', type: 'family', effects: { happiness: 4, social: 3 } },
-  { age: [6, 18], title: '教室里的早读', text: '天还没完全亮，全班一起念课文。声音乱糟糟的，但很有力气。', type: 'warm', effects: { knowledge: 4 } },
-  { age: [18, 60], title: '春运的车厢', text: '过道里站满了人，行李箱叠在门口。你靠着窗，一路听着方言和呼噜。', type: 'event', effects: { happiness: 2, health: -2 } },
-  { age: [30, 80], title: '楼下的小馆子', text: '老板记得你不吃葱。一碗面端上来，热气把镜片蒙住了。', type: 'warm', effects: { happiness: 3 } }
+  { age: [3, 12], title: '跟着母亲去年货市场', text: '母亲一手拎着袋子一手拽着你，在人群里挤。她挑对联时把纸举起来对着光看有没有破口，你手里被塞了一串糖葫芦，糖壳粘在牙上。', type: 'warm', effects: { happiness: 5 } },
+  { age: [5, 16], title: '中秋夜在院子里', text: '父亲把方桌搬到院子里，母亲切开月饼，一人一块。奶奶说月亮里的影子是兔子。你抬头看了很久，只看见一片白。', type: 'family', effects: { happiness: 4, social: 3 } },
+  { age: [6, 18], title: '天没亮的早读', text: '六点二十到教室，全班一起念课文。你的同桌念错了字，被老师点起来重念。窗外的天一点点亮起来。', type: 'warm', effects: { knowledge: 4 } },
+  { age: [18, 60], title: '春运的硬座车厢', text: '过道站满了人，行李箱摞到门口。你靠着窗，听邻座大叔讲他一年攒了多少钱、孩子考了多少分。十四小时后到站，腿肿了。', type: 'event', effects: { happiness: 2, health: -2 } },
+  { age: [30, 80], title: '楼下的面馆', text: '老板记得你不吃葱。面端上来，热气把眼镜蒙住。你摘下眼镜擦，听见老板娘在后厨骂孩子写作业。', type: 'warm', effects: { happiness: 3 } }
  ],
  IN: [
-  { age: [4, 14], title: '排灯节的灯', text: '邻居在窗前点起一排小灯，街道亮到半夜。有人递来一盘甜点。', type: 'warm', effects: { happiness: 5, social: 2 } },
-  { age: [6, 16], title: '季风来的第一场雨', text: '雨砸在铁皮顶上，整条街的人都跑出来看。孩子们在水里跳。', type: 'warm', effects: { happiness: 4, health: -1 } },
-  { age: [8, 18], title: '火车上的长夜', text: '卧铺里挤着陌生人和行李，有人分你半块饼。天亮时窗外全是绿。', type: 'event', effects: { happiness: 2, knowledge: 2 } },
-  { age: [20, 70], title: '婚礼上的鼓', text: '亲戚从很远的地方赶来，鼓声从傍晚响到深夜。你被拉进人群跳了一段。', type: 'family', effects: { happiness: 6, social: 4 } }
+  { age: [4, 14], title: '排灯节那天点灯', text: '母亲在每扇窗台放一排小陶灯，点完手上全是油。隔壁的阿姨端来一盘甜点，你拿了两个，被说“再拿一个”。', type: 'warm', effects: { happiness: 5, social: 2 } },
+  { age: [6, 16], title: '雨季的第一场雨', text: '雨砸在铁皮顶上，整条巷子的人都跑出来看。你光脚在水里踩，母亲在门口喊你回去。晚上停电，点了蜡烛吃晚饭。', type: 'warm', effects: { happiness: 4, health: -1 } },
+  { age: [8, 18], title: '火车上的那一夜', text: '父亲买了三等卧铺，三个人挤两个铺位。他把毯子给你，自己在过道坐到天亮。到站时他先去搬行李，没让你碰。', type: 'event', effects: { happiness: 2, knowledge: 2 } },
+  { age: [20, 70], title: '表哥的婚礼', text: '鼓从傍晚响到深夜。你被拉进人群里跳了一段，跳完汗湿透了衬衫。散场时母亲塞给你一包喜糖，让你带回去。', type: 'family', effects: { happiness: 6, social: 4 } }
  ],
  NG: [
-  { age: [4, 14], title: '发电机的声音', text: '停电了，家里的小发电机响起来。风扇转起来那一刻，屋子里有人欢呼。', type: 'event', effects: { happiness: 3, health: -1 } },
-  { age: [6, 18], title: '市场里的布', text: '跟着大人去市场挑布，颜色亮得晃眼。摊主一边喊价一边笑。', type: 'warm', effects: { happiness: 4, social: 2 } },
-  { age: [8, 20], title: '雨后的红土路', text: '雨停了，路变成深红色。鞋子陷进去，走两步就要甩一下。', type: 'event', effects: { happiness: 2, health: -1 } },
-  { age: [20, 70], title: '婚礼上的米和油', text: '亲戚们凑了米和油送来。有人唱歌，有人记账，热闹了一整天。', type: 'family', effects: { happiness: 5, social: 4 } }
+  { age: [4, 14], title: '停电的那一夜', text: '灯灭的一瞬间，屋外有人喊。父亲去开发电机，拉了三次才响起来。风扇转起来时，妹妹欢呼了一声，屋里的人才开始说话。', type: 'event', effects: { happiness: 3, health: -1 } },
+  { age: [6, 18], title: '跟着母亲去市场', text: '母亲挑布时把料子贴在手背上比颜色，摊主一边喊价一边笑。你负责拎袋子，被晒得头皮发烫。回家路上她给你买了一袋炸面团。', type: 'warm', effects: { happiness: 4, social: 2 } },
+  { age: [8, 20], title: '雨后的红土路', text: '雨一停，路就变成暗红色。鞋陷进去要甩两下才能走。你和邻居的孩子比赛谁踩的水花大，回家被母亲拦在门口脱鞋。', type: 'event', effects: { happiness: 2, health: -1 } },
+  { age: [20, 70], title: '亲戚送来的米和油', text: '婚礼前一周，亲戚陆续上门，有人送米，有人送油。母亲拿本子记下每一份礼，说以后要还。', type: 'family', effects: { happiness: 5, social: 4 } }
  ],
  US: [
-  { age: [5, 15], title: '万圣节的门口', text: '你穿着临时拼的服装挨家敲门，袋子越来越沉。有人夸你的扮相。', type: 'warm', effects: { happiness: 5, social: 3 } },
-  { age: [14, 22], title: '第一份暑期工', text: '收银台站一整天，腿是酸的，工资单上还扣了税。', type: 'event', effects: { cash: 'gdp:.03', knowledge: 2, health: -1 } },
-  { age: [16, 30], title: '公路上的长途', text: '车窗外的平原一望无际，电台放着一首老歌。你在休息站买了杯咖啡。', type: 'warm', effects: { happiness: 4 } },
-  { age: [25, 70], title: '感恩节的餐桌', text: '桌上的菜多得放不下。有人为了谁坐哪边吵了几句，最后还是碰了杯。', type: 'family', effects: { happiness: 5, social: 4 } }
+  { age: [5, 15], title: '万圣节那晚', text: '母亲用旧床单给你缝了个幽灵袍，你挨家敲门，袋子越来越沉。最后一家是个老太太，她说“你是我今晚见过最好的扮相”，多给了两块巧克力。', type: 'warm', effects: { happiness: 5, social: 3 } },
+  { age: [14, 22], title: '第一份暑期工', text: '在超市收银台站八小时，中间休息十五分钟。第一张工资单到手，先被扣了税。父亲说“记住这个数，以后每次都会扣”。', type: 'event', effects: { cash: 'gdp:.03', knowledge: 2, health: -1 } },
+  { age: [16, 30], title: '公路上的长途', text: '开着旧车穿过一整片平原，电台放一首听了二十年的老歌。在加油站买了一杯咖啡，收银员问你去哪儿，你说不知道。', type: 'warm', effects: { happiness: 4 } },
+  { age: [25, 70], title: '感恩节的餐桌', text: '母亲烤了整只火鸡，父亲的兄弟带来了派。为了谁坐主位争了两句，最后还是碰了杯。洗碗时你和一个表亲聊到很晚。', type: 'family', effects: { happiness: 5, social: 4 } }
  ],
  JP: [
-  { age: [4, 14], title: '夏祭的烟火', text: '穿上浴衣走进人群，摊位前排着队。烟火在头顶炸开的时候，所有人一起抬头。', type: 'warm', effects: { happiness: 6, social: 3 } },
-  { age: [6, 18], title: '开学第一天', text: '教室换了新座位，窗外樱花刚开。老师让学生一个个站起来说假期做了什么。', type: 'warm', effects: { knowledge: 3, social: 2 } },
-  { age: [18, 60], title: '加班后的末班车', text: '车厢里全是和你一样的人，领带松着，都在看手机。有人睡着坐过了站。', type: 'event', effects: { happiness: -1, health: -2 } },
-  { age: [20, 70], title: '新年第一次参拜', text: '天还没亮就排起长队，冷得跺脚。钟声一下一下地敲，没有人说话。', type: 'warm', effects: { happiness: 4 } }
+  { age: [4, 14], title: '夏祭的烟火', text: '母亲帮你把浴衣的带子系好，说太松会散。人群里你和妹妹的手一直被攥着。烟火炸开时所有人都抬头，妹妹喊了一声。', type: 'warm', effects: { happiness: 6, social: 3 } },
+  { age: [6, 18], title: '开学第一天', text: '换了新座位，你被安排在第一排。老师让每个人站起来说假期做了什么，你说去了外婆家，声音小得自己都听不清。', type: 'warm', effects: { knowledge: 3, social: 2 } },
+  { age: [18, 60], title: '末班车', text: '加班到十一点，车厢里全是和你一样的人，领带松着，都在看手机。对面的人睡着了坐过站，被广播叫醒时慌张地跑下车。', type: 'event', effects: { happiness: -1, health: -2 } },
+  { age: [20, 70], title: '新年第一次参拜', text: '天没亮就去排队，冷得跺脚。钟一下一下敲，没有人说话。你在签筒前抽了一支，是“小吉”，父亲说这个就够了。', type: 'warm', effects: { happiness: 4 } }
  ],
  DE: [
-  { age: [5, 16], title: '圣诞市场的热酒', text: '广场上支起一排小木屋，空气里是肉桂和烤肠的味道。你捧着一杯热饮暖手。', type: 'warm', effects: { happiness: 5, social: 2 } },
-  { age: [10, 22], title: '周日不开门的街', text: '整条街安静得反常，店门都关着。有人在河边骑车，有人在草地上躺着看书。', type: 'warm', effects: { happiness: 3 } },
-  { age: [16, 30], title: '职业学校的车间', text: '一边是课本，一边是真机床。手上的油污到晚上才洗得掉。', type: 'event', effects: { knowledge: 4, cash: 'gdp:.02' } },
-  { age: [20, 70], title: '足球夜', text: '朋友家的客厅里挤满人，盯着同一块屏幕。进球时整间屋子炸开，啤酒洒了一地。', type: 'warm', effects: { happiness: 5, social: 4 } }
+  { age: [5, 16], title: '圣诞市场', text: '广场上支起一排木屋，空气里是肉桂和烤肠的味道。母亲给了你几枚硬币，让你自己去买一杯热果汁，找回来的零钱她没要。', type: 'warm', effects: { happiness: 5, social: 2 } },
+  { age: [10, 22], title: '周日不开门的街', text: '整条街安静得反常，店门都关着。父亲带你去河边骑车，草地上有人躺着看书。他说这里周日就该这样。', type: 'warm', effects: { happiness: 3 } },
+  { age: [16, 30], title: '职业学校的车间', text: '上午在教室讲图纸，下午上机床。师傅来看你做的第一件东西，用手指抹了一下边角，说倒角太糙，让你重做。', type: 'event', effects: { knowledge: 4, cash: 'gdp:.02' } },
+  { age: [20, 70], title: '足球夜', text: '朋友家的客厅挤了七个人，盯着同一块屏幕。进球那一刻整间屋子炸开，啤酒洒在茶几上，有人抱着你跳。', type: 'warm', effects: { happiness: 5, social: 4 } }
  ],
  BR: [
-  { age: [4, 14], title: '街角的足球', text: '天还没黑，球已经踢起来了。球门是两只拖鞋，守门的是最小的那个。', type: 'warm', effects: { happiness: 5, health: 2, social: 3 } },
-  { age: [6, 18], title: '海边的一天', text: '巴士坐到海边只要几个硬币。浪比想象的大，西瓜比想象甜。', type: 'warm', effects: { happiness: 5 } },
-  { age: [16, 40], title: '狂欢节的彩带', text: '整条街都是鼓点和彩带，陌生人往你脸上抹一点彩粉。没有人问你是谁。', type: 'warm', effects: { happiness: 6, social: 4 } },
-  { age: [20, 70], title: '烧烤的长桌', text: '周末的院子支起烤架，肉从中午烤到天黑。孩子追着狗跑，大人的话题换了三轮。', type: 'family', effects: { happiness: 5, social: 4 } }
+  { age: [4, 14], title: '街角的足球', text: '球门是两只拖鞋，守门的是最小的那个。你的球被人抢走三次，第四次终于带过去了，膝盖擦破了也不觉得疼。', type: 'warm', effects: { happiness: 5, health: 2, social: 3 } },
+  { age: [6, 18], title: '去海边的那天', text: '坐了三个小时巴士才到。母亲把西瓜泡在海水里，说这样凉。浪比想象的大，你被拍倒两次，喝了咸水。', type: 'warm', effects: { happiness: 5 } },
+  { age: [16, 40], title: '狂欢节', text: '整条街都是鼓点，彩带落了一地。有人往你脸上抹了一点彩粉，你没有擦。跳到最后脚底板疼。', type: 'warm', effects: { happiness: 6, social: 4 } },
+  { age: [20, 70], title: '院子里的烧烤', text: '父亲从中午烤到天黑，肉一批一批端上来。孩子追着狗跑，大人换了三轮话题。你负责翻面，手臂被烟熏得发酸。', type: 'family', effects: { happiness: 5, social: 4 } }
  ],
  MX: [
-  { age: [4, 14], title: '亡灵节的橘色', text: '家门口摆满了万寿菊和照片。大人说，只要记得，他们就一直都在。', type: 'family', effects: { happiness: 3, social: 3 } },
-  { age: [6, 18], title: '玉米饼的香味', text: '街角的磨坊天不亮就开工。热乎的玉米饼用纸包着，边走边吃最香。', type: 'warm', effects: { happiness: 4 } },
-  { age: [8, 20], title: '广场的傍晚', text: '广场上乐队一响，跳舞的人围成一圈。你被外婆拉进去转了两圈。', type: 'warm', effects: { happiness: 5, social: 4 } },
-  { age: [20, 70], title: '十五岁的裙子', text: '亲戚家女孩的成人礼办了一整天。弥撒、彩车、还有一支突然出现的乐队。', type: 'family', effects: { happiness: 5, social: 4 } }
+  { age: [4, 14], title: '亡灵节的橘色', text: '母亲在门口摆上万寿菊和照片，一路撒花瓣引路。她说“只要记得，他们就一直都在”。你偷偷把自己的照片也放上去，被她笑着拿走。', type: 'family', effects: { happiness: 3, social: 3 } },
+  { age: [6, 18], title: '玉米饼的香味', text: '街角磨坊天没亮就开工，玉米面还是热的。你出门时外婆塞给你两张饼，用纸包着，说路上吃。', type: 'warm', effects: { happiness: 4 } },
+  { age: [8, 20], title: '广场的傍晚', text: '乐队一响，跳舞的人围成一圈。外婆把你拉进去转了两圈，转完她自己先笑出声。', type: 'warm', effects: { happiness: 5, social: 4 } },
+  { age: [20, 70], title: '十五岁的成人礼', text: '亲戚家的女孩办了成人礼，弥撒、彩车、还有一支突然出现的乐队。你被安排端盘子，站了一整天。', type: 'family', effects: { happiness: 5, social: 4 } }
  ],
  KR: [
-  { age: [5, 16], title: '考试前夜的炸鸡', text: '全城都在为考生安静下来。大人和你分一盒炸鸡，说喂给运气吃。', type: 'warm', effects: { happiness: 4 } },
-  { age: [6, 18], title: '爬山的一家', text: '秋天满山都是红叶，登山杖敲石头的声音一路都是。泡面在山顶最好吃。', type: 'warm', effects: { happiness: 4, health: 2 } },
-  { age: [16, 35], title: '深夜的食堂', text: '下班后来到布帐马车，一碗汤下肚。老板娘多给你舀了一勺小菜。', type: 'warm', effects: { happiness: 3 } },
-  { age: [20, 70], title: '春节的祭桌', text: '凌晨摆好祭桌，向长辈行完礼，一起吃年糕汤。吃了这碗，就算长了一岁。', type: 'family', effects: { happiness: 4, social: 3 } }
+  { age: [5, 16], title: '考试前夜', text: '全城为考生安静下来，母亲把炸鸡装在盒子里说“喂给运气吃”。她自己也吃了两块，说不能让你一个人长胖。', type: 'warm', effects: { happiness: 4 } },
+  { age: [6, 18], title: '秋天去爬山', text: '父亲准备了泡面，说到山顶再吃。一路都是红叶，登山杖敲石头的声音断断续续。泡面在山上的味道确实不一样。', type: 'warm', effects: { happiness: 4, health: 2 } },
+  { age: [16, 35], title: '深夜的小摊', text: '下班后来到布帐马车，一碗汤下肚。老板娘多给你舀了一勺小菜，说看你脸都冻红了。', type: 'warm', effects: { happiness: 3 } },
+  { age: [20, 70], title: '春节的祭桌', text: '凌晨就起来摆祭桌，摆完向长辈行礼。母亲端上年糕汤，说吃了这碗就算长了一岁。父亲那天话特别少。', type: 'family', effects: { happiness: 4, social: 3 } }
  ],
  TR: [
-  { age: [5, 16], title: '茶杯不离手', text: '郁金香形的小茶杯一天要来七八回。倒茶的人手腕稳得像杂技。', type: 'warm', effects: { happiness: 3, social: 2 } },
-  { age: [6, 18], title: '渡轮上的海鸥', text: '横渡海峡只要十几分钟，海鸥追着船飞。有人把面包掰碎了抛向空中。', type: 'warm', effects: { happiness: 4 } },
-  { age: [8, 22], title: '开斋的第一口', text: '日落前满街飘着饭香。第一口水下去的那一瞬间，全桌人都笑了。', type: 'family', effects: { happiness: 4, social: 3 } },
-  { age: [20, 70], title: '邻里的一杯水', text: '对面的大妈隔三差五端来一碗热汤。你回赠一盘自己做的，一来一往成了习惯。', type: 'family', effects: { happiness: 4, social: 4 } }
- ],
+  { age: [5, 16], title: '一天里第七杯茶', text: '茶杯小得只有两根指头粗。你来来回回倒了七趟，姨母说“手上有点活，人才踏实”。', type: 'warm', effects: { happiness: 3, social: 2 } },
+  { age: [6, 18], title: '渡轮横渡海峡', text: '十几分钟就到对岸，海鸥追着船飞。有人把面包掰碎抛向空中，你学着做，被风吹了一脸渣。', type: 'warm', effects: { happiness: 4 } },
+  { age: [8, 22], title: '开斋的第一口水', text: '日落前满街都是饭香。第一口水下去的那一刻，全桌人都笑了。祖母说“慢慢吃，别噎着”。', type: 'family', effects: { happiness: 4, social: 3 } },
+  { age: [20, 70], title: '对门送来的一碗汤', text: '对门的大妈隔三差五端来一碗热汤，说是做多了。母亲回赠一盘甜的，一来一往就成了习惯。', type: 'family', effects: { happiness: 4, social: 4 } }
+ ]
 };
 
 // ---- "envy" events: pure feeling from a missing condition, never a dialog, never compensated ----
@@ -763,7 +763,14 @@ export function choose(life,index){
  }
  const effects=prepareEffects(outcome.effects||{},life);
  const details=applyEffects(life,effects);
- log(life,option.label,`${outcome.text||option.description||''}${details.length?` ${details.join('，')}。`:''}`,'consequence');
+ const body0 = String(outcome.text || option.description || '').trim();
+ // result headline: take the first clause of the outcome (it already says what happened),
+ // and only fall back to a generic phrase when there is nothing to quote.
+ const firstClause = (body0.split(/[。；;]/)[0] || '').trim();
+ const resultHead = firstClause && firstClause.length >= 4 && firstClause.length <= 28
+   ? firstClause
+   : (pending.kind === 'milestone' ? '你按自己的意思定了一件事' : '这件事有了结果');
+ log(life,outcome.headline||resultHead,`${outcome.text||option.description||''}${details.length?` ${details.join('，')}。`:''}`,'consequence',{choice:option.label});
  for(const k of Object.keys(life.stats))life.stats[k]=clamp(life.stats[k]);
  life.money=Math.max(0,round(life.money));life.income=Math.max(0,round(life.income));life.debt=Math.max(0,round(life.debt));
  return life;

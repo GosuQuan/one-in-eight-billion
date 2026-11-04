@@ -150,3 +150,4 @@
 .ending-pair .track{position:relative;display:block;height:6px;background:var(--line);border-radius:3px}
 .ending-pair .dot{position:absolute;top:-3px;width:12px;height:12px;border-radius:50%;background:var(--wine);transform:translateX(-50%)}
 .pair-note{margin:5px 0 0;font:11px var(--sans);color:var(--muted)}
+.feed-choice{font:11px var(--sans);color:var(--muted);letter-spacing:.04em;margin:2px 0 1px}
